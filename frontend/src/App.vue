@@ -1,11 +1,9 @@
-<script setup></script>
-
 <template>
-  <h1>You did it!</h1>
-  <p>
-    Visit <a href="https://vuejs.org/" target="_blank" rel="noopener">vuejs.org</a> to read the
-    documentation
-  </p>
+  <v-app>
+    <MapOpenLayers />
+  </v-app>
 </template>
 
-<style scoped></style>
+<script setup>
+import MapOpenLayers from './components/MapOpenLayers.vue'
+</script>
