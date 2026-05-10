@@ -48,6 +48,6 @@ onUnmounted(() => {
 <style scoped>
 .map-container {
   width: 100%;
-  height: 100vh;
+  height: 100%;
 }
 </style>
