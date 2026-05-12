@@ -3,7 +3,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
 import Map from 'ol/Map'
 import View from 'ol/View'
 import TileLayer from 'ol/layer/Tile'
@@ -11,11 +11,43 @@ import OSM from 'ol/source/OSM'
 import { fromLonLat } from 'ol/proj'
 import 'ol/ol.css'
 
+import Draw, { createBox } from 'ol/interaction/Draw.js'
+import VectorLayer from 'ol/layer/Vector.js'
+import VectorSource from 'ol/source/Vector.js'
+import { useMapStore } from '@/stores/map'
+
+const mapStore = useMapStore()
+
 const mapContainer = ref(null) // reactive container for the map div
 let map = null // variable to hold the OpenLayers map instance
 
 // Münster coordinates [longitude, latitude], converted to the map's projection
 const MUENSTER_COORDS = fromLonLat([7.6261, 51.9607])
+
+const vectorSource = new VectorSource({ wrapX: false })
+const vectorLayer = new VectorLayer({ source: vectorSource })
+
+let draw = null
+
+function startDrawing() {
+  vectorSource.clear()
+  if (draw) map.removeInteraction(draw)
+
+  draw = new Draw({
+    source: vectorSource,
+    type: 'Circle',
+    geometryFunction: createBox(),
+  })
+
+  draw.on('drawend', (event) => {
+    const extent = event.feature.getGeometry().getExtent()
+    console.log('Bounding Box:', extent)
+    map.removeInteraction(draw)
+    draw = null
+  })
+
+  map.addInteraction(draw)
+}
 
 // Runs after Vue has rendered the template and the div actually exists in the DOM
 // Create the OpenLayers map and attach it to the div
@@ -26,6 +58,7 @@ onMounted(() => {
       new TileLayer({
         source: new OSM(),
       }),
+      vectorLayer,
     ],
     view: new View({
       center: MUENSTER_COORDS,
@@ -42,6 +75,11 @@ onUnmounted(() => {
     map = null
   }
 })
+
+watch(() => mapStore.startDrawingTrigger, () => {
+  startDrawing()
+})
+
 </script>
 
 <!-- Size of the map container -->
