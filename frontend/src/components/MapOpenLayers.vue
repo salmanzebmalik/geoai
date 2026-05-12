@@ -15,6 +15,7 @@ import Draw, { createBox } from 'ol/interaction/Draw.js'
 import VectorLayer from 'ol/layer/Vector.js'
 import VectorSource from 'ol/source/Vector.js'
 import { useMapStore } from '@/stores/map'
+import GeoJSON from 'ol/format/GeoJSON.js'
 
 const mapStore = useMapStore()
 
@@ -40,8 +41,11 @@ function startDrawing() {
   })
 
   draw.on('drawend', (event) => {
-    const extent = event.feature.getGeometry().getExtent()
-    console.log('Bounding Box:', extent)
+    const geoJSON = new GeoJSON().writeFeatureObject(event.feature, {
+      featureProjection: 'EPSG:3857',
+      dataProjection: 'EPSG:4326',
+    })
+    console.log('GeoJSON:', geoJSON)
     map.removeInteraction(draw)
     draw = null
   })
