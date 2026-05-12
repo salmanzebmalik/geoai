@@ -14,10 +14,28 @@
             title="Start Analysis"
           ></v-list-item>
         </v-list>
+
+        <v-btn @click="mapStore.triggerDrawing()" class="select-button">
+            <v-icon left>mdi-select</v-icon>
+            Select Area
+          </v-btn>
         
   </v-navigation-drawer>
 </template>
 
 <script setup>
+import { useMapStore } from '@/stores/map'
 
+const mapStore = useMapStore()
 </script>
+
+<style scoped>
+.select-button {
+  width: 90%;
+  margin: 0 16px;
+
+  .v-icon {
+    margin-right: 8px;
+  }
+}
+</style>
