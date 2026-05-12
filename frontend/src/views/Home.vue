@@ -1,17 +1,15 @@
 <template>
   <div class="home">
-    <h1>Welcome to GeoAI</h1>
-    <p>Dashboard für die Baumüberwachung.</p>
+    <MapOpenLayers />
   </div>
 </template>
 
 <script setup>
+import MapOpenLayers from '../components/MapOpenLayers.vue'
 </script>
 
 <style scoped>
 .home {
-  padding: 20px;
-  max-width: 800px;
-  margin: 0 auto;
+  height: 100%;
 }
 </style>
