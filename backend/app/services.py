@@ -4,8 +4,8 @@ from typing import Tuple
 from PIL import Image, ImageDraw
 from sqlmodel import Session
 
-from backend.app.db_models import SegmentationQuery
-from backend.app.schemas import (
+from app.db_models import SegmentationQuery
+from app.schemas import (
     BoundingBox,
     ImageInfo,
     SegmentationClassResult,

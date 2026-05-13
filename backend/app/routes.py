@@ -3,9 +3,9 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 
-from backend.app.database import get_session
-from backend.app.db_models import SegmentationQuery
-from backend.app.schemas import (
+from app.database import get_session
+from app.db_models import SegmentationQuery
+from app.schemas import (
     BoundingBox,
     ImageInfo,
     SegmentationHistoryItem,
@@ -13,7 +13,7 @@ from backend.app.schemas import (
     SegmentationRequest,
     SegmentationResponse,
 )
-from backend.app.services import create_segmentation_prediction
+from app.services import create_segmentation_prediction
 
 
 router = APIRouter(
