@@ -368,3 +368,21 @@ Kubernetes Cluster
 └── Secrets / ConfigMaps
 ```
 ---
+
+## Git Workflow
+
+We use `develop` as the main integration branch and keep `main` stable.
+
+### Branch Flow
+
+```text
+feature branch → develop → main
+
+Rules:
+
+- Do not push directly to main.
+- Create all new work branches from develop.
+- Merge feature branches into develop using Pull Requests.
+- Merge develop into main only after the integrated code is tested and stable.
+- Do not commit secrets or local files.
+```
