@@ -1,0 +1,7 @@
+.env
+__pycache__/
+*.pyc
+geoai.db
+venv/
+static/images/
+static/masks/
