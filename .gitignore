@@ -1,0 +1,10 @@
+backend/.env
+backend/venv/
+backend/__pycache__/
+backend/**/*.pyc
+backend/geoai.db
+
+backend/static/images/
+backend/static/masks/
+
+.DS_Store
