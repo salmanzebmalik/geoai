@@ -9,7 +9,7 @@ import Map from 'ol/Map'
 import View from 'ol/View'
 import TileLayer from 'ol/layer/Tile'
 import TileWMS from 'ol/source/TileWMS'
-import { fromLonLat } from 'ol/proj'
+import { fromLonLat, toLonLat } from 'ol/proj'
 import 'ol/ol.css'
 import Draw, { createBox } from 'ol/interaction/Draw.js'
 import VectorLayer from 'ol/layer/Vector.js'
@@ -20,8 +20,6 @@ import GeoJSON from 'ol/format/GeoJSON.js'
 const mapStore = useMapStore()
 const mapContainer = ref(null)
 let map = null
-
-const MUENSTER_COORDS = fromLonLat([7.6261, 51.9607])
 
 // Sentinel Hub WMS configuratioon
 const INSTANCE_ID = import.meta.env.VITE_SENTINELHUB_INSTANCE_ID
@@ -84,9 +82,16 @@ onMounted(() => {
       vectorLayer,
     ],
     view: new View({
-      center: MUENSTER_COORDS,
-      zoom: 13.5,
+      center: fromLonLat(mapStore.mapCenter),
+      zoom: mapStore.mapZoom,
     }),
+  })
+
+  // save state to store whenever the user moves/zooms
+  map.on('moveend', () => {
+    const view = map.getView()
+    mapStore.mapCenter = toLonLat(view.getCenter())
+    mapStore.mapZoom = view.getZoom()
   })
 })
 
