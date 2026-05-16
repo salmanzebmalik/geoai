@@ -23,22 +23,33 @@ let map = null
 
 const MUENSTER_COORDS = fromLonLat([7.6261, 51.9607])
 
-// --- Sentinel Hub WMS config ---
+// Sentinel Hub WMS configuratioon
 const INSTANCE_ID = import.meta.env.VITE_SENTINELHUB_INSTANCE_ID
+
+function getLastXDaysRange(range=60) {
+  const today = new Date()
+  const xDaysAgo = new Date()
+  xDaysAgo.setDate(today.getDate() - range)
+  
+  const format = (date) => date.toISOString().split('T')[0] // = 'YYYY-MM-DD'
+  
+  return `${format(xDaysAgo)}/${format(today)}`
+}
 
 const sentinelSource = new TileWMS({
   url: `https://sh.dataspace.copernicus.eu/ogc/wms/${INSTANCE_ID}`,
   params: {
-    LAYERS: 'TRUE-COLOR-S2L2A',   // layer name configured in your SH config
+    LAYERS: 'TRUE-COLOR-S2L2A', // same layer name as in the SH config (copernicus dashboard)
     FORMAT: 'image/png',
     TILED: true,
-    MAXCC: 20,                    // max cloud cover %
-    TIME: '2026-03-01/2026-04-30' // date range for mosaicking
+    MAXCC: 20, // max cloud cover percentage
+    TIME: getLastXDaysRange() // date range for mosaicking
   },
-  serverType: 'geoserver',        // tells OL how to build tile requests
+  serverType: 'geoserver',
   transition: 0,
 })
 
+// Bounding Box (draw) functionality
 const vectorSource = new VectorSource({ wrapX: false })
 const vectorLayer = new VectorLayer({ source: vectorSource })
 let draw = null
@@ -63,11 +74,8 @@ function startDrawing() {
   map.addInteraction(draw)
 }
 
-// Optional: expose a method to update the TIME param dynamically
-function setDateRange(start, end) {
-  sentinelSource.updateParams({ TIME: `${start}/${end}` })
-}
-
+// Runs after Vue has rendered the template and the div actually exists in the DOM
+// Create the map and attach it to the div
 onMounted(() => {
   map = new Map({
     target: mapContainer.value,
@@ -82,6 +90,7 @@ onMounted(() => {
   })
 })
 
+// Runs when the component is removed from the page 
 onUnmounted(() => {
   if (map) {
     map.setTarget(null)
@@ -92,8 +101,6 @@ onUnmounted(() => {
 watch(() => mapStore.startDrawingTrigger, () => {
   startDrawing()
 })
-
-defineExpose({ setDateRange })
 </script>
 
 <style scoped>

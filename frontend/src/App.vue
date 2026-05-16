@@ -14,13 +14,11 @@
     <v-main>
       <RouterView />
     </v-main>
-    <NavigationbarLeft></NavigationbarLeft>
   </v-app>
 </template>
 
 <script setup>
 import { RouterView } from 'vue-router'
-import NavigationbarLeft from './components/NavigationbarLeft.vue'
 </script>
 
 <style>
