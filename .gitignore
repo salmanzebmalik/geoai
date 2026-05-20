@@ -14,3 +14,9 @@ wheels/
 uv.lock
 .python-version
 *.png
+/frontend/node_modules
+/models/datasets
+*.jp2
+*.lock
+*.lock
+uv.lock
