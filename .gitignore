@@ -11,3 +11,11 @@ ml-service/uploads
 ml-service/venv
 
 .DS_Store
+/ml-service/app/models/datasets
+/runs
+*.pt
+*.lock
+.python-version
+*.jp2
+/ml-service/app/models/__pycache__
+/ml-service/app/__pycache__

@@ -4,7 +4,8 @@ from pydantic import BaseModel
 
 
 class GeoJSONGeometry(BaseModel):
-    type: Literal["Polygon"]
+    # type: Literal["Polygon"] 
+    type: Literal["Polygon", "MultiPolygon"]
     coordinates: List[List[List[float]]]
 
 
