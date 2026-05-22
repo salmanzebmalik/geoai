@@ -7,4 +7,7 @@ backend/geoai.db
 backend/static/images/
 backend/static/masks/
 
+ml-service/uploads
+ml-service/venv
+
 .DS_Store

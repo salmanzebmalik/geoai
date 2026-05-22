@@ -7,91 +7,100 @@ from app.database import get_session
 from app.db_models import SegmentationQuery
 from app.schemas import (
     BoundingBox,
+    BuildingFootprintPrediction,
     ImageInfo,
-    SegmentationHistoryItem,
-    SegmentationPrediction,
-    SegmentationRequest,
-    SegmentationResponse,
+    PredictionHistoryItem,
+    PredictionRequest,
+    PredictionResponse,
 )
-from app.services import create_segmentation_prediction
+from app.services import create_prediction
 
 
 router = APIRouter(
     prefix="/api/segmentation",
-    tags=["Segmentation"]
+    tags=["Building Footprint Prediction"],
 )
 
 
-@router.post("/predict", response_model=SegmentationResponse)
-def predict_segmentation(
-    request: SegmentationRequest,
-    session: Session = Depends(get_session)
+@router.post("/predict", response_model=PredictionResponse)
+def predict_building_footprints(
+    request: PredictionRequest,
+    session: Session = Depends(get_session),
 ):
     try:
-        result = create_segmentation_prediction(request, session)
-        return result
+        return create_prediction(request, session)
 
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error))
 
+    except Exception as error:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Prediction failed: {str(error)}",
+        )
 
-@router.get("/results", response_model=list[SegmentationHistoryItem])
-def get_all_segmentation_results(
-    session: Session = Depends(get_session)
+
+@router.get("/results", response_model=list[PredictionHistoryItem])
+def get_all_results(
+    session: Session = Depends(get_session),
 ):
-    statement = select(SegmentationQuery).order_by(SegmentationQuery.created_at.desc())
+    statement = select(SegmentationQuery).order_by(
+        SegmentationQuery.created_at.desc()
+    )
+
     results = session.exec(statement).all()
 
     history = []
 
     for item in results:
         history.append(
-            SegmentationHistoryItem(
+            PredictionHistoryItem(
                 query_id=item.id,
                 status=item.status,
                 bbox=BoundingBox(
                     north=item.north,
                     south=item.south,
                     east=item.east,
-                    west=item.west
+                    west=item.west,
                 ),
                 summary=item.summary,
-                created_at=item.created_at
+                created_at=item.created_at,
             )
         )
 
     return history
 
 
-@router.get("/results/{query_id}", response_model=SegmentationResponse)
-def get_segmentation_result(
+@router.get("/results/{query_id}", response_model=PredictionResponse)
+def get_result_by_id(
     query_id: UUID,
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_session),
 ):
     result = session.get(SegmentationQuery, query_id)
 
     if result is None:
         raise HTTPException(
             status_code=404,
-            detail="Segmentation result not found"
+            detail="Prediction result not found",
         )
 
-    prediction = SegmentationPrediction(**result.prediction_result)
+    prediction = BuildingFootprintPrediction(**result.prediction_result)
 
-    return SegmentationResponse(
+    return PredictionResponse(
         query_id=result.id,
         status=result.status,
         bbox=BoundingBox(
             north=result.north,
             south=result.south,
             east=result.east,
-            west=result.west
+            west=result.west,
         ),
         image=ImageInfo(
             image_url=result.image_url,
             width=result.image_width,
-            height=result.image_height
+            height=result.image_height,
+            format="tiff",
         ),
         prediction=prediction,
-        created_at=result.created_at
+        created_at=result.created_at,
     )
