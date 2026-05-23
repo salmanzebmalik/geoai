@@ -18,6 +18,7 @@ class InferencePipeline:
         print(f"Segformer model is on device: {self.device} ---")
         self.processor = AutoImageProcessor.from_pretrained(model_id)
         self.model = SegformerForSemanticSegmentation.from_pretrained(model_id).to(self.device)
+        self.patch_size = 512
         self.model.eval()
 
     @staticmethod
@@ -30,14 +31,14 @@ class InferencePipeline:
             img = (img / 256).astype(np.uint8)
         return img
 
-    def get_full_mask(self,image_path):
+    def get_full_mask(self, image_path:str) -> np.ndarray:
         with rasterio.open(image_path) as src:
             # Sliced Inference
-            h, w, patch_size = src.height, src.width, 512
+            h, w = src.height, src.width
             full_mask = np.zeros((h, w), dtype=np.uint8)
             # generate all windows covering the image with stride = 512
-            windows = [(Window(x, y, min(patch_size, w-x), min(patch_size, h-y)), x, y)
-                    for y in range(0, h, patch_size) for x in range(0, w, patch_size)]
+            windows = [(Window(x, y, min(self.patch_size, w-x), min(self.patch_size, h-y)), x, y)
+                    for y in range(0, h, self.patch_size) for x in range(0, w, self.patch_size)]
 
             # testing prints
             print(f"starting tiled inference on {image_path}")
@@ -54,6 +55,28 @@ class InferencePipeline:
                     mask.argmax(dim=1)[0].cpu().numpy() == 1
                 ).astype(np.uint8)
             return full_mask
+
+    def get_full_mask_from_bytes(self, image_bytes: bytes) -> np.ndarray:
+        """same as get_full_mask but accepts bytes """
+        with rasterio.MemoryFile(image_bytes) as memfile:  # only line changing
+            with memfile.open() as src:
+                h, w = src.height, src.width
+                full_mask = np.zeros((h, w), dtype=np.uint8)
+                windows = [(Window(x, y, min(self.patch_size, w-x), min(self.patch_size, h-y)), x, y)
+                        for y in range(0, h, self.patch_size)
+                        for x in range(0, w, self.patch_size)]
+                for window, x, y in windows:
+                    patch = self._read_rgb(src, window=window)
+                    inputs = self.processor(images=patch, return_tensors="pt").to(self.device)
+                    with torch.no_grad():
+                        logits = self.model(**inputs).logits
+                    mask = torch.nn.functional.interpolate(
+                        logits, size=(window.height, window.width), mode="bilinear"
+                    )
+                    full_mask[y:y+window.height, x:x+window.width] = (
+                        mask.argmax(dim=1)[0].cpu().numpy() == 1
+                    ).astype(np.uint8)
+                return full_mask
 
 
     @staticmethod

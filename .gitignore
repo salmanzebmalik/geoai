@@ -19,3 +19,4 @@ ml-service/venv
 *.jp2
 /ml-service/app/models/__pycache__
 /ml-service/app/__pycache__
+*.pyc

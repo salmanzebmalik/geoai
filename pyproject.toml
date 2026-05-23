@@ -1,5 +1,5 @@
 [project]
-name = "geoai-env"
+name = "geoai"
 version = "0.1.0"
 description = "Environment for GeoAI"
 readme = "README.md"
@@ -15,6 +15,7 @@ dependencies = [
     "numpy>=2.4.4",
     "pandas>=3.0.2",
     "pydantic>=2.13.4",
+    "python-multipart>=0.0.29",
     "rasterio>=1.5.0",
     "scikit-learn>=1.8.0",
     "scipy>=1.17.1",
