@@ -4,10 +4,8 @@ from pydantic import BaseModel
 
 
 class GeoJSONGeometry(BaseModel):
-    # type: Literal["Polygon"] 
     type: Literal["Polygon", "MultiPolygon"]
     coordinates: List
-    # coordinates: List[List[List[float]]] ---> previous
 
 
 
@@ -20,7 +18,6 @@ class GeoJSONFeature(BaseModel):
 class GeoJSONFeatureCollection(BaseModel):
     type: Literal["FeatureCollection"]
     features: List[GeoJSONFeature]
-    # --> we deal with this later, not a crucial field. depends on how we design the frontend
 
 
 class PredictionResponse(BaseModel):
