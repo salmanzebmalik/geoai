@@ -1,8 +1,9 @@
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Optional
 from uuid import uuid4
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
-from app.inference import run_tree_detection
+from app.inference import run_tree_detection, run_zero_shot_detection
 from app.schemas import PredictionResponse, GeoJSONFeatureCollection
 import torch
 
@@ -80,8 +81,7 @@ async def predict_building_footprints(
     if image.filename:
         file_extension = Path(image.filename).suffix.lower()
     else:
-        raise HTTPException(status_code = 400, detail="...")
-
+        raise HTTPException(status_code=400, detail="...")
 
     if file_extension not in allowed_extensions:
         raise HTTPException(status_code=400, detail="Uploaded image must be a .tif, .tiff or .jp2 file")
@@ -102,6 +102,35 @@ async def predict_building_footprints(
             prediction_type="tree_detection",
             geojson=feature_collection,
             summary=f"Found {len(feature_collection.features)} tree poylgons/clusters",
+        )
+
+    except Exception as e:
+        raise HTTPException(500, f"inference failed --- error: {str(e)}")
+
+
+@app.post("/predict/zeroshot")
+async def detect_zeroshot(
+    image: UploadFile = File(...),
+    min_lon: float = Form(...),
+    min_lat: float = Form(...),
+    max_lon: float = Form(...),
+    max_lat: float = Form(...),
+    keyword: str = Form(default="solar panel"),
+):
+
+    image_bytes = await image.read()
+    # bbox = (min_lon, min_lat, max_lon, max_lat)
+    bbox = (7.68, 51.99, 7.685, 52)
+    try:
+        geojson_dict = run_zero_shot_detection(image_bytes, bbox, keyword=keyword)
+        feature_collection = GeoJSONFeatureCollection(**geojson_dict)
+        return PredictionResponse(
+            query_id=str(uuid4()),
+            status="completed",
+            model_name="lang-sam",
+            prediction_type="zero_shot_detection",
+            geojson=feature_collection,
+            summary=f"Found {len(feature_collection.features)} {keyword} polygons/clusters",
         )
 
     except Exception as e:

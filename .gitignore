@@ -21,3 +21,5 @@ ml-service/venv
 /ml-service/app/__pycache__
 *.pyc
 *.png
+/Grounded-SAM-2
+pyproject.toml
