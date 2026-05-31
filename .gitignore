@@ -21,3 +21,4 @@ ml-service/venv
 /ml-service/app/__pycache__
 *.pyc
 *.png
+venv_titiler
