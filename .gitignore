@@ -21,9 +21,6 @@ ml-service/venv
 /ml-service/app/__pycache__
 *.pyc
 *.png
-<<<<<<< HEAD
 venv_titiler
-=======
 /Grounded-SAM-2
 pyproject.toml
->>>>>>> origin/develop
