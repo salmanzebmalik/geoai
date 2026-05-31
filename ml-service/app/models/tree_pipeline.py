@@ -10,7 +10,7 @@ from shapely.geometry import shape
 from rasterio.transform import from_bounds
 
 
-class InferencePipeline:
+class TCDSegformer:
     def __init__(self, model_id="restor/tcd-segformer-mit-b2"):
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         print(f"Segformer model is on device: {self.device} ---")
