@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-ML_SERVICE_URL = os.getenv("ML_SERVICE_URL", "http://localhost:8001")
+ML_SERVICE_URL = os.getenv("ML_SERVICE_URL", "http://127.0.0.1:8001")
 
 
 def call_ml_service(

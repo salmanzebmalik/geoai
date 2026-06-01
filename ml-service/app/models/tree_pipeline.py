@@ -79,7 +79,7 @@ class TCDSegformer:
                 for window, x, y in windows:
                     patch = self._read_rgb(src, window=window)
                     inputs = self.processor(images=patch, return_tensors="pt").to(self.device)
-                    with torch.inference_mode(), torch.autocast():
+                    with torch.inference_mode(), torch.autocast(device_type=self.device):
                         logits = self.model(**inputs).logits
                     mask = torch.nn.functional.interpolate(logits, size=(window.height, window.width), mode="bilinear")
                     full_mask[y: y + window.height, x: x + window.width] = (mask.argmax(dim=1)[0].cpu().numpy() == 1).astype(np.uint8)
