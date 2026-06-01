@@ -9,7 +9,7 @@
           color="success"
           variant="outlined"
           divided
-          style="width: 100%"
+          class="map-type-toggle"
         >
           <v-btn value="osm" style="flex: 1">
             <v-icon>mdi-map</v-icon>
@@ -67,9 +67,17 @@ const mapStore = useMapStore()
   margin-bottom: 10px;
 }
 
+.map-type-toggle {
+  width: 100%;
+  background-color: white;
+  color: #333;
+}
+
 .select-button {
   width: 90%;
   margin: 0 16px;
+  background-color: white;
+  color: #333;
 
   .v-icon {
     margin-right: 8px;

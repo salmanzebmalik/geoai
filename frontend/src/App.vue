@@ -3,9 +3,7 @@
     <v-app-bar>
       <div class="left-section">
         <img src="/geoai_icon_pin.svg" alt="GeoAI Icon" class="app-icon"/>
-        <v-app-bar-title style="font-weight: bold;">
-          GeoAI Monitor
-        </v-app-bar-title>
+        <v-app-bar-title>GeoAI Monitor</v-app-bar-title>
         <v-btn variant="text" to="/">Dashboard</v-btn>
         <v-btn variant="text" to="/about">About</v-btn>
       </div>
@@ -22,6 +20,19 @@ import { RouterView } from 'vue-router'
 </script>
 
 <style>
+.v-main {
+  background-color: white;
+  color: #333;
+}
+
+.v-app-bar {
+  background-color: white;
+}
+
+.v-app-bar-title, .left-section .v-btn {
+  color: #333;
+}
+
 .left-section {
   display: flex;
   align-items: center;
@@ -36,5 +47,6 @@ import { RouterView } from 'vue-router'
 
 .left-section .v-app-bar-title {
   margin-right: 20px;
+  font-weight: bold;
 }
 </style>
