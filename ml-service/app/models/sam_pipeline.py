@@ -54,7 +54,7 @@ class LangSAMPipeline:
                         )
                         masks = res[0].get("masks") if res else None
                         if masks is not None and len(masks) > 0:
-                            m_np = masks.cpu().numpy() if hasattr(masks, "cpu") else masks
+                            m_np = masks.cpu().numpy().copy() if hasattr(masks, "cpu") else masks
                             if m_np.ndim == 3:
                                 c_mask = np.any(m_np, axis=0)
                             else:
