@@ -4,6 +4,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.routes import router
 from app.database import create_db_and_tables
+from app.schemas import BoundingBox
 
 
 app = FastAPI(
@@ -16,6 +17,7 @@ app = FastAPI(
 origins = [
     "http://localhost:3000",
     "http://localhost:5173",
+    "http://localhost:5174",
     "http://127.0.0.1:5173"
 ]
 
@@ -45,3 +47,13 @@ def root():
     return {
         "message": "GeoAI Segmentation Backend API is running"
     }
+
+
+@app.get("/ping")
+def ping():
+    return {"message": "pong"}
+
+
+@app.post("/bbox")
+def receive_bbox(bbox: BoundingBox):
+    return {"received": bbox.model_dump()}
