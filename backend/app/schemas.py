@@ -5,17 +5,26 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 
+# ----------------------------
+# Bounding Box Model
+# ----------------------------
 class BoundingBox(BaseModel):
-    north: float = Field(..., description="Northern latitude boundary")
-    south: float = Field(..., description="Southern latitude boundary")
-    east: float = Field(..., description="Eastern longitude boundary")
-    west: float = Field(..., description="Western longitude boundary")
+    max_lat: float = Field(..., description="Maximum latitude boundary")
+    min_lat: float = Field(..., description="Minimum latitude boundary")
+    max_lon: float = Field(..., description="Maximum longitude boundary")
+    min_lon: float = Field(..., description="Minimum longitude boundary")
 
 
+# ----------------------------
+# Prediction Request Model
+# ----------------------------
 class PredictionRequest(BaseModel):
     bbox: BoundingBox
 
 
+# ----------------------------
+# Image Metadata Model
+# ----------------------------
 class ImageInfo(BaseModel):
     image_url: Optional[str] = None
     width: Optional[int] = None
@@ -23,6 +32,9 @@ class ImageInfo(BaseModel):
     format: Optional[str] = "tiff"
 
 
+# ----------------------------
+# GeoJSON Models
+# ----------------------------
 class GeoJSONGeometry(BaseModel):
     type: Literal["Polygon"]
     coordinates: List[List[List[float]]]
@@ -36,29 +48,36 @@ class GeoJSONFeature(BaseModel):
 
 class GeoJSONFeatureCollection(BaseModel):
     type: Literal["FeatureCollection"]
-    name: str
+    name: Optional[str] = None
     features: List[GeoJSONFeature]
 
 
-class BuildingFootprintPrediction(BaseModel):
-    prediction_type: str = "building_footprint_geojson"
+# ----------------------------
+# Prediction Output Model
+# ----------------------------
+class PredictionOutput(BaseModel):
+    prediction_type: str
     model_name: str
     geojson: GeoJSONFeatureCollection
-    summary: str
 
 
+# ----------------------------
+# Full Prediction Response Model
+# ----------------------------
 class PredictionResponse(BaseModel):
     query_id: UUID
     status: str
     bbox: BoundingBox
-    image: ImageInfo
-    prediction: BuildingFootprintPrediction
+    image: Optional[ImageInfo] = None
+    prediction: PredictionOutput
     created_at: datetime
 
 
+# ----------------------------
+# Prediction History Model
+# ----------------------------
 class PredictionHistoryItem(BaseModel):
     query_id: UUID
     status: str
     bbox: BoundingBox
-    summary: str
     created_at: datetime
