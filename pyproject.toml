@@ -71,6 +71,8 @@ dependencies = [
     "uvloop==0.22.1",
     "watchfiles==1.2.0",
     "websockets==16.0",
+    "sqlmodel==0.0.38",
+    "psycopg2-binary==2.9.12",
 ]
 
 [tool.uv.sources]

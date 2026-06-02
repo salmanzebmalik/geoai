@@ -7,27 +7,62 @@ from app.database import get_session
 from app.db_models import SegmentationQuery
 from app.schemas import (
     BoundingBox,
-    BuildingFootprintPrediction,
     ImageInfo,
     PredictionHistoryItem,
     PredictionRequest,
     PredictionResponse,
+    PredictionOutput,
 )
-from app.services import create_prediction
-
+from app.services import create_prediction  # your ML service handler
+from app.satellite_image_service import fetch_satellite_image_from_titiler
 
 router = APIRouter(
     prefix="/api/segmentation",
-    tags=["Building Footprint Prediction"],
+    tags=["segmentation prediction"],
 )
 
+# ----------------------------
+# New route: fetch & save image only
+# ----------------------------
+@router.post("/fetch-image", response_model=ImageInfo)
+def fetch_image(
+    bbox: BoundingBox,
+    session: Session = Depends(get_session),  # optional, in case you want to log requests
+):
+    """
+    Given a bounding box, fetch the satellite image via tiTiler
+    and save it in the static folder.
+    """
+    try:
+        # Generate a unique query ID for naming
+        from uuid import uuid4
+        query_id = str(uuid4())
 
+        # Call the satellite image service
+        image_path, image_info = fetch_satellite_image_from_titiler(
+            query_id=query_id,
+            bbox=bbox,
+            source_type="satellite"  # or "ortho" if needed
+        )
+
+        return image_info
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch satellite image: {str(e)}"
+        )
+        
+# ----------------------------
+# POST /predict
+# ----------------------------
 @router.post("/predict", response_model=PredictionResponse)
-def predict_building_footprints(
+def predict_segmentation(
     request: PredictionRequest,
     session: Session = Depends(get_session),
 ):
     try:
+        # create_prediction should return SegmentationQuery object or compatible dict
         return create_prediction(request, session)
 
     except ValueError as error:
@@ -40,30 +75,28 @@ def predict_building_footprints(
         )
 
 
+# ----------------------------
+# GET /results
+# ----------------------------
 @router.get("/results", response_model=list[PredictionHistoryItem])
-def get_all_results(
-    session: Session = Depends(get_session),
-):
+def get_all_results(session: Session = Depends(get_session)):
     statement = select(SegmentationQuery).order_by(
         SegmentationQuery.created_at.desc()
     )
-
     results = session.exec(statement).all()
 
     history = []
-
     for item in results:
         history.append(
             PredictionHistoryItem(
                 query_id=item.id,
                 status=item.status,
                 bbox=BoundingBox(
-                    north=item.north,
-                    south=item.south,
-                    east=item.east,
-                    west=item.west,
+                    min_lat=item.min_lat,
+                    max_lat=item.max_lat,
+                    min_lon=item.min_lon,
+                    max_lon=item.max_lon,
                 ),
-                summary=item.summary,
                 created_at=item.created_at,
             )
         )
@@ -71,6 +104,9 @@ def get_all_results(
     return history
 
 
+# ----------------------------
+# GET /results/{query_id}
+# ----------------------------
 @router.get("/results/{query_id}", response_model=PredictionResponse)
 def get_result_by_id(
     query_id: UUID,
@@ -84,16 +120,17 @@ def get_result_by_id(
             detail="Prediction result not found",
         )
 
-    prediction = BuildingFootprintPrediction(**result.prediction_result)
+    # Convert stored JSON into PredictionOutput schema
+    prediction_output = PredictionOutput(**result.prediction_result)
 
     return PredictionResponse(
         query_id=result.id,
         status=result.status,
         bbox=BoundingBox(
-            north=result.north,
-            south=result.south,
-            east=result.east,
-            west=result.west,
+            min_lat=result.min_lat,
+            max_lat=result.max_lat,
+            min_lon=result.min_lon,
+            max_lon=result.max_lon,
         ),
         image=ImageInfo(
             image_url=result.image_url,
@@ -101,6 +138,6 @@ def get_result_by_id(
             height=result.image_height,
             format="tiff",
         ),
-        prediction=prediction,
+        prediction=prediction_output,
         created_at=result.created_at,
     )
