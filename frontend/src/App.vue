@@ -22,15 +22,10 @@ import { RouterView } from 'vue-router'
 <style>
 .v-main {
   background-color: white;
-  color: #333;
 }
 
 .v-app-bar {
   background-color: white;
-}
-
-.v-app-bar-title, .left-section .v-btn {
-  color: #333;
 }
 
 .left-section {
