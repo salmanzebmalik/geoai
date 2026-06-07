@@ -19,6 +19,10 @@
             <v-icon>mdi-satellite-variant</v-icon>
             <span class="ml-1">Sentinel</span>
           </v-btn>
+          <v-btn value="orthophoto" style="flex: 1">
+          <v-icon>mdi-magnify</v-icon>
+          <span class="ml-1">Ortho</span>
+        </v-btn>
         </v-btn-toggle>
       </div>
 
