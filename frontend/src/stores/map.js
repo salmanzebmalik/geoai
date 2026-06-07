@@ -4,7 +4,7 @@ import { ref } from 'vue'
 export const useMapStore = defineStore('map', () => {
   const startDrawingTrigger = ref(0)
 
-  const mapType = ref('orthophoto') // default map type
+  const mapType = ref('osm') // default map type
 
   const mapCenter = ref([7.6261, 51.9607]) // default Münster coordinates
   const mapZoom = ref(13.5) // default zoom level

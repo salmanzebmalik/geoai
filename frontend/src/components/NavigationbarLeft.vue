@@ -4,9 +4,8 @@
         <p class="picker-label">Map</p>
         <v-btn-toggle
           v-model="mapStore.mapType"
-          mandatory
-          color="success"
-          variant="outlined"
+          rounded
+          variant="transparent"
           divided
           class="map-type-toggle"
         >
@@ -96,7 +95,6 @@ const mapStore = useMapStore()
 
 .map-type-toggle {
   width: 100%;
-  background-color: white;
 }
 
 .select-button {
