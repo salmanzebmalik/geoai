@@ -1,6 +1,5 @@
 <template>
   <v-navigation-drawer permanent width="300" color="#1b2e1b">
-
       <div class="map-picker">
         <p class="picker-label">Map</p>
         <v-btn-toggle
@@ -11,43 +10,63 @@
           divided
           class="map-type-toggle"
         >
-          <v-btn value="osm" style="flex: 1">
-            <v-icon>mdi-map</v-icon>
-            <span class="ml-1">OSM</span>
+          <v-btn value="osm" prepend-icon="mdi-map">
+            OSM
           </v-btn>
-          <v-btn value="sentinel" style="flex: 1">
-            <v-icon>mdi-satellite-variant</v-icon>
-            <span class="ml-1">Sentinel</span>
+          <v-btn value="sentinel" prepend-icon="mdi-satellite-variant">
+            Sentinel
           </v-btn>
-          <v-btn value="orthophoto" style="flex: 1">
-          <v-icon>mdi-magnify</v-icon>
-          <span class="ml-1">Ortho</span>
-        </v-btn>
+          <v-btn value="orthophoto" prepend-icon="mdi-magnify">
+            Ortho
+          </v-btn>
         </v-btn-toggle>
       </div>
 
-      <v-divider color="rgba(255,255,255,0.6)" class="mb-2"/>
-
+      <v-divider/>
     
-      <v-list color="transparent">
+      <v-list class="procedure" lines="one">
           <v-list-item
             prepend-icon="mdi-numeric-1-circle"
             title="Select Area"
           ></v-list-item>
+          <v-btn 
+            @click="mapStore.triggerDrawing()" 
+            class="select-button" 
+            prepend-icon="mdi-select" 
+            variant="tonal"
+          >Select Area</v-btn>
           <v-list-item
             prepend-icon="mdi-numeric-2-circle"
-            title="Machine Learning Task"
+            title="Task"
           ></v-list-item>
-          <v-list-item 
-            prepend-icon="mdi-numeric-3-circle" 
-            title="Start Analysis"
+          <v-select
+            :items="['Tree Quality', 'Pavement Quality', 'Construction Site Detection']"
+            placeholder="Select Task"
+            variant="solo"
+            density="compact"
+            class="ml-task-dropdown"
+            hide-details
+          ></v-select>
+          <v-list-item
+            prepend-icon="mdi-numeric-3-circle"
+            title="Model"
           ></v-list-item>
+          <v-select
+            :items="['Model A', 'Model B', 'Model C']"
+            placeholder="Select Model"
+            variant="solo"
+            density="compact"
+            class="ml-task-dropdown"
+            hide-details
+          ></v-select>
+          <v-list-item
+            prepend-icon="mdi-numeric-3-circle"
+            title="Run"
+          ></v-list-item>
+          <v-btn prepend-icon="mdi-rocket-launch" class="run-btn" color="success">Run</v-btn>
       </v-list>
 
-      <v-btn @click="mapStore.triggerDrawing()" class="select-button">
-        <v-icon left>mdi-select</v-icon>
-        Select Area
-      </v-btn>
+      
         
   </v-navigation-drawer>
 </template>
@@ -61,10 +80,14 @@ const mapStore = useMapStore()
 <style scoped>
 .map-picker {
   padding: 16px 16px 12px;
+
+  .v-btn {
+    flex: 1;
+  }
 }
 
 .picker-label {
-  color: rgba(255, 255, 255, 0.6);
+  color: "white";
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -74,17 +97,20 @@ const mapStore = useMapStore()
 .map-type-toggle {
   width: 100%;
   background-color: white;
-  color: #333;
 }
 
 .select-button {
   width: 90%;
   margin: 0 16px;
-  background-color: white;
-  color: #333;
+}
 
-  .v-icon {
-    margin-right: 8px;
-  }
+.ml-task-dropdown {
+  width: 90%;
+  margin: 0 16px;
+}
+
+.run-btn {
+  width: 90%;
+  margin: 0 16px;
 }
 </style>
