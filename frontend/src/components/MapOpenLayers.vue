@@ -51,27 +51,6 @@ function startDrawing() {
     console.log('GeoJSON:', geoJSON)
     map.removeInteraction(draw)
     draw = null
-
-    // Extract bounding box from GeoJSON
-    const coords = geoJSON.geometry.coordinates[0]
-    const lons = coords.map(c => c[0])
-    const lats = coords.map(c => c[1])
-    const bbox = {
-      north: Math.max(...lats),
-      south: Math.min(...lats),
-      east:  Math.max(...lons),
-      west:  Math.min(...lons),
-    }
-
-    // Send bbox to backend
-    fetch('http://localhost:8000/bbox', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(bbox),
-    })
-      .then(r => r.json())
-      .then(data => console.log('Backend received bbox:', data))
-      .catch(err => console.error('Backend unreachable:', err))
   })
 
   map.addInteraction(draw)
