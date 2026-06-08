@@ -28,12 +28,20 @@
             prepend-icon="mdi-numeric-1-circle"
             title="Select Area"
           ></v-list-item>
-          <v-btn 
-            @click="mapStore.triggerDrawing()" 
-            class="select-button" 
-            prepend-icon="mdi-select" 
+          <v-btn
+            @click="mapStore.triggerDrawing()"
+            class="select-button"
+            prepend-icon="mdi-select"
             variant="tonal"
           >Select Area</v-btn>
+
+          <v-card class="bbox-info" variant="tonal" v-if="mapStore.bbox">
+            <span>N {{ mapStore.bbox.max_lat.toFixed(5) }}</span>
+            <span>S {{ mapStore.bbox.min_lat.toFixed(5) }}</span>
+            <span>E {{ mapStore.bbox.max_lon.toFixed(5) }}</span>
+            <span>W {{ mapStore.bbox.min_lon.toFixed(5) }}</span>
+          </v-card>
+
           <v-list-item
             prepend-icon="mdi-numeric-2-circle"
             title="Task"
@@ -110,5 +118,16 @@ const mapStore = useMapStore()
 .run-btn {
   width: 90%;
   margin: 0 16px;
+}
+
+.bbox-info {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  width: 90%;
+  margin: 8px 16px;
+  padding: 8px;
+  font-size: 12px;
+  text-align: center;
 }
 </style>
