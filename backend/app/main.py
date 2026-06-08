@@ -4,6 +4,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.routes import router
 from app.database import create_db_and_tables
+from app.schemas import BoundingBox
 
 
 app = FastAPI(

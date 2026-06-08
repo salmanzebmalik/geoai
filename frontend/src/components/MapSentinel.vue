@@ -1,3 +1,11 @@
+<!-- THIS COMPONENT IS DEPRECTED  -->
+<!-- It uses the sentinel images from Copernicus Hub
+- to use it, create a Copernicus account + set up a Dashboard & Configuration
+- add the Service endpoint ID to the .env file as VITE_SENTINELHUB_INSTANCE_ID=your_id
+- add a Layer TRUE COLOR S2L2A with the desired settings in the Dashboard configuration
+- we used it as a demo of how our images will look like, but as there are usage limits and the copernicus watermark, we are only using our own images
+  -->
+
 <!-- MapSentinel.vue -->
 <template>
   <div ref="mapContainer" class="map-container" />

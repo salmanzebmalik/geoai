@@ -1,3 +1,9 @@
+<!-- THIS COMPONENT IS DEPRECTED  -->
+<!-- All functionality is bundled in Map.vue now, this component will be deleted soon (probably) -->
+
+
+
+
 <template>
   <div ref="mapContainer" class="map-container" />
 </template>
