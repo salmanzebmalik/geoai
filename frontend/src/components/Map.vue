@@ -80,7 +80,15 @@ function startDrawing() {
       featureProjection: 'EPSG:3857',
       dataProjection: 'EPSG:4326',
     })
-    console.log('GeoJSON:', geoJSON)
+    const coords = geoJSON.geometry.coordinates[0]
+    const lons = coords.map(c => c[0])
+    const lats = coords.map(c => c[1])
+
+    mapStore.bbox = {
+      min_lon: Math.min(...lons), max_lon: Math.max(...lons),
+      min_lat: Math.min(...lats), max_lat: Math.max(...lats),
+    }
+
     map.removeInteraction(draw)
     draw = null
   })
@@ -124,6 +132,22 @@ watch(() => mapStore.mapType, (type) => showMapLayer(type))
 
 // Nav bar "Select Area" -> start drawing
 watch(() => mapStore.startDrawingTrigger, () => startDrawing())
+
+// Nav bar "Run" -> predict
+watch(() => mapStore.runTrigger, async () => {
+  if (!mapStore.bbox) return
+
+  // Send bbox to backend for prediction
+  const response = await fetch('http://localhost:8002/api/segmentation/predict', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ bbox: mapStore.bbox }),
+  })
+
+  const result = await response.json() // prediction result from the backend
+
+  console.log('Prediction:', result)
+})
 </script>
 
 <style scoped>

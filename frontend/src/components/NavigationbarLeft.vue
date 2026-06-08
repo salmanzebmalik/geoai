@@ -5,8 +5,8 @@
         <v-btn-toggle
           v-model="mapStore.mapType"
           rounded
-          variant="transparent"
           divided
+          color="success"
           class="map-type-toggle"
         >
           <v-btn value="osm" prepend-icon="mdi-map">
@@ -62,7 +62,7 @@
             prepend-icon="mdi-numeric-3-circle"
             title="Run"
           ></v-list-item>
-          <v-btn prepend-icon="mdi-rocket-launch" class="run-btn" color="success">Run</v-btn>
+          <v-btn @click="mapStore.triggerRun()" prepend-icon="mdi-rocket-launch" class="run-btn" color="success">Run</v-btn>
       </v-list>
 
       
