@@ -47,12 +47,14 @@
             title="Task"
           ></v-list-item>
           <v-select
-            :items="['Tree Quality', 'Pavement Quality', 'Construction Site Detection']"
+            :items="['Tree Detection', 'Pavement Quality', 'Construction Site Detection']"
             placeholder="Select Task"
             variant="solo"
             density="compact"
             class="ml-task-dropdown"
             hide-details
+            v-model="mapStore.selectedTask"
+            disabled
           ></v-select>
           <v-list-item
             prepend-icon="mdi-numeric-3-circle"
@@ -65,6 +67,7 @@
             density="compact"
             class="ml-task-dropdown"
             hide-details
+            disabled
           ></v-select>
           <v-list-item
             prepend-icon="mdi-numeric-3-circle"

@@ -6,6 +6,8 @@ export const useMapStore = defineStore('map', () => {
 
   const mapType = ref('osm') // default map type
 
+  const selectedTask = ref('Tree Detection')
+
   const mapCenter = ref([7.6261, 51.9607]) // default Münster coordinates
   const mapZoom = ref(13.5) // default zoom level
 
@@ -24,5 +26,5 @@ export const useMapStore = defineStore('map', () => {
     runTrigger.value++
   }
 
-  return { startDrawingTrigger, triggerDrawing, mapType, setMapType, mapCenter, mapZoom, bbox, runTrigger, triggerRun }
+  return { startDrawingTrigger, triggerDrawing, mapType, setMapType, mapCenter, mapZoom, bbox, runTrigger, triggerRun, selectedTask }
 })
