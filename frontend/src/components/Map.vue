@@ -22,7 +22,7 @@ const mapContainer = ref(null)
 let map = null
 
 // --- map settings ---
-const TITILER_URL = 'http://localhost:10000' // titiler URL, server must be running for the XYZ layers to work
+const TITILER_URL = 'http://localhost:8001' // titiler URL, server must be running for the XYZ layers to work
 
 const orthophotoSource = new XYZ({
   url:
