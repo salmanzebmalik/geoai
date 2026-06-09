@@ -14,6 +14,8 @@ export const useMapStore = defineStore('map', () => {
   const bbox = ref(null)
   const runTrigger = ref(0)
 
+  const areaSqm = ref(null)
+
   function triggerDrawing() {
     startDrawingTrigger.value++ // jedes Increment = neues Zeichnen
   }
@@ -26,5 +28,5 @@ export const useMapStore = defineStore('map', () => {
     runTrigger.value++
   }
 
-  return { startDrawingTrigger, triggerDrawing, mapType, setMapType, mapCenter, mapZoom, bbox, runTrigger, triggerRun, selectedTask }
+  return { startDrawingTrigger, triggerDrawing, mapType, setMapType, mapCenter, mapZoom, bbox, runTrigger, triggerRun, selectedTask, areaSqm }
 })

@@ -17,6 +17,7 @@ import { Style, Fill, Stroke } from 'ol/style'
 import { fromLonLat, toLonLat } from 'ol/proj'
 import { useMapStore } from '@/stores/map'
 import 'ol/ol.css'
+import { getArea } from 'ol/sphere'
 
 const mapStore = useMapStore()
 const mapContainer = ref(null)
@@ -87,6 +88,8 @@ function startDrawing() {
   })
 
   draw.on('drawend', (event) => {
+    const geometry = event.feature.getGeometry()
+
     const geoJSON = new GeoJSON().writeFeatureObject(event.feature, {
       featureProjection: 'EPSG:3857',
       dataProjection: 'EPSG:4326',
@@ -99,6 +102,7 @@ function startDrawing() {
       min_lon: Math.min(...lons), max_lon: Math.max(...lons),
       min_lat: Math.min(...lats), max_lat: Math.max(...lats),
     }
+    mapStore.areaSqm = getArea(geometry)
 
     map.removeInteraction(draw)
     draw = null

@@ -40,6 +40,7 @@
             <span>S {{ mapStore.bbox.min_lat.toFixed(5) }}</span>
             <span>E {{ mapStore.bbox.max_lon.toFixed(5) }}</span>
             <span>W {{ mapStore.bbox.min_lon.toFixed(5) }}</span>
+            <span class="area">{{ formatArea(mapStore.areaSqm) }}</span>
           </div>
 
           <v-list-item
@@ -85,6 +86,13 @@
 import { useMapStore } from '@/stores/map'
 
 const mapStore = useMapStore()
+
+function formatArea(sqm) {
+  if (sqm == null) return ''
+  return sqm > 1_000_000
+    ? `${(sqm / 1_000_000).toFixed(2)} km²`
+    : `${Math.round(sqm)} m²`
+}
 </script>
 
 <style scoped>
