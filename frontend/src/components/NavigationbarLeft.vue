@@ -35,12 +35,12 @@
             variant="tonal"
           >Select Area</v-btn>
 
-          <v-card class="bbox-info" variant="tonal" v-if="mapStore.bbox">
+          <div class="bbox-info" v-if="mapStore.bbox">
             <span>N {{ mapStore.bbox.max_lat.toFixed(5) }}</span>
             <span>S {{ mapStore.bbox.min_lat.toFixed(5) }}</span>
             <span>E {{ mapStore.bbox.max_lon.toFixed(5) }}</span>
             <span>W {{ mapStore.bbox.min_lon.toFixed(5) }}</span>
-          </v-card>
+          </div>
 
           <v-list-item
             prepend-icon="mdi-numeric-2-circle"

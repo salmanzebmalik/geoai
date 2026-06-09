@@ -13,6 +13,7 @@ import VectorLayer from 'ol/layer/Vector.js'
 import VectorSource from 'ol/source/Vector.js'
 import Draw, { createBox } from 'ol/interaction/Draw.js'
 import GeoJSON from 'ol/format/GeoJSON.js'
+import { Style, Fill, Stroke } from 'ol/style'
 import { fromLonLat, toLonLat } from 'ol/proj'
 import { useMapStore } from '@/stores/map'
 import 'ol/ol.css'
@@ -63,6 +64,16 @@ function showMapLayer(type) {
 // --- Bounding box drawing ---
 const vectorSource = new VectorSource({ wrapX: false })
 const vectorLayer = new VectorLayer({ source: vectorSource })
+
+// --- Prediction result overlay ---
+const predictionSource = new VectorSource()
+const predictionLayer = new VectorLayer({
+  source: predictionSource,
+  style: new Style({
+    fill: new Fill({ color: 'rgba(0, 200, 100, 0.25)' }),
+    stroke: new Stroke({ color: '#00c864', width: 1.5 }),
+  }),
+})
 let draw = null
 
 function startDrawing() {
@@ -102,7 +113,8 @@ onMounted(() => {
     target: mapContainer.value,
     layers: [
       ...Object.values(mapLayers), // all map layers
-      vectorLayer, // bbox drawn on top
+      predictionLayer,             // prediction polygons
+      vectorLayer,                 // bbox drawn on top
     ],
     view: new View({
       center: fromLonLat(mapStore.mapCenter),
@@ -144,9 +156,21 @@ watch(() => mapStore.runTrigger, async () => {
     body: JSON.stringify({ bbox: mapStore.bbox }),
   })
 
-  const result = await response.json() // prediction result from the backend
-
+  const result = await response.json()
   console.log('Prediction:', result)
+
+  if (!response.ok) {
+    console.error('Prediction failed:', result.detail)
+    return
+  }
+
+  predictionSource.clear()
+  const features = new GeoJSON().readFeatures(result.prediction.geojson, {
+    dataProjection: 'EPSG:4326',
+    featureProjection: 'EPSG:3857',
+  })
+
+  predictionSource.addFeatures(features)
 })
 </script>
 
