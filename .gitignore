@@ -10,6 +10,7 @@ backend/static/masks/
 
 ml-service/uploads
 ml-service/venv
+ml-service/.env
 
 .DS_Store
 /ml-service/app/models/datasets
@@ -24,3 +25,5 @@ ml-service/venv
 *.png
 /Grounded-SAM-2
 pyproject.toml
+
+storage/

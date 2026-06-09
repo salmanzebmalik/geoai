@@ -3,7 +3,7 @@ from uuid import uuid4
 from sqlmodel import Session
 
 from app.db_models import SegmentationQuery
-from app.ml_service_client import call_ml_service, call_ml_service_dummy
+from app.ml_service_client import call_ml_service
 from app.satellite_image_service import fetch_satellite_image_from_titiler
 from app.schemas import (
     BoundingBox,
@@ -68,7 +68,11 @@ def create_prediction(
         )
 
         # Step 2: send bbox & query_id to ML service
-        ml_result = call_ml_service_dummy(query_id=query_id, bbox=request.bbox)
+        ml_result = call_ml_service(
+            query_id=query_id,
+            bbox=request.bbox,
+            input_image_path=image_path,
+        )
         
         # Step 3: parse ML response into PredictionOutput
         prediction_output = PredictionOutput(

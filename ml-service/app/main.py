@@ -7,7 +7,10 @@ from app.inference import run_tree_detection, run_zero_shot_detection
 from app.schemas import PredictionResponse, GeoJSONFeatureCollection
 import torch
 import requests
+from pydantic import BaseModel
 
+from app.core.config import get_shared_storage_path
+from app.utils.storage import ensure_path_inside_storage
 
 UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
@@ -49,65 +52,142 @@ def root():
 def health_check():
     return {"status": "healthy"}
 
+class PredictionRequest(BaseModel):
+    query_id: str | None = None
+    input_image_path: str
+    output_dir: str | None = None
 
+    min_lon: float
+    min_lat: float
+    max_lon: float
+    max_lat: float
 
 
 @app.post("/predict", response_model=PredictionResponse)
-async def predict_building_footprints(
-    query_id: str = Form(default=None),
-    min_lon: float = Form(...), # xmin
-    min_lat: float = Form(...), #ymin
-    max_lon: float = Form(...), # xmax
-    max_lat: float = Form(...), # ymax
-):
+async def predict_footprints(request: PredictionRequest):
    
 
-    if query_id is None:
+    if request.query_id is None:
         query_id = str(uuid4())
+    else:
+        query_id = request.query_id
 
-
-    titiler_url = f"http://127.0.0.1:8001/cog/bbox/{min_lon},{min_lat},{max_lon},{max_lat}.tif"
-
-    proxies = {
-        "http": None,
-        "https": None,
-    }
-    params = {
-            "url": "/home/ubuntu/work/satellite_data/germany/2021/2021_08.vrt",
-            "bidx": [3, 2, 1],  # RGB bands
-            "rescale": "0,3000"
-    }
+    print('ML Service: Running Query for: ', query_id)
     
-    # fetch the image from Titiler
+    storage_root = get_shared_storage_path()
+
+    # titiler_url = f"http://127.0.0.1:8001/cog/bbox/{min_lon},{min_lat},{max_lon},{max_lat}.tif"
+
+    # proxies = {
+    #     "http": None,
+    #     "https": None,
+    # }
+    
+    # params = {
+    #         "url": "/home/ubuntu/work/satellite_data/germany/2021/2021_08.vrt",
+    #         "bidx": [3, 2, 1],  # RGB bands
+    #         "rescale": "0,3000"
+    # }
+    
+    # # fetch the image from Titiler
+    # try:
+    #     response = requests.get(titiler_url, params=params,proxies=proxies, timeout=30)
+    #     response.raise_for_status()  # Raises HTTPError for bad responses
+    # except requests.exceptions.RequestException as e:
+    #     raise HTTPException(
+    #         status_code=503 if isinstance(e, requests.exceptions.ConnectionError) else 500,
+    #         detail=f"Failed to fetch image from titiler: {str(e)}"
+    #     )
+    
+    # image_bytes = response.content
+    # if len(image_bytes) == 0:
+    #     raise HTTPException(400, "titiler returned an empty image")
+    
+    # -----------------------------
+    # Validate input image path
+    # -----------------------------
     try:
-        response = requests.get(titiler_url, params=params,proxies=proxies, timeout=30)
-        response.raise_for_status()  # Raises HTTPError for bad responses
-    except requests.exceptions.RequestException as e:
-        raise HTTPException(
-            status_code=503 if isinstance(e, requests.exceptions.ConnectionError) else 500,
-            detail=f"Failed to fetch image from titiler: {str(e)}"
+        input_path = ensure_path_inside_storage(
+            request.input_image_path,
+            storage_root,
         )
-    
-    image_bytes = response.content
-    if len(image_bytes) == 0:
-        raise HTTPException(400, "titiler returned an empty image")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
-    bbox = (min_lon, min_lat, max_lon, max_lat)
+    if not input_path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail=f"Input image not found: {input_path}",
+        )
+
+    if not input_path.is_file():
+        raise HTTPException(
+            status_code=400,
+            detail=f"Input path is not a file: {input_path}",
+        )
+
+    # -----------------------------
+    # Optional: validate/create output dir
+    # -----------------------------
+    output_dir = None
+
+    if request.output_dir is not None:
+        try:
+            output_dir = ensure_path_inside_storage(
+                request.output_dir,
+                storage_root,
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
+        output_dir.mkdir(parents=True, exist_ok=True)
+        
+    # -----------------------------
+    # Read image bytes from shared storage
+    # -----------------------------
+    try:
+        image_bytes = input_path.read_bytes()
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to read input image from shared storage: {str(e)}",
+        )
+
+    if len(image_bytes) == 0:
+        raise HTTPException(
+            status_code=400,
+            detail="Input image exists but is empty.",
+        )
+
+    bbox = (
+        request.min_lon,
+        request.min_lat,
+        request.max_lon,
+        request.max_lat,
+    )
+
+
+    # -----------------------------
+    # Run model inference
+    # -----------------------------
     try:
         geojson_dict = run_tree_detection(image_bytes, bbox)
         feature_collection = GeoJSONFeatureCollection(**geojson_dict)
+
         return PredictionResponse(
-            query_id=str(uuid4()),
+            query_id=query_id,
             status="completed",
             model_name="tcd-segformer-mit-b2",
             prediction_type="tree_detection",
             geojson=feature_collection,
-            summary=f"Found {len(feature_collection.features)} tree poylgons/clusters",
+            summary=f"Found {len(feature_collection.features)} tree polygons/clusters",
         )
 
     except Exception as e:
-        raise HTTPException(500, f"inference failed --- error: {str(e)}")
-
+        raise HTTPException(
+            status_code=500,
+            detail=f"Inference failed --- error: {str(e)}",
+        )
 
 @app.post("/predict/zeroshot")
 async def detect_zeroshot(
