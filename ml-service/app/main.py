@@ -23,8 +23,9 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 async def lifespan(app: FastAPI):
     print("Loading models...")
     try:
-        app.state.segformer = TCDSegformer()
-        app.state.lang_sam = LangSAMPipeline(patch_size=1024, overlap=128)
+        offline = False  # use HF weight loading by default
+        app.state.segformer = TCDSegformer(offline=offline)
+        app.state.lang_sam = LangSAMPipeline(patch_size=1024, overlap=128, offline=offline)
         print("Models loaded successfully")
     except Exception as e:
         print(f"Failed to load models: {e}")
