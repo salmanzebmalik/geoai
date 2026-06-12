@@ -4,7 +4,7 @@ import { ref } from 'vue'
 export const useMapStore = defineStore('map', () => {
   const startDrawingTrigger = ref(0)
 
-  const mapType = ref('osm') // default map type
+  const mapType = ref('orthophoto') // default map type
 
   const selectedTask = ref('Tree Detection')
 

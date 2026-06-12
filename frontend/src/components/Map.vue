@@ -58,7 +58,7 @@ const mapLayers = {
 // Show only the map layer matching `type` (set by the nav bar buttons)
 function showMapLayer(type) {
   for (const [key, layer] of Object.entries(mapLayers)) {
-    layer.setVisible(key === type)
+    layer.setVisible(key === 'osm' || key === type)
   }
 }
 
