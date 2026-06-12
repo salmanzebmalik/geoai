@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import numpy as np
 import torch
 from PIL import Image
@@ -10,6 +12,7 @@ from rasterio.transform import from_bounds
 import geopandas as gpd
 from tqdm import tqdm
 from typing import Optional, Tuple, List
+from app.models.model_downloader import ensure_langsam_models
 
 
 class LangSAMPipeline:
@@ -18,6 +21,8 @@ class LangSAMPipeline:
         patch_size: int = 1024,
         overlap: int = 128,
         device: Optional[str] = None,
+        offline: bool = True,
+        # confidence thresholds for LangSAM predictions --- need to tune
         text_threshold: float = 0.15,
         box_threshold: float = 0.3
     ):
@@ -29,7 +34,26 @@ class LangSAMPipeline:
             self.device = "cuda" if torch.cuda.is_available() else "cpu"
         else:
             self.device = device
-        self.model = LangSAM()
+
+        if offline:
+            # set directory paths for local model files
+            current_dir = Path(__file__).parent.resolve()
+            model_dir = current_dir.parent / "models" / "local_langsam"
+
+            ensure_langsam_models(model_dir)  # will download if missing (with lock)
+
+            sam_ckpt_path = f"{model_dir}/sam2.1_hiera_large.pt"
+            gdino_model_path = f"{model_dir}/groundingdino_hf_model"
+            gdino_processor_path = f"{model_dir}/bert-base-uncased"
+
+            self.model = LangSAM(
+                sam_type="sam2.1_hiera_large",
+                sam_ckpt_path=sam_ckpt_path,
+                gdino_model_ckpt_path=gdino_model_path,
+                gdino_processor_ckpt_path=gdino_processor_path,
+            )
+        else:  # online
+            self.model = LangSAM()
 
     def get_full_mask_from_bytes(self, image_bytes: bytes, keyword: str = "tree") -> np.ndarray:
         stride = self.patch_size - self.overlap

@@ -1,3 +1,6 @@
+from pathlib import Path
+from typing import Optional
+
 import numpy as np
 import torch
 import rasterio
@@ -8,15 +11,37 @@ import geopandas as gpd
 from rasterio.features import shapes
 from shapely.geometry import shape
 from rasterio.transform import from_bounds
+from app.models.model_downloader import ensure_segformer_models
 
 
 class TCDSegformer:
-    def __init__(self, model_id="restor/tcd-segformer-mit-b2"):
+    def __init__(
+        self,
+        model_id="restor/tcd-segformer-mit-b2",
+        offline: bool = True,
+        patch_size: int = 512,
+    ):
+
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        print(f"Segformer model is on device: {self.device} ---")
-        self.processor = AutoImageProcessor.from_pretrained(model_id)
-        self.model = SegformerForSemanticSegmentation.from_pretrained(model_id).to(self.device)
-        self.patch_size = 512
+
+        if offline:
+            # look for local models in this path, if not exists, raise error
+            current_dir = Path(__file__).parent.resolve()
+            model_dir = current_dir.parent / "models" / "local_tcd-segformer_local"
+            ensure_segformer_models(model_dir)  # will download if missing, with lock
+
+            if not model_dir.exists():
+                raise FileNotFoundError(f"TCD Segformer model not found at {model_dir}")
+
+            self.processor = AutoImageProcessor.from_pretrained(str(model_dir), local_files_only=True)
+            self.model = SegformerForSemanticSegmentation.from_pretrained(str(model_dir), local_files_only=True).to(self.device)
+            print("weights loaded")
+        else:
+            self.processor = AutoImageProcessor.from_pretrained(model_id)
+            self.model = SegformerForSemanticSegmentation.from_pretrained(model_id).to(self.device)
+            # HF already has a print
+
+        self.patch_size = patch_size
         self.model.eval()
 
     @staticmethod

@@ -12,13 +12,24 @@ from pydantic import BaseModel
 from app.core.config import get_shared_storage_path
 from app.utils.storage import ensure_path_inside_storage
 
+from app.models.tree_pipeline import TCDSegformer
+from app.models.sam_pipeline import LangSAMPipeline
+
 UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Model already initialized in inference.py => subject to change
+    print("Loading models...")
+    try:
+        offline = False  # use HF weight loading by default
+        app.state.segformer = TCDSegformer(offline=offline)
+        app.state.lang_sam = LangSAMPipeline(patch_size=1024, overlap=128, offline=offline)
+        print("Models loaded successfully")
+    except Exception as e:
+        print(f"Failed to load models: {e}")
+        raise
 
     yield
     # on shutdown, clean pytorch resources
@@ -57,6 +68,11 @@ class PredictionRequest(BaseModel):
     input_image_path: str
     output_dir: str | None = None
 
+class PredictionRequest(BaseModel):
+    query_id: str | None = None
+    input_image_path: str
+    output_dir: str | None = None
+
     min_lon: float
     min_lat: float
     max_lon: float
@@ -65,44 +81,18 @@ class PredictionRequest(BaseModel):
 
 @app.post("/predict", response_model=PredictionResponse)
 async def predict_footprints(request: PredictionRequest):
-   
-
+  
     if request.query_id is None:
         query_id = str(uuid4())
     else:
         query_id = request.query_id
 
     print('ML Service: Running Query for: ', query_id)
+
+
     
     storage_root = get_shared_storage_path()
 
-    # titiler_url = f"http://127.0.0.1:8001/cog/bbox/{min_lon},{min_lat},{max_lon},{max_lat}.tif"
-
-    # proxies = {
-    #     "http": None,
-    #     "https": None,
-    # }
-    
-    # params = {
-    #         "url": "/home/ubuntu/work/satellite_data/germany/2021/2021_08.vrt",
-    #         "bidx": [3, 2, 1],  # RGB bands
-    #         "rescale": "0,3000"
-    # }
-    
-    # # fetch the image from Titiler
-    # try:
-    #     response = requests.get(titiler_url, params=params,proxies=proxies, timeout=30)
-    #     response.raise_for_status()  # Raises HTTPError for bad responses
-    # except requests.exceptions.RequestException as e:
-    #     raise HTTPException(
-    #         status_code=503 if isinstance(e, requests.exceptions.ConnectionError) else 500,
-    #         detail=f"Failed to fetch image from titiler: {str(e)}"
-    #     )
-    
-    # image_bytes = response.content
-    # if len(image_bytes) == 0:
-    #     raise HTTPException(400, "titiler returned an empty image")
-    
     # -----------------------------
     # Validate input image path
     # -----------------------------
@@ -166,12 +156,12 @@ async def predict_footprints(request: PredictionRequest):
         request.max_lat,
     )
 
-
     # -----------------------------
     # Run model inference
     # -----------------------------
     try:
-        geojson_dict = run_tree_detection(image_bytes, bbox)
+        segformer = app.state.segformer
+        geojson_dict = run_tree_detection(segformer, image_bytes, bbox)
         feature_collection = GeoJSONFeatureCollection(**geojson_dict)
 
         return PredictionResponse(
@@ -209,9 +199,9 @@ async def detect_zeroshot(
         "https": None,
     }
     params = {
-            "url": "/home/ubuntu/work/satellite_data/germany/2021/2021_08.vrt",
-            "bidx": [3, 2, 1], # RGB bands
-            "rescale": "0,3000"
+        "url": "/home/ubuntu/work/satellite_data/germany/2021/2021_08.vrt",
+        "bidx": [3, 2, 1],  # RGB bands
+        "rescale": "0,3000"
     }
 
     # fetch the image from Titiler
