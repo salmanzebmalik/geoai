@@ -24,3 +24,5 @@ ml-service/venv
 *.png
 /Grounded-SAM-2
 pyproject.toml
+/ml-service/app/models/local_langsam
+/ml-service/app/models/local_tcd-segformer_local
