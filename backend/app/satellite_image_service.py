@@ -6,13 +6,14 @@ from PIL import Image
 
 from app.schemas import BoundingBox, ImageInfo
 
-# -----------------------------
-# Config
-# -----------------------------
-STATIC_DIR = Path("static")
-IMAGE_DIR = STATIC_DIR / "images"
+# Import your config/settings
+# Adjust this import if your config file has a different location/name
+from app.core.config import settings
 
-# tiTiler service URL (running on VM)
+
+# -----------------------------
+# tiTiler service URL
+# -----------------------------
 TITILER_BASE_URL = "http://localhost:8001"
 
 # Raster sources
@@ -21,10 +22,40 @@ ORTHO_MOSAIC_PATH = "/home/ubuntu/work/saved_data/collections/digital_orthofoto_
 
 
 # -----------------------------
-# Helpers
+# Shared storage helpers
 # -----------------------------
-def ensure_image_folder_exists() -> None:
-    IMAGE_DIR.mkdir(parents=True, exist_ok=True)
+def get_shared_storage_dir() -> Path:
+    """
+    Return the shared storage root directory.
+
+    Example:
+        /home/ubuntu/your-project/storage
+        or
+        /app/storage inside Docker
+    """
+    return Path(settings.shared_storage_dir).resolve()
+
+
+def get_query_dir(query_id: str) -> Path:
+    """
+    Return query-specific storage folder.
+
+    Example:
+        storage/queries/{query_id}
+    """
+    query_dir = get_shared_storage_dir() / "queries" / str(query_id)
+    query_dir.mkdir(parents=True, exist_ok=True)
+    return query_dir
+
+
+def get_input_image_path(query_id: str) -> Path:
+    """
+    Return full path for the input image.
+
+    Example:
+        storage/queries/{query_id}/input.tiff
+    """
+    return get_query_dir(query_id) / "input.tiff"
 
 
 def bbox_to_titiler_string(bbox: BoundingBox) -> str:
@@ -46,19 +77,22 @@ def fetch_satellite_image_from_titiler(
     """
     Fetch a cropped satellite or orthophoto image from tiTiler.
 
+    The image is saved into shared storage:
+
+        storage/queries/{query_id}/input.tiff
+
     Args:
-        query_id: Unique query ID for naming the image file.
+        query_id: Unique query ID for the query folder.
         bbox: Bounding box coordinates.
         source_type: "satellite" for VRT imagery, "ortho" for MosaicJSON.
 
     Returns:
         Tuple containing:
-        - Local path to saved TIFF image
-        - ImageInfo object with URL, width, height, format
+        - Local shared-storage path to saved TIFF image
+        - ImageInfo object with image path, width, height, format
     """
-    ensure_image_folder_exists()
-    image_path = IMAGE_DIR / f"{query_id}.tiff"
 
+    image_path = get_input_image_path(query_id)
     bbox_string = bbox_to_titiler_string(bbox)
 
     if source_type == "satellite":
@@ -68,9 +102,13 @@ def fetch_satellite_image_from_titiler(
             "bidx": [3, 2, 1],
             "rescale": "0,3000",
         }
+
     elif source_type == "ortho":
         endpoint = f"{TITILER_BASE_URL}/mosaicjson/bbox/{bbox_string}.tif"
-        params = {"url": ORTHO_MOSAIC_PATH}
+        params = {
+            "url": ORTHO_MOSAIC_PATH,
+        }
+
     else:
         raise ValueError("Invalid source_type. Use 'satellite' or 'ortho'.")
 
@@ -80,6 +118,7 @@ def fetch_satellite_image_from_titiler(
     print("Request URL:", request_url)
     print("Bounding box string:", bbox_string)
     print("Params:", params)
+    print("Shared storage root:", get_shared_storage_dir())
     print("Output image path:", image_path)
     print("==========================================\n")
 
@@ -103,10 +142,16 @@ def fetch_satellite_image_from_titiler(
         raise RuntimeError(
             f"Could not connect to tiTiler at {TITILER_BASE_URL}: {e}"
         ) from e
+
     except requests.exceptions.Timeout as e:
-        raise RuntimeError(f"tiTiler request timed out: {request_url}") from e
+        raise RuntimeError(
+            f"tiTiler request timed out: {request_url}"
+        ) from e
+
     except requests.exceptions.RequestException as e:
-        raise RuntimeError(f"Failed to call tiTiler: {e}") from e
+        raise RuntimeError(
+            f"Failed to call tiTiler: {e}"
+        ) from e
 
     # -----------------------------
     # Check response
@@ -118,16 +163,21 @@ def fetch_satellite_image_from_titiler(
         )
 
     # -----------------------------
-    # Save image
+    # Save image into shared storage
     # -----------------------------
+    image_path.parent.mkdir(parents=True, exist_ok=True)
     image_path.write_bytes(response.content)
 
-    # Read image to get dimensions
+    # -----------------------------
+    # Read image dimensions
+    # -----------------------------
     with Image.open(image_path) as img:
         width, height = img.width, img.height
 
     image_info = ImageInfo(
-        image_url=f"/static/images/{query_id}.tiff",
+        # This is no longer a public static URL.
+        # It is now the internal shared-storage path.
+        image_url=str(image_path),
         width=width,
         height=height,
         format="tiff",

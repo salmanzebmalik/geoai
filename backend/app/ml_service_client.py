@@ -10,60 +10,16 @@ load_dotenv()
 ML_SERVICE_URL = os.getenv("ML_SERVICE_URL", "http:127.0.0.1:8000")
 
 
-def call_ml_service(
-    image_path: str,
-    query_id: str,
-) -> dict:
-    """
-    Sends a TIFF image to the ML service and receives GeoJSON building footprints.
-
-    The ML service is expected to expose:
-        POST /predict
-
-    With multipart form data:
-        image: .tif/.tiff file
-        query_id: string
-    """
-
-    predict_url = f"{ML_SERVICE_URL}/predict"
-
-    image_file_path = Path(image_path)
-
-    if not image_file_path.exists():
-        raise FileNotFoundError(f"Image file not found: {image_path}")
-
-    with image_file_path.open("rb") as image_file:
-        files = {
-            "image": (
-                image_file_path.name,
-                image_file,
-                "image/tiff",
-            )
-        }
-
-        data = {
-            "query_id": query_id
-        }
-
-        response = requests.post(
-            predict_url,
-            files=files,
-            data=data,
-            timeout=60,
-        )
-
-    response.raise_for_status()
-
-    return response.json()
-
-
-def call_ml_service_dummy(query_id: str, bbox: BoundingBox) -> dict:
+def call_ml_service(query_id: str, bbox: BoundingBox, input_image_path: str,) -> dict:
     """
     Sends a form-encoded POST request to the ML service with bounding box.
     """
     url = f"{ML_SERVICE_URL}/predict"
+    output_dir = str(Path(input_image_path).parent)
     data = {
         "query_id": query_id,
+        "input_image_path": input_image_path,
+        "output_dir": output_dir,
         "min_lon": bbox.min_lon,
         "min_lat": bbox.min_lat,
         "max_lon": bbox.max_lon,
@@ -73,12 +29,17 @@ def call_ml_service_dummy(query_id: str, bbox: BoundingBox) -> dict:
     session = requests.Session()
     session.trust_env = False  # important to bypass proxy settings
     
+    print("\n========== ML Service Request Debug ==========")
+    print("ML Service URL:", f"{ML_SERVICE_URL}/predict")
+    print("Data:", data)
+    print("=============================================\n")
+    
     try:
         response = session.post(
             url,
-            data=data,
+            json=data,
             headers={"Accept": "application/json"},
-            timeout=60,
+            timeout=300,
         )
         response.raise_for_status()
     except requests.exceptions.RequestException as e:

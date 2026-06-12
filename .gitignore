@@ -10,6 +10,7 @@ backend/static/masks/
 
 ml-service/uploads
 ml-service/venv
+ml-service/.env
 
 .DS_Store
 /ml-service/app/models/datasets
@@ -26,3 +27,5 @@ ml-service/venv
 pyproject.toml
 /ml-service/app/models/local_langsam
 /ml-service/app/models/local_tcd-segformer_local
+
+storage/

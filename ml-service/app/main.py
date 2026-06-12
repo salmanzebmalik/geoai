@@ -63,6 +63,10 @@ def root():
 def health_check():
     return {"status": "healthy"}
 
+class PredictionRequest(BaseModel):
+    query_id: str | None = None
+    input_image_path: str
+    output_dir: str | None = None
 
 class PredictionRequest(BaseModel):
     query_id: str | None = None
@@ -77,7 +81,7 @@ class PredictionRequest(BaseModel):
 
 @app.post("/predict", response_model=PredictionResponse)
 async def predict_footprints(request: PredictionRequest):
-
+  
     if request.query_id is None:
         query_id = str(uuid4())
     else:
@@ -85,8 +89,13 @@ async def predict_footprints(request: PredictionRequest):
 
     print('ML Service: Running Query for: ', query_id)
 
+
+    
     storage_root = get_shared_storage_path()
 
+    # -----------------------------
+    # Validate input image path
+    # -----------------------------
     try:
         input_path = ensure_path_inside_storage(
             request.input_image_path,
@@ -122,7 +131,7 @@ async def predict_footprints(request: PredictionRequest):
             raise HTTPException(status_code=400, detail=str(e))
 
         output_dir.mkdir(parents=True, exist_ok=True)
-
+        
     # -----------------------------
     # Read image bytes from shared storage
     # -----------------------------
@@ -169,7 +178,6 @@ async def predict_footprints(request: PredictionRequest):
             status_code=500,
             detail=f"Inference failed --- error: {str(e)}",
         )
-
 
 @app.post("/predict/zeroshot")
 async def detect_zeroshot(
