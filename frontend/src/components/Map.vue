@@ -36,7 +36,7 @@ const orthophotoSource = new XYZ({
   maxZoom: 20,
 })
 
-const sentinelSource = new XYZ({
+const germanySource = new XYZ({
   url:
     `${TITILER_URL}/cog/tiles/WebMercatorQuad/{z}/{x}/{y}` +
     `?url=/home/ubuntu/work/satellite_data/germany/2021/2021_08.vrt` +
@@ -51,7 +51,7 @@ const sentinelSource = new XYZ({
 // The TileLayer per map type, keyed by the value the nav bar (buttons) sets
 const mapLayers = {
   osm: new TileLayer({ source: new OSM() }),
-  sentinel: new TileLayer({ source: sentinelSource }),
+  germany: new TileLayer({ source: germanySource }),
   orthophoto: new TileLayer({ source: orthophotoSource }),
 }
 
