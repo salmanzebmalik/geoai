@@ -1,9 +1,9 @@
 <template>
   <div v-if="visible" class="overlay-wrapper">
-    <v-card class="overlay-card" elevation="8" rounded="lg">
+    <v-card class="overlay-card" color="#1b2e1b" elevation="8" rounded="lg">
       <v-card-text>
         <div class="message">
-          <v-icon icon="mdi-loading" class="spin mr-2" />
+          <v-progress-circular indeterminate size="20" width="2" color="success" class="mr-2" />
           Prediction is running…
         </div>
 
@@ -80,8 +80,6 @@ watch(() => mapStore.isPredicting, (predicting) => {
 .overlay-card {
   width: 380px;
   pointer-events: all;
-  background-color: rgba(27, 46, 27);
-  color: white;
 }
 
 .message {
@@ -89,17 +87,6 @@ watch(() => mapStore.isPredicting, (predicting) => {
   align-items: center;
   font-size: 15px;
   margin-bottom: 16px;
-  color: white;
-}
-
-.spin {
-  animation: spin 1.2s linear infinite;
-  color: #4caf50;
-}
-
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
 }
 
 .progress-bar {

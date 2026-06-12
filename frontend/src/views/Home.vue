@@ -2,14 +2,14 @@
   <div class="home">
     <MapView />
     <NavigationbarLeft />
-    <PredictionOverlay />
+    <LoadingOverlay />
   </div>
 </template>
 
 <script setup>
 import MapView from '../components/Map.vue'
 import NavigationbarLeft from '../components/NavigationbarLeft.vue'
-import PredictionOverlay from '../components/PredictionOverlay.vue'
+import LoadingOverlay from '../components/LoadingOverlay.vue'
 </script>
 
 <style scoped>
