@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import numpy as np
 import torch
 from PIL import Image
@@ -18,6 +20,9 @@ class LangSAMPipeline:
         patch_size: int = 1024,
         overlap: int = 128,
         device: Optional[str] = None,
+        # For offline loading
+        offline: bool = True,
+        # Confidence thresholds for LangSAM predictions --- need to tune
         text_threshold: float = 0.15,
         box_threshold: float = 0.3
     ):
@@ -29,7 +34,24 @@ class LangSAMPipeline:
             self.device = "cuda" if torch.cuda.is_available() else "cpu"
         else:
             self.device = device
-        self.model = LangSAM()
+
+        if offline:
+            # set directory paths for local model files
+            current_dir = Path(__file__).parent.resolve()  
+            model_dir = current_dir.parent / "models" / "local_langsam"
+            sam_ckpt_path = f"{model_dir}/sam2.1_hiera_large.pt"
+            gdino_model_path = f"{model_dir}/groundingdino_hf_model"
+            gdino_processor_path = f"{model_dir}/bert-base-uncased"
+
+            self.model = LangSAM(
+                sam_type="sam2.1_hiera_large",
+                sam_ckpt_path=sam_ckpt_path,
+                gdino_model_ckpt_path=gdino_model_path,
+                gdino_processor_ckpt_path=gdino_processor_path,
+            )
+        else:
+            # Online mode – downloads everything automatically from the internet
+            self.model = LangSAM()
 
     def get_full_mask_from_bytes(self, image_bytes: bytes, keyword: str = "tree") -> np.ndarray:
         stride = self.patch_size - self.overlap

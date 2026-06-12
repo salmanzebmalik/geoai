@@ -1,3 +1,6 @@
+from pathlib import Path
+from typing import Optional
+
 import numpy as np
 import torch
 import rasterio
@@ -11,11 +14,34 @@ from rasterio.transform import from_bounds
 
 
 class TCDSegformer:
-    def __init__(self, model_id="restor/tcd-segformer-mit-b2"):
+    def __init__(
+                self, 
+                model_id="restor/tcd-segformer-mit-b2",
+                offline: bool = True,
+                model_path: Optional[str] = None,
+                ):
+        
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        print(f"Segformer model is on device: {self.device} ---")
-        self.processor = AutoImageProcessor.from_pretrained(model_id)
-        self.model = SegformerForSemanticSegmentation.from_pretrained(model_id).to(self.device)
+
+        if offline:
+            # look for local models in this path, if not exists, raise error
+            if model_path is None:
+                current_dir = Path(__file__).parent.resolve()
+                model_dir = current_dir.parent / "models" / "local_tcd-segformer_local"
+            else:
+                model_dir = Path(model_path).resolve()
+
+            if not model_dir.exists():
+                raise FileNotFoundError(f"TCD Segformer model not found at {model_dir}")
+            
+            self.processor = AutoImageProcessor.from_pretrained(str(model_dir), local_files_only=True)
+            self.model = SegformerForSemanticSegmentation.from_pretrained(str(model_dir), local_files_only=True).to(self.device)
+            print("weights loaded")
+        else:
+            self.processor = AutoImageProcessor.from_pretrained(model_id)
+            self.model = SegformerForSemanticSegmentation.from_pretrained(model_id).to(self.device)
+            # HF already has a print
+    
         self.patch_size = 512
         self.model.eval()
 
