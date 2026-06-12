@@ -64,7 +64,12 @@ function showMapLayer(type) {
 
 // --- Bounding box drawing ---
 const vectorSource = new VectorSource({ wrapX: false })
-const vectorLayer = new VectorLayer({ source: vectorSource })
+const vectorLayer = new VectorLayer({
+  source: vectorSource,
+  style: new Style({
+    stroke: new Stroke({ color: '#0077ff', width: 3 }),
+  }),
+})
 
 // --- Prediction result overlay ---
 const predictionSource = new VectorSource()
@@ -153,28 +158,34 @@ watch(() => mapStore.startDrawingTrigger, () => startDrawing())
 watch(() => mapStore.runTrigger, async () => {
   if (!mapStore.bbox) return
 
-  // Send bbox to backend for prediction
-  const response = await fetch('http://localhost:8002/api/segmentation/predict', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ bbox: mapStore.bbox }),
-  })
+  mapStore.isPredicting = true
 
-  const result = await response.json()
-  console.log('Prediction:', result)
+  try {
+    // Send bbox to backend for prediction
+    const response = await fetch('http://localhost:8002/api/segmentation/predict', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ bbox: mapStore.bbox }),
+    })
 
-  if (!response.ok) {
-    console.error('Prediction failed:', result.detail)
-    return
+    const result = await response.json()
+    console.log('Prediction:', result)
+
+    if (!response.ok) {
+      console.error('Prediction failed:', result.detail)
+      return
+    }
+
+    predictionSource.clear()
+    const features = new GeoJSON().readFeatures(result.prediction.geojson, {
+      dataProjection: 'EPSG:4326',
+      featureProjection: 'EPSG:3857',
+    })
+
+    predictionSource.addFeatures(features)
+  } finally {
+    mapStore.isPredicting = false
   }
-
-  predictionSource.clear()
-  const features = new GeoJSON().readFeatures(result.prediction.geojson, {
-    dataProjection: 'EPSG:4326',
-    featureProjection: 'EPSG:3857',
-  })
-
-  predictionSource.addFeatures(features)
 })
 </script>
 

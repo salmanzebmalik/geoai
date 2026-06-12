@@ -13,6 +13,7 @@ export const useMapStore = defineStore('map', () => {
 
   const bbox = ref(null)
   const runTrigger = ref(0)
+  const isPredicting = ref(false)
 
   const areaSqm = ref(null)
 
@@ -28,5 +29,5 @@ export const useMapStore = defineStore('map', () => {
     runTrigger.value++
   }
 
-  return { startDrawingTrigger, triggerDrawing, mapType, setMapType, mapCenter, mapZoom, bbox, runTrigger, triggerRun, selectedTask, areaSqm }
+  return { startDrawingTrigger, triggerDrawing, mapType, setMapType, mapCenter, mapZoom, bbox, runTrigger, triggerRun, selectedTask, areaSqm, isPredicting }
 })
