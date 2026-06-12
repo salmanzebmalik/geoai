@@ -5,8 +5,8 @@
         <v-btn-toggle
           v-model="mapStore.mapType"
           rounded
-          variant="transparent"
           divided
+          color="success"
           class="map-type-toggle"
         >
           <v-btn value="osm" prepend-icon="mdi-map">
@@ -28,23 +28,34 @@
             prepend-icon="mdi-numeric-1-circle"
             title="Select Area"
           ></v-list-item>
-          <v-btn 
-            @click="mapStore.triggerDrawing()" 
-            class="select-button" 
-            prepend-icon="mdi-select" 
+          <v-btn
+            @click="mapStore.triggerDrawing()"
+            class="select-button"
+            prepend-icon="mdi-select"
             variant="tonal"
           >Select Area</v-btn>
+
+          <div class="bbox-info" v-if="mapStore.bbox">
+            <span>N {{ mapStore.bbox.max_lat.toFixed(5) }}</span>
+            <span>S {{ mapStore.bbox.min_lat.toFixed(5) }}</span>
+            <span>E {{ mapStore.bbox.max_lon.toFixed(5) }}</span>
+            <span>W {{ mapStore.bbox.min_lon.toFixed(5) }}</span>
+            <span class="area">{{ formatArea(mapStore.areaSqm) }}</span>
+          </div>
+
           <v-list-item
             prepend-icon="mdi-numeric-2-circle"
             title="Task"
           ></v-list-item>
           <v-select
-            :items="['Tree Quality', 'Pavement Quality', 'Construction Site Detection']"
+            :items="['Tree Detection', 'Pavement Quality', 'Construction Site Detection']"
             placeholder="Select Task"
             variant="solo"
             density="compact"
             class="ml-task-dropdown"
             hide-details
+            v-model="mapStore.selectedTask"
+            disabled
           ></v-select>
           <v-list-item
             prepend-icon="mdi-numeric-3-circle"
@@ -57,12 +68,13 @@
             density="compact"
             class="ml-task-dropdown"
             hide-details
+            disabled
           ></v-select>
           <v-list-item
             prepend-icon="mdi-numeric-3-circle"
             title="Run"
           ></v-list-item>
-          <v-btn prepend-icon="mdi-rocket-launch" class="run-btn" color="success">Run</v-btn>
+          <v-btn @click="mapStore.triggerRun()" prepend-icon="mdi-rocket-launch" class="run-btn" color="success">Run</v-btn>
       </v-list>
 
       
@@ -74,6 +86,13 @@
 import { useMapStore } from '@/stores/map'
 
 const mapStore = useMapStore()
+
+function formatArea(sqm) {
+  if (sqm == null) return ''
+  return sqm > 1_000_000
+    ? `${(sqm / 1_000_000).toFixed(2)} km²`
+    : `${Math.round(sqm)} m²`
+}
 </script>
 
 <style scoped>
@@ -110,5 +129,16 @@ const mapStore = useMapStore()
 .run-btn {
   width: 90%;
   margin: 0 16px;
+}
+
+.bbox-info {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  width: 90%;
+  margin: 8px 16px;
+  padding: 8px;
+  font-size: 12px;
+  text-align: center;
 }
 </style>
