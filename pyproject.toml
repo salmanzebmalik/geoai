@@ -3,7 +3,7 @@ name = "geoai"
 version = "0.1.0"
 description = "Environment for GeoAI"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.12"
 dependencies = [
     "affine==2.4.0",
     "annotated-doc==0.0.4",
@@ -63,7 +63,7 @@ dependencies = [
     "torchaudio>=2.11.0",
     "torchvision>=0.26.0",
     "tqdm>=4.67.3",
-    "transformers>=5.7.0",
+    "transformers == 4.44.2",
     "typing-extensions==4.15.0",
     "typing-inspection==0.4.2",
     "ultralytics>=8.4.46",

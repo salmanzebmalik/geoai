@@ -15,17 +15,15 @@ def download_langsam(local_path="ml-service/app/models/local_langsam"):
     SAM2_VARIANT = "sam2.1_hiera_large"   # or "sam2.1_hiera_small", "sam2.1_hiera_base_plus", "sam2.1_hiera_large"
 
 
-    # Download GDINO Model checkpoints
+    gdino_dir = os.path.join(local_path, "groundingdino_hf_model")
     print("Downloading GroundingDINO (once) from HF...")
-    gdino_hf_dir = os.path.join(local_path, "groundingdino_hf_model")
-    # -base or -tiny
-    model_id = "IDEA-Research/grounding-dino-base"
-    model = AutoModelForZeroShotObjectDetection.from_pretrained(model_id)
-    processor = AutoProcessor.from_pretrained(model_id)
-    # Save the model and processor to the local directory
-    model.save_pretrained(gdino_hf_dir)
-    processor.save_pretrained(gdino_hf_dir)
-    print(f"GroundingDINO HF model saved to: {gdino_hf_dir}")
+    snapshot_download(
+        repo_id="IDEA-Research/grounding-dino-base",
+        local_dir=gdino_dir,
+        local_dir_use_symlinks=False,
+        resume_download=True,
+    )
+    print(f"GroundingDINO saved to: {gdino_dir}")
 
 
 

@@ -44,13 +44,12 @@ class LangSAMPipeline:
 
             sam_ckpt_path = f"{model_dir}/sam2.1_hiera_large.pt"
             gdino_model_path = f"{model_dir}/groundingdino_hf_model"
-            gdino_processor_path = f"{model_dir}/bert-base-uncased"
 
             self.model = LangSAM(
                 sam_type="sam2.1_hiera_large",
                 sam_ckpt_path=sam_ckpt_path,
                 gdino_model_ckpt_path=gdino_model_path,
-                gdino_processor_ckpt_path=gdino_processor_path,
+                gdino_processor_ckpt_path=gdino_model_path,
             )
         else:  # online
             self.model = LangSAM()
