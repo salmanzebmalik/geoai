@@ -3,7 +3,7 @@ import requests
 import webbrowser
 from pathlib import Path
 
-TITILER = "http://localhost:8000"
+TITILER = "http://localhost:8004"
 MOSAIC_PATH = "/home/ubuntu/work/saved_data/collections/digital_orthofoto_nrw/mosaic.json"
 GERMANY_COG_PATH = "/home/ubuntu/work/satellite_data/germany/2021/2021_08.vrt"
 print("step1")

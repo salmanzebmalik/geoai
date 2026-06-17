@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal
 
 from pydantic import BaseModel
 
@@ -6,7 +6,6 @@ from pydantic import BaseModel
 class GeoJSONGeometry(BaseModel):
     type: Literal["Polygon", "MultiPolygon"]
     coordinates: List
-
 
 
 class GeoJSONFeature(BaseModel):
@@ -18,12 +17,3 @@ class GeoJSONFeature(BaseModel):
 class GeoJSONFeatureCollection(BaseModel):
     type: Literal["FeatureCollection"]
     features: List[GeoJSONFeature]
-
-
-class PredictionResponse(BaseModel):
-    query_id: str
-    status: str
-    model_name: str
-    prediction_type: str
-    geojson: GeoJSONFeatureCollection
-    summary: str

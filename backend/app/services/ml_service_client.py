@@ -1,0 +1,107 @@
+from pathlib import Path
+from typing import Literal, Optional
+
+import requests
+
+from app.core.config import settings
+from app.schemas.segmentation import BoundingBox
+
+
+ModelType = Literal["tree", "zeroshot"]
+
+
+def get_ml_endpoint(model_type: ModelType) -> str:
+    if model_type == "tree":
+        return "/api/v1/predict/tree"
+
+    if model_type == "zeroshot":
+        return "/api/v1/predict/zeroshot"
+
+    raise ValueError(f"Unsupported model_type: {model_type}")
+
+
+def call_ml_service(
+    query_id: str,
+    bbox: BoundingBox,
+    input_image_path: str,
+    model_type: ModelType = "tree",
+    keyword: Optional[str] = None,
+) -> dict:
+    """
+    Call the ML service using the shared-storage image path.
+
+    Backend sends:
+        query_id
+        input_image_path
+        output_dir
+        bbox coordinates
+        optional keyword for zero-shot
+    """
+
+    endpoint = get_ml_endpoint(model_type)
+    url = f"{settings.ml_service_url}{endpoint}"
+
+    output_dir = str(Path(input_image_path).parent)
+
+    payload = {
+        "query_id": query_id,
+        "input_image_path": input_image_path,
+        "output_dir": output_dir,
+        "min_lon": bbox.min_lon,
+        "min_lat": bbox.min_lat,
+        "max_lon": bbox.max_lon,
+        "max_lat": bbox.max_lat,
+    }
+
+    if model_type == "zeroshot":
+        payload["keyword"] = keyword or "tree"
+
+    session = requests.Session()
+    session.trust_env = False  # avoids proxy problems on some systems
+
+    print("\n========== ML Service Request Debug ==========")
+    print("URL:", url)
+    print("Model type:", model_type)
+    print("Payload:", payload)
+    print("=============================================\n")
+
+    try:
+        response = session.post(
+            url,
+            json=payload,
+            headers={"Accept": "application/json"},
+            timeout=300,
+        )
+
+        print("\n========== ML Service Response Debug ==========")
+        print("Status code:", response.status_code)
+        print("Content-Type:", response.headers.get("content-type"))
+        print("Response preview:", response.text[:500])
+        print("==============================================\n")
+
+        response.raise_for_status()
+
+    except requests.exceptions.ConnectionError as e:
+        raise RuntimeError(
+            f"Could not connect to ML service at {settings.ml_service_url}: {e}"
+        ) from e
+
+    except requests.exceptions.Timeout as e:
+        raise RuntimeError(
+            f"ML service request timed out after 300 seconds: {url}"
+        ) from e
+
+    except requests.exceptions.HTTPError as e:
+        raise RuntimeError(
+            f"ML service returned HTTP {response.status_code}: {response.text[:1000]}"
+        ) from e
+
+    except requests.exceptions.RequestException as e:
+        raise RuntimeError(f"ML service request failed: {e}") from e
+
+    try:
+        return response.json()
+    except ValueError as e:
+        raise RuntimeError(
+            f"ML service returned invalid JSON: {response.text[:1000]}"
+        ) from e

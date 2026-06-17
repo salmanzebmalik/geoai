@@ -1,31 +1,165 @@
+# ============================================================
+# Python
+# ============================================================
+
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+
+# Python build / package artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Virtual environments
 .venv/
-backend/.env
+venv/
+env/
+ENV/
 backend/venv/
-backend/__pycache__/
-backend/**/*.pyc
+ml-service/venv/
+
+# Python tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.cache/
+
+# Jupyter
+.ipynb_checkpoints/
+
+
+# ============================================================
+# Environment variables / secrets
+# ============================================================
+
+.env
+*.env
+backend/.env
+ml-service/.env
+
+# Keep example env files
+!.env.example
+!backend/.env.example
+!ml-service/.env.example
+
+
+# ============================================================
+# Local databases
+# ============================================================
+
+*.db
+*.sqlite
+*.sqlite3
 backend/geoai.db
+
+
+# ============================================================
+# Backend generated files
+# ============================================================
 
 backend/static/images/
 backend/static/masks/
+backend/static/outputs/
 
-ml-service/uploads
-ml-service/venv
-ml-service/.env
 
-.DS_Store
-/ml-service/app/models/datasets
-/runs
-*.pt
-*.lock
-.python-version
-*.jp2
-/ml-service/app/models/__pycache__
-/ml-service/app/__pycache__
-*.pyc
-*.png
-/Grounded-SAM-2
-pyproject.toml
-/ml-service/app/models/local_langsam
-/ml-service/app/models/local_tcd-segformer_local
+# ============================================================
+# ML service generated files
+# ============================================================
+
+ml-service/uploads/
+ml-service/outputs/
+ml-service/runs/
+runs/
+
+
+# ============================================================
+# Shared storage / mounted volumes
+# ============================================================
 
 storage/
+shared/
+shared_storage/
+
+
+# ============================================================
+# ML models, checkpoints, and weights
+# ============================================================
+
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.safetensors
+*.bin
+
+ml-service/app/models/datasets/
+ml-service/app/models/local_langsam/
+ml-service/app/models/local_tcd-segformer_local/
+Grounded-SAM-2/
+
+# ============================================================
+# Large satellite / geospatial data
+# ============================================================
+
+*.jp2
+*.tif
+*.tiff
+*.vrt
+*.geotiff
+*.geojson
+*.shp
+*.shx
+*.dbf
+*.prj
+*.cpg
+
+
+# ============================================================
+# Generated images / masks
+# ============================================================
+
+*.png
+*.jpg
+*.jpeg
+*.webp
+
+
+# ============================================================
+# OS / editor files
+# ============================================================
+
+.DS_Store
+Thumbs.db
+
+.vscode/
+.idea/
+
+
+# ============================================================
+# Logs and temporary files
+# ============================================================
+
+*.log
+logs/
+tmp/
+temp/
+*.tmp
+
+
+# ============================================================
+# Lock files
+# ============================================================
+
+*.lock
+
+
+# ============================================================
+# Local Python version files
+# ============================================================
+
+.python-version

@@ -1,8 +1,0 @@
-fastapi
-uvicorn[standard]
-pydantic
-sqlmodel
-psycopg2-binary
-python-dotenv
-pillow
-requests

@@ -37,6 +37,6 @@ echo "Starting backend on port 8002..."
 cd "$SCRIPT_DIR/$BACKEND_DIR"
 uvicorn app.main:app --host 127.0.0.1 --port 8002 &
 
-echo "Starting frontend dev server..."
-cd "$SCRIPT_DIR/$FRONTEND_DIR"
-npm run dev
+# echo "Starting frontend dev server..."
+# cd "$SCRIPT_DIR/$FRONTEND_DIR"
+# npm run dev

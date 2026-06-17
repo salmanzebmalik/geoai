@@ -5,26 +5,37 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 
-# ----------------------------
-# Bounding Box Model
-# ----------------------------
+SourceType = Literal["satellite", "ortho"]
+ModelType = Literal["tree", "zeroshot"]
+
+
 class BoundingBox(BaseModel):
-    max_lat: float = Field(..., description="Maximum latitude boundary")
     min_lat: float = Field(..., description="Minimum latitude boundary")
-    max_lon: float = Field(..., description="Maximum longitude boundary")
+    max_lat: float = Field(..., description="Maximum latitude boundary")
     min_lon: float = Field(..., description="Minimum longitude boundary")
+    max_lon: float = Field(..., description="Maximum longitude boundary")
 
 
-# ----------------------------
-# Prediction Request Model
-# ----------------------------
 class PredictionRequest(BaseModel):
     bbox: BoundingBox
 
+    # Default keeps your old behavior.
+    # Frontend can omit this and tree detection will run.
+    model_type: ModelType = "tree"
 
-# ----------------------------
-# Image Metadata Model
-# ----------------------------
+    # Only used when model_type = "zeroshot".
+    # If omitted, backend sends "tree" as default keyword.
+    keyword: Optional[str] = None
+
+    # Optional source selection for tiTiler.
+    source_type: SourceType = "satellite"
+
+
+class FetchImageRequest(BaseModel):
+    bbox: BoundingBox
+    source_type: SourceType = "satellite"
+
+
 class ImageInfo(BaseModel):
     image_url: Optional[str] = None
     width: Optional[int] = None
@@ -32,12 +43,11 @@ class ImageInfo(BaseModel):
     format: Optional[str] = "tiff"
 
 
-# ----------------------------
-# GeoJSON Models
-# ----------------------------
 class GeoJSONGeometry(BaseModel):
-    type: Literal["Polygon"]
-    coordinates: List[List[List[float]]]
+    type: Literal["Polygon", "MultiPolygon"]
+
+    # Use flexible coordinates because Polygon and MultiPolygon have different nesting.
+    coordinates: List[Any]
 
 
 class GeoJSONFeature(BaseModel):
@@ -52,30 +62,22 @@ class GeoJSONFeatureCollection(BaseModel):
     features: List[GeoJSONFeature]
 
 
-# ----------------------------
-# Prediction Output Model
-# ----------------------------
 class PredictionOutput(BaseModel):
     prediction_type: str
     model_name: str
     geojson: GeoJSONFeatureCollection
+    summary: Optional[str] = None
 
 
-# ----------------------------
-# Full Prediction Response Model
-# ----------------------------
 class PredictionResponse(BaseModel):
     query_id: UUID
     status: str
     bbox: BoundingBox
     image: Optional[ImageInfo] = None
-    prediction: PredictionOutput
+    prediction: Optional[PredictionOutput] = None
     created_at: datetime
 
 
-# ----------------------------
-# Prediction History Model
-# ----------------------------
 class PredictionHistoryItem(BaseModel):
     query_id: UUID
     status: str

@@ -1,29 +1,24 @@
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.routes import router
-from app.database import create_db_and_tables
-from app.schemas import BoundingBox
+from app.api.router import api_router
+from app.core.config import settings
+from app.db.database import create_db_and_tables
 
 
 app = FastAPI(
-    title="GeoAI Segmentation Backend API",
-    description="Backend API for bounding-box based satellite image segmentation.",
-    version="1.0.0"
+    title=settings.app_title,
+    description=settings.app_description,
+    version=settings.app_version,
 )
-
-
-origins = [
-    "http://localhost:3000",
-    "http://localhost:5173",
-    "http://127.0.0.1:5173"
-]
 
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=settings.cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -35,14 +30,24 @@ def on_startup():
     create_db_and_tables()
 
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
+static_dir = Path("static")
+static_dir.mkdir(parents=True, exist_ok=True)
+
+app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
 
-app.include_router(router)
+app.include_router(api_router, prefix="/api")
 
 
 @app.get("/")
 def root():
     return {
-        "message": "GeoAI Segmentation Backend API is running"
+        "message": "GeoAI Segmentation Backend API is running",
+    }
+
+
+@app.get("/health")
+def health_check():
+    return {
+        "status": "healthy",
     }

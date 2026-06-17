@@ -17,6 +17,5 @@ curl --noproxy localhost -o munster_ger.tif "http://localhost:8000/cog/bbox/7.62
 
 curl --noproxy localhost -o munster_ger.tif "http://localhost:8000/mosaicjson/bbox/7.62121,51.94791,7.62179,51.94889.tif?url=/home/ubuntu/work/saved_data/collections/digital_orthofoto_nrw/mosaic.json"
 
-curl -o munster_ortho.tif "http://localhost:8001/mosaicjson/bbox/7.62121,51.94791,7.62179,51.94889.tif?url=/home/ubuntu/work/saved_data/collections/digital_orthofoto_nrw/mosaic.json"
+curl -o munster_ortho.tif "http://localhost:8004/mosaicjson/bbox/7.62121,51.94791,7.62179,51.94889.tif?url=/home/ubuntu/work/saved_data/collections/digital_orthofoto_nrw/mosaic.json"
 ```
-
