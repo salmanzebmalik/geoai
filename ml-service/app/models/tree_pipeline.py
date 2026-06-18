@@ -19,7 +19,8 @@ class TCDSegformer:
         self,
         model_id="restor/tcd-segformer-mit-b2",
         offline: bool = True,
-        patch_size: int = 512,
+        patch_size: int = 1024,
+        overlap: int = 128,
     ):
 
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -42,6 +43,7 @@ class TCDSegformer:
             # HF already has a print
 
         self.patch_size = patch_size
+        self.overlap = overlap
         self.model.eval()
 
     @staticmethod
@@ -83,6 +85,7 @@ class TCDSegformer:
 
     def get_full_mask_from_bytes(self, image_bytes: bytes) -> np.ndarray:
         """same as get_full_mask but accepts bytes"""
+        stride = self.patch_size - self.overlap
         with rasterio.MemoryFile(image_bytes) as memfile:  # only line changing
             with memfile.open() as src:
                 h, w = src.height, src.width
@@ -98,8 +101,9 @@ class TCDSegformer:
                         x,
                         y,
                     )
-                    for y in range(0, h, self.patch_size)
-                    for x in range(0, w, self.patch_size)
+                    # subtract overlap from patch size to get step size that overlaps
+                    for y in range(0, h, stride) 
+                    for x in range(0, w, stride)
                 ]
                 for window, x, y in windows:
                     patch = self._read_rgb(src, window=window)

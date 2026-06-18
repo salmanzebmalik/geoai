@@ -13,10 +13,14 @@ async def lifespan(app: FastAPI):
     print("Loading models...")
 
     try:
-        offline = False
+        offline = False  # set to True to load from local files, False to load from Hugging Face 
 
         app.state.models = {
-            "segformer": TCDSegformer(offline=offline),
+            "segformer": TCDSegformer(
+                offline=offline, 
+                patch_size=1024, 
+                overlap=128
+                ),
             "lang_sam": LangSAMPipeline(
                 patch_size=1024,
                 overlap=128,
