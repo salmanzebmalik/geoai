@@ -90,7 +90,7 @@ class LangSAMPipeline:
             return full_mask.astype(np.uint8)
 
     @staticmethod
-    def bbox_to_tree_geojson(bbox_coords, mask) -> gpd.GeoDataFrame:
+    def bbox_to_tree_geojson(bbox_coords, mask, keyword: str = "tree") -> gpd.GeoDataFrame:
         min_lon, min_lat, max_lon, max_lat = bbox_coords
         height, width = mask.shape
         transform = from_bounds(min_lon, min_lat, max_lon, max_lat, width, height)
@@ -99,7 +99,7 @@ class LangSAMPipeline:
             results.append(
                 {
                     "geometry": shape(geom),
-                    "properties": {"class": "tree", "area_m2": None},
+                    "properties": {"class": keyword, "area_m2": None},
                 }
             )
         if not results:

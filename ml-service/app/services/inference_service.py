@@ -19,14 +19,16 @@ def run_zero_shot_detection(
     bbox_coords: tuple,
     keyword: str = "tree",
 ):
+    
     mask = pipeline.get_full_mask_from_bytes(
         image_bytes,
         keyword=keyword,
     )
 
-    gdf = pipeline.bbox_to_tree_geojson(bbox_coords, mask)
+    gdf = pipeline.bbox_to_tree_geojson(bbox_coords, mask, keyword)
 
     if isinstance(gdf, gpd.GeoDataFrame):
         return json.loads(gdf.to_json())
 
+    
     return gdf
