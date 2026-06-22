@@ -1,4 +1,6 @@
+import os
 from pathlib import Path
+import sys
 from typing import Optional
 
 import numpy as np
@@ -12,6 +14,10 @@ from rasterio.features import shapes
 from shapely.geometry import shape
 from rasterio.transform import from_bounds
 from app.models.model_downloader import ensure_segformer_models
+
+from app.utils.logger import get_logger
+logger = get_logger(__name__)
+import time
 
 
 class TCDSegformer:
@@ -36,15 +42,16 @@ class TCDSegformer:
 
             self.processor = AutoImageProcessor.from_pretrained(str(model_dir), local_files_only=True)
             self.model = SegformerForSemanticSegmentation.from_pretrained(str(model_dir), local_files_only=True).to(self.device)
-            print("weights loaded")
+            logger.info("TCD Segformer model weights loaded from local files")
         else:
             self.processor = AutoImageProcessor.from_pretrained(model_id)
             self.model = SegformerForSemanticSegmentation.from_pretrained(model_id).to(self.device)
-            # HF already has a print
 
         self.patch_size = patch_size
         self.overlap = overlap
         self.model.eval()
+
+
 
     @staticmethod
     def _read_rgb(
@@ -69,8 +76,6 @@ class TCDSegformer:
                        for x in range(0, w, self.patch_size)
                        ]
 
-            # testing prints
-            print(f"starting tiled inference on {image_path}")
             # processing of each patches
             for window, x, y in tqdm(windows, desc="Inference...", unit="patch"):
                 patch = self._read_rgb(src, window=window)
@@ -86,10 +91,16 @@ class TCDSegformer:
     def get_full_mask_from_bytes(self, image_bytes: bytes) -> np.ndarray:
         """same as get_full_mask but accepts bytes"""
         stride = self.patch_size - self.overlap
+        logger.info(f"Reading image... | size: {len(image_bytes)} bytes")
+        start_time = time.time()
         with rasterio.MemoryFile(image_bytes) as memfile:  # only line changing
             with memfile.open() as src:
                 h, w = src.height, src.width
+                logger.info(f"Image dimensions: {h}x{w}")
                 full_mask = np.zeros((h, w), dtype=np.uint8)
+
+
+
                 windows = [
                     (
                         Window(
@@ -105,17 +116,37 @@ class TCDSegformer:
                     for y in range(0, h, stride) 
                     for x in range(0, w, stride)
                 ]
+
+                total_tiles = len(windows)
+                # logger init
+                logger.info("Processing tiles -- Total tile length: %d", total_tiles)
+                processed = 0
+                failed = 0
                 for window, x, y in windows:
-                    patch = self._read_rgb(src, window=window)
-                    inputs = self.processor(images=patch, return_tensors="pt").to(self.device)
-                    with torch.inference_mode(), torch.autocast(device_type=self.device):
-                        logits = self.model(**inputs).logits
-                    mask = torch.nn.functional.interpolate(logits, size=(window.height, window.width), mode="bilinear")
-                    full_mask[y: y + window.height, x: x + window.width] = (mask.argmax(dim=1)[0].cpu().numpy() == 1).astype(np.uint8)
+                    try:
+                        patch = self._read_rgb(src, window=window)
+                        inputs = self.processor(images=patch, return_tensors="pt").to(self.device)
+                        with torch.inference_mode(), torch.autocast(device_type=self.device):
+                            logits = self.model(**inputs).logits
+                        mask = torch.nn.functional.interpolate(logits, size=(window.height, window.width), mode="bilinear")
+                        full_mask[y: y + window.height, x: x + window.width] = (mask.argmax(dim=1)[0].cpu().numpy() == 1).astype(np.uint8)
+                        processed += 1
+                        # Log progress every 10%
+                        if processed % max(1, total_tiles // 10) == 0:
+                            logger.info(f"Progress: {processed}/{total_tiles} ({processed/total_tiles*100:.0f}%)")
+                    # Final summary
+                    except Exception as e:
+                        logger.warning(f"Failed to process tile at ({x}, {y}): {e}")
+                        failed += 1
+                        continue
+                elapsed = time.time() - start_time
+                logger.info(f"Inference complete | tiles: {processed}/{total_tiles} | failed: {failed} | time: {elapsed:.2f}s") 
                 return full_mask
 
     @staticmethod
     def bbox_to_tree_geojson(bbox_coords, mask):
+        logger.info(f"Converting mask to GeoJSON | bbox: {bbox_coords}")
+        start_time = time.time()
         min_lon, min_lat, max_lon, max_lat = bbox_coords
         height, width = mask.shape
         transform = from_bounds(min_lon, min_lat, max_lon, max_lat, width, height)
@@ -128,9 +159,16 @@ class TCDSegformer:
                 }
             )
         if not results:
+            logger.warning("No trees detected in mask")
             return {"type": "FeatureCollection", "features": []}
+
+        # CREATING GDF
+        logger.info(f"Creating GeoDataFrame with {len(results)} trees")
         gdf = gpd.GeoDataFrame.from_features(results, crs="EPSG:4326")
         gdf_projected = gdf.to_crs("EPSG:3857")
         gdf["area_m2"] = gdf_projected.geometry.area
         print("GeoJSON result: ", gdf)
+
+        elapsed = time.time() - start_time
+        logger.info(f"GeoJSON conversion complete | trees: {len(gdf)} | avg area: {gdf['area_m2'].mean():.2f}m² | time: {elapsed:.2f}s")
         return gdf

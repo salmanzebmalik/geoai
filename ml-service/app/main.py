@@ -7,10 +7,12 @@ from app.api.router import api_router
 from app.models.tree_pipeline import TCDSegformer
 from app.models.sam_pipeline import LangSAMPipeline
 
+from app.utils.logger import get_logger
+logger = get_logger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("Loading models...")
+    logger.info("Starting up ML service and loading models...")
 
     try:
         offline = False  # set to True to load from local files, False to load from Hugging Face 
@@ -28,10 +30,10 @@ async def lifespan(app: FastAPI):
             ),
         }
 
-        print("Models loaded successfully")
+        logger.info("Models loaded successfully")
 
     except Exception as e:
-        print(f"Failed to load models: {e}")
+        logger.error(f"Error loading models: {e}")
         raise
 
     yield

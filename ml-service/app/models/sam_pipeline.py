@@ -1,4 +1,5 @@
 from pathlib import Path
+import time
 
 import numpy as np
 import torch
@@ -13,6 +14,18 @@ import geopandas as gpd
 from tqdm import tqdm
 from typing import Optional, Tuple, List
 from app.models.model_downloader import ensure_langsam_models
+
+
+# Supress LangSAM internal noisy prints
+import builtins
+_original_print = builtins.print
+builtins.print = lambda *args, **kwargs: None if args and isinstance(args[0], str) and (args[0].startswith("Predicting") or args[0].startswith("Predicted")) else _original_print(*args, **kwargs)
+
+import warnings
+warnings.filterwarnings("ignore", message="The given NumPy array is not writable") # this gets handled under the hood, so warning is just nosiy.
+
+from app.utils.logger import get_logger
+logger = get_logger(__name__)
 
 
 class LangSAMPipeline:
@@ -55,20 +68,35 @@ class LangSAMPipeline:
             self.model = LangSAM()
 
     def get_full_mask_from_bytes(self, image_bytes: bytes, keyword: str = "tree") -> np.ndarray:
+        start_time = time.time()
         stride = self.patch_size - self.overlap
         with rasterio.MemoryFile(image_bytes) as memfile, memfile.open() as src:
             h, w = src.height, src.width
+            logger.info(f"Image dimensions: {h}x{w}")
+
             full_mask = np.zeros((h, w), dtype=bool)
+
+            # Calculate the total of tiles
+            tiles_y = (h + stride - 1) // stride
+            tiles_x = (w + stride - 1) // stride
+            total_tiles = tiles_y * tiles_x
+            logger.info(f"Processing {total_tiles} tiles")
+            processed = 0
+            failed = 0
+
+
             for y in range(0, h, stride):
                 for x in range(0, w, stride):
                     th = min(self.patch_size, h - y)
                     tw = min(self.patch_size, w - x)
                     window = Window(x, y, tw, th)
-                    patch = src.read([1, 2, 3], window=window)
-                    patch = np.moveaxis(patch, 0, -1)
-                    if patch.dtype == np.uint16:
-                        patch = (patch >> 8).astype(np.uint8)
                     try:
+                        patch = src.read([1, 2, 3], window=window)
+                        patch = np.moveaxis(patch, 0, -1)
+                        patch = patch.copy() # ensure contiguous array for PIL
+                        if patch.dtype == np.uint16:
+                            patch = (patch >> 8).astype(np.uint8)
+                        # Creates 
                         res = self.model.predict(
                             [Image.fromarray(patch)],
                             [keyword],
@@ -85,12 +113,25 @@ class LangSAMPipeline:
                             if c_mask.shape != (th, tw):
                                 c_mask = np.array(Image.fromarray(c_mask).resize((tw, th), Image.NEAREST))
                             full_mask[y:y+th, x:x+tw] |= c_mask.astype(bool)
+                        processed += 1
+                    
+                        # Log progress every 10%
+                        if processed % max(1, total_tiles // 10) == 0:
+                            logger.info(f"Progress: {processed}/{total_tiles} ({processed/total_tiles*100:.0f}%)")
                     except Exception as e:
-                        print(f"Skipping tile at ({x}, {y}): {e}")
+                        failed += 1
+                        logger.warning(f"Tile failed at ({x}, {y}): {str(e)}")
+                        continue
+            elapsed = time.time() - start_time
+            logger.info(f"Inference complete ===> tiles: {processed}/{total_tiles} | failed: {failed} | time: {elapsed:.2f}s")
             return full_mask.astype(np.uint8)
-
+        
+    
     @staticmethod
     def bbox_to_tree_geojson(bbox_coords, mask, keyword: str = "tree") -> gpd.GeoDataFrame:
+        logger.info(f"Converting mask to GeoJSON | bbox: {bbox_coords}")
+        start_time = time.time()
+
         min_lon, min_lat, max_lon, max_lat = bbox_coords
         height, width = mask.shape
         transform = from_bounds(min_lon, min_lat, max_lon, max_lat, width, height)
@@ -103,10 +144,16 @@ class LangSAMPipeline:
                 }
             )
         if not results:
+            logger.warning(f"No {keyword}s detected in mask")
             return gpd.GeoDataFrame({"geometry": []}, crs="EPSG:4326")
+        
+        # Create GDF
+        logger.info(f"Creating GeoDataFrame with {len(results)} {keyword}s")
         gdf = gpd.GeoDataFrame.from_features(results, crs="EPSG:4326")
         gdf_projected = gdf.to_crs("EPSG:3857")
         gdf["area_m2"] = gdf_projected.geometry.area
         gdf = gdf.drop(columns=["geometry"]).set_geometry(gdf_projected.geometry)  # keep projected?
         gdf["area_m2"] = gdf_projected.geometry.area
+        elapsed = time.time() - start_time
+        logger.info(f"GeoJSON conversion complete | {keyword}s: {len(gdf)} | avg area: {gdf['area_m2'].mean():.2f}m² | time: {elapsed:.2f}s")
         return gdf
