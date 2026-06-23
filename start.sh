@@ -1,42 +1,55 @@
 #!/bin/bash
-# chmod +x start.sh
-set -e 
+set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
 echo "Working directory: $(pwd)"
 
-
 pkill -f uvicorn || true
 sleep 2
 
-# Activate venv
 if [ ! -d ".venv" ]; then
     echo "ERROR: Virtual environment not found at .venv/ in the repository root."
     exit 1
 fi
 source .venv/bin/activate
 
-# Relative paths:
-ML_SERVICE_DIR="ml-service"
-IMAGE_PIPELINE_DIR="image_pipeline"
-BACKEND_DIR="backend"
-FRONTEND_DIR="frontend"
+# Function to stop all background processes on exit
+cleanup() {
+    echo "Shutting down services..."
+    pkill -f uvicorn || true
+    pkill -f "npm run dev" || true
+    exit 0
+}
 
+trap cleanup SIGINT SIGTERM
 
+# Start all services in the background with logs
 echo "Starting ml-service on port 8000..."
-cd "$SCRIPT_DIR/$ML_SERVICE_DIR"
+cd "$SCRIPT_DIR/ml-service"
 uvicorn app.main:app --host 127.0.0.1 --port 8000 &
+ML_PID=$!
 
 echo "Starting image-pipeline (Titiler) on port 8001..."
-cd "$SCRIPT_DIR/$IMAGE_PIPELINE_DIR"
+cd "$SCRIPT_DIR/image_pipeline"
 uvicorn titiler_app:app --host 127.0.0.1 --port 8001 &
+TITILER_PID=$!
 
 echo "Starting backend on port 8002..."
-cd "$SCRIPT_DIR/$BACKEND_DIR"
+cd "$SCRIPT_DIR/backend"
 uvicorn app.main:app --host 127.0.0.1 --port 8002 &
+BACKEND_PID=$!
 
+# Wait for services
+sleep 3
+
+echo "All services are running!"
 echo "Starting frontend dev server..."
-cd "$SCRIPT_DIR/$FRONTEND_DIR"
-npm run dev
+echo "Press Ctrl+C to stop all services"
+
+cd "$SCRIPT_DIR/frontend"
+npm run dev &
+
+# Wait for all background processes
+wait
