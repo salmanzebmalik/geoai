@@ -92,7 +92,7 @@ def fetch_satellite_image_from_titiler(
     session.trust_env = False
 
     try:
-        response = session.get(request_url, timeout=60)
+        response = session.get(request_url)
 
         print("\n========== tiTiler Response Debug ==========")
         print("Status code:", response.status_code)

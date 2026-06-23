@@ -70,7 +70,6 @@ def call_ml_service(
             url,
             json=payload,
             headers={"Accept": "application/json"},
-            timeout=300,
         )
 
         print("\n========== ML Service Response Debug ==========")
