@@ -12,11 +12,11 @@
           <v-btn value="osm" prepend-icon="mdi-map">
             OSM
           </v-btn>
-          <v-btn value="sentinel" prepend-icon="mdi-satellite-variant">
-            Sentinel
+          <v-btn value="germany" prepend-icon="mdi-earth">
+            Germany
           </v-btn>
           <v-btn value="orthophoto" prepend-icon="mdi-magnify">
-            Ortho
+            NRW
           </v-btn>
         </v-btn-toggle>
       </div>

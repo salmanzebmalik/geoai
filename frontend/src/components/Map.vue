@@ -36,7 +36,7 @@ const orthophotoSource = new XYZ({
   maxZoom: 20,
 })
 
-const sentinelSource = new XYZ({
+const germanySource = new XYZ({
   url:
     `${TITILER_URL}/cog/tiles/WebMercatorQuad/{z}/{x}/{y}` +
     `?url=/home/ubuntu/work/satellite_data/germany/2021/2021_08.vrt` +
@@ -51,20 +51,25 @@ const sentinelSource = new XYZ({
 // The TileLayer per map type, keyed by the value the nav bar (buttons) sets
 const mapLayers = {
   osm: new TileLayer({ source: new OSM() }),
-  sentinel: new TileLayer({ source: sentinelSource }),
+  germany: new TileLayer({ source: germanySource }),
   orthophoto: new TileLayer({ source: orthophotoSource }),
 }
 
 // Show only the map layer matching `type` (set by the nav bar buttons)
 function showMapLayer(type) {
   for (const [key, layer] of Object.entries(mapLayers)) {
-    layer.setVisible(key === type)
+    layer.setVisible(key === 'osm' || key === type)
   }
 }
 
 // --- Bounding box drawing ---
 const vectorSource = new VectorSource({ wrapX: false })
-const vectorLayer = new VectorLayer({ source: vectorSource })
+const vectorLayer = new VectorLayer({
+  source: vectorSource,
+  style: new Style({
+    stroke: new Stroke({ color: '#0077ff', width: 3 }),
+  }),
+})
 
 // --- Prediction result overlay ---
 const predictionSource = new VectorSource()
@@ -153,28 +158,34 @@ watch(() => mapStore.startDrawingTrigger, () => startDrawing())
 watch(() => mapStore.runTrigger, async () => {
   if (!mapStore.bbox) return
 
-  // Send bbox to backend for prediction
-  const response = await fetch('http://localhost:8002/api/segmentation/predict', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ bbox: mapStore.bbox }),
-  })
+  mapStore.isPredicting = true
 
-  const result = await response.json()
-  console.log('Prediction:', result)
+  try {
+    // Send bbox to backend for prediction
+    const response = await fetch('http://localhost:8002/api/segmentation/predict', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ bbox: mapStore.bbox }),
+    })
 
-  if (!response.ok) {
-    console.error('Prediction failed:', result.detail)
-    return
+    const result = await response.json()
+    console.log('Prediction:', result)
+
+    if (!response.ok) {
+      console.error('Prediction failed:', result.detail)
+      return
+    }
+
+    predictionSource.clear()
+    const features = new GeoJSON().readFeatures(result.prediction.geojson, {
+      dataProjection: 'EPSG:4326',
+      featureProjection: 'EPSG:3857',
+    })
+
+    predictionSource.addFeatures(features)
+  } finally {
+    mapStore.isPredicting = false
   }
-
-  predictionSource.clear()
-  const features = new GeoJSON().readFeatures(result.prediction.geojson, {
-    dataProjection: 'EPSG:4326',
-    featureProjection: 'EPSG:3857',
-  })
-
-  predictionSource.addFeatures(features)
 })
 </script>
 
