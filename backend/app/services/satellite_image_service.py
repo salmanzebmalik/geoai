@@ -27,8 +27,25 @@ def get_query_dir(query_id: str) -> Path:
     return query_dir
 
 
-def get_input_image_path(query_id: str) -> Path:
-    return get_query_dir(query_id) / "input.tiff"
+def get_input_image_path(
+    query_id: str,
+    tile_id: str | None = None,
+) -> Path:
+    """
+    Single tile:
+        storage/queries/{query_id}/input.tiff
+
+    Multiple tiles:
+        storage/queries/{query_id}/tiles/{tile_id}/input.tiff
+    """
+
+    if tile_id is None:
+        return get_query_dir(query_id) / "input.tiff"
+
+    tile_dir = get_query_dir(query_id) / "tiles" / tile_id
+    tile_dir.mkdir(parents=True, exist_ok=True)
+
+    return tile_dir / "input.tiff"
 
 
 def bbox_to_titiler_string(bbox: BoundingBox) -> str:
@@ -64,6 +81,7 @@ def fetch_satellite_image_from_titiler(
     query_id: str,
     bbox: BoundingBox,
     source_type: SourceType = "satellite",
+    tile_id: str | None = None,
 ) -> tuple[str, ImageInfo]:
     """
     Fetch cropped image from tiTiler and save it into shared storage.
@@ -72,7 +90,10 @@ def fetch_satellite_image_from_titiler(
         storage/queries/{query_id}/input.tiff
     """
 
-    image_path = get_input_image_path(query_id)
+    image_path = get_input_image_path(
+        query_id=query_id,
+        tile_id=tile_id,
+    )   
 
     endpoint, params = build_titiler_request(
         bbox=bbox,
