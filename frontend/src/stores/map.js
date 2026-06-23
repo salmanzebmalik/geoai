@@ -17,6 +17,9 @@ export const useMapStore = defineStore('map', () => {
 
   const areaSqm = ref(null)
 
+  const modelType = ref('tree')  // 'tree' or 'zeroshot'
+  const keyword = ref('house')    // For zeroshot model
+
   function triggerDrawing() {
     startDrawingTrigger.value++ // jedes Increment = neues Zeichnen
   }
@@ -29,5 +32,18 @@ export const useMapStore = defineStore('map', () => {
     runTrigger.value++
   }
 
-  return { startDrawingTrigger, triggerDrawing, mapType, setMapType, mapCenter, mapZoom, bbox, runTrigger, triggerRun, selectedTask, areaSqm, isPredicting }
+  // 
+  function setModelType(type) {
+    modelType.value = type
+  }
+
+  function setKeyword(text) {
+    keyword.value = text
+  }
+
+
+  return {
+    startDrawingTrigger, triggerDrawing, mapType, setMapType, mapCenter, mapZoom, bbox, runTrigger, triggerRun, selectedTask, areaSqm, isPredicting,
+    modelType, keyword,  setModelType, setKeyword,
+  }
 })

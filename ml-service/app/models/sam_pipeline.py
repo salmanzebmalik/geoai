@@ -152,8 +152,7 @@ class LangSAMPipeline:
         gdf = gpd.GeoDataFrame.from_features(results, crs="EPSG:4326")
         gdf_projected = gdf.to_crs("EPSG:3857")
         gdf["area_m2"] = gdf_projected.geometry.area
-        gdf = gdf.drop(columns=["geometry"]).set_geometry(gdf_projected.geometry)  # keep projected?
-        gdf["area_m2"] = gdf_projected.geometry.area
+        
         elapsed = time.time() - start_time
         logger.info(f"GeoJSON conversion complete | {keyword}s: {len(gdf)} | avg area: {gdf['area_m2'].mean():.2f}m² | time: {elapsed:.2f}s")
         return gdf

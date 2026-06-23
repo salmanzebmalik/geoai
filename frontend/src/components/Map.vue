@@ -29,9 +29,10 @@ const TITILER_URL = 'http://localhost:8001' // titiler URL, server must be runni
 const orthophotoSource = new XYZ({
   url:
     `${TITILER_URL}/mosaicjson/tiles/WebMercatorQuad/{z}/{x}/{y}` +
-    `?url=/home/ubuntu/work/saved_data/collections/digital_orthofoto_nrw/mosaic.json` +
-    `&tilesize=512`,
-  tileSize: 512,
+    `?url=/home/ubuntu/work/saved_data/collections/digital_orthofoto_nrw/mosaic.json`
+  // + `&tilesize=512`,
+  // tileSize: 512,
+  ,
   minZoom: 8,
   maxZoom: 20,
 })
@@ -41,9 +42,9 @@ const germanySource = new XYZ({
     `${TITILER_URL}/cog/tiles/WebMercatorQuad/{z}/{x}/{y}` +
     `?url=/home/ubuntu/work/satellite_data/germany/2021/2021_08.vrt` +
     `&bidx=3&bidx=2&bidx=1` +
-    `&rescale=0,3000` +
-    `&tilesize=512`,
-  tileSize: 512,
+    `&rescale=0,3000`,
+  //+ `&tilesize=512`,
+  // tileSize: 512,
   minZoom: 6,
   maxZoom: 22,
 })
@@ -161,11 +162,38 @@ watch(() => mapStore.runTrigger, async () => {
   mapStore.isPredicting = true
 
   try {
+    // Derive satSoruceType from the selected map type
+    let satSourceType
+    switch (mapStore.mapType) {
+      case 'orthophoto':
+        satSourceType = 'ortho'
+        break
+      case 'germany':
+        satSourceType = 'germany'
+        break
+      default: 
+        console.warn('OSM is not a valid prediction source')
+        mapStore.isPredicting = false
+        return
+    }
+
+
+
+    const requestBody = {
+      bbox: mapStore.bbox,
+      model_type: mapStore.modelType || "tree",  // 'tree' or 'zeroshot'
+      source_type: satSourceType,  // 'ortho' or 'germany'
+    }
+
+    if (requestBody.model_type === 'zeroshot') {
+      requestBody.keyword = mapStore.keyword
+    }
+
     // Send bbox to backend for prediction
     const response = await fetch('http://localhost:8002/api/segmentation/predict', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ bbox: mapStore.bbox }),
+      body: JSON.stringify(requestBody),
     })
 
     const result = await response.json()

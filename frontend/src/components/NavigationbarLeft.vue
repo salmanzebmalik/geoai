@@ -42,21 +42,37 @@
             <span>W {{ mapStore.bbox.min_lon.toFixed(5) }}</span>
             <span class="area">{{ formatArea(mapStore.areaSqm) }}</span>
           </div>
-
+          <!-- Task selection  -->
           <v-list-item
             prepend-icon="mdi-numeric-2-circle"
             title="Task"
           ></v-list-item>
           <v-select
-            :items="['Tree Detection', 'Pavement Quality', 'Construction Site Detection']"
+            :items="['Tree Detection', 'Zero-Shot']"
             placeholder="Select Task"
             variant="solo"
             density="compact"
             class="ml-task-dropdown"
             hide-details
-            v-model="mapStore.selectedTask"
-            disabled
+            v-model="mapStore.selectedTask" 
+            @update:model-value="onTaskChange"
           ></v-select>
+
+          <template v-if="mapStore.selectedTask === 'Zero-Shot'">
+          <v-list-item prepend-icon="mdi-numeric-2-circle" title="Keyword" />
+          <v-text-field
+            v-model="mapStore.keyword"
+            placeholder="e.g., buildings, swimming pools, trees"
+            variant="solo"
+            density="compact"
+            class="ml-task-dropdown"
+            hide-details
+            prepend-inner-icon="mdi-magnify"
+            @keyup.enter="mapStore.triggerRun()"
+          />
+        </template>
+
+
           <v-list-item
             prepend-icon="mdi-numeric-3-circle"
             title="Model"
@@ -93,6 +109,17 @@ function formatArea(sqm) {
     ? `${(sqm / 1_000_000).toFixed(2)} km²`
     : `${Math.round(sqm)} m²`
 }
+
+
+function onTaskChange() {
+  if (mapStore.selectedTask === 'Zero-Shot') {
+    mapStore.modelType = 'zeroshot'
+  } else {
+    mapStore.modelType = 'tree'
+    mapStore.keyword = ''   // clear keyword for non zero shot
+  }
+}
+
 </script>
 
 <style scoped>
