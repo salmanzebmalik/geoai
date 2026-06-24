@@ -1,4 +1,3 @@
-# GeoAI Architecture
 
 ## High-Level Architecture
 
