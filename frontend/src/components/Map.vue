@@ -206,8 +206,10 @@ watch(() => mapStore.runTrigger, async () => {
       body: JSON.stringify(requestBody),
     })
 
+    console.log('Prediction request sent:', requestBody)
+
     const result = await response.json()
-    console.log('Prediction:', result)
+    console.log('Prediction result recieved:', result)
 
     if (!response.ok) {
       console.error('Prediction failed:', result.detail)
