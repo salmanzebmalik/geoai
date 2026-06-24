@@ -26,7 +26,7 @@
       <v-list class="procedure" lines="one">
           <v-list-item
             prepend-icon="mdi-numeric-1-circle"
-            title="Select Area"
+            title="Area"
           ></v-list-item>
           <v-btn
             @click="mapStore.triggerDrawing()"
@@ -87,14 +87,25 @@
             disabled
           ></v-select>
           <v-list-item
-            prepend-icon="mdi-numeric-3-circle"
-            title="Run"
+            prepend-icon="mdi-numeric-4-circle"
+            title="Start Prediction"
           ></v-list-item>
           <v-btn @click="mapStore.triggerRun()" prepend-icon="mdi-rocket-launch" class="run-btn" color="success">Run</v-btn>
       </v-list>
 
-      
-        
+      <template #append>
+        <div class="bottom-actions">
+          <v-btn
+            size="small"
+            variant="tonal"
+            density="comfortable"
+            :color="mapStore.mapType === 'germany-slow' ? 'success' : 'grey'"
+            @click="mapStore.setMapType('germany-slow')"
+          >
+            germany slow
+          </v-btn>
+        </div>
+      </template>
   </v-navigation-drawer>
 </template>
 
@@ -156,6 +167,12 @@ function onTaskChange() {
 .run-btn {
   width: 90%;
   margin: 0 16px;
+}
+
+.bottom-actions {
+  display: flex;
+  justify-content: flex-start;
+  padding: 8px 12px;
 }
 
 .bbox-info {

@@ -37,7 +37,7 @@ const orthophotoSource = new XYZ({
   maxZoom: 20,
 })
 
-const germanySource = new XYZ({
+const germanySourceOld = new XYZ({
   url:
     `${TITILER_URL}/cog/tiles/WebMercatorQuad/{z}/{x}/{y}` +
     `?url=/home/ubuntu/work/satellite_data/germany/2021/2021_08.vrt` +
@@ -49,10 +49,19 @@ const germanySource = new XYZ({
   maxZoom: 22,
 })
 
+const germanySource = new XYZ({
+  url:
+    `${TITILER_URL}/cog/tiles/WebMercatorQuad/{z}/{x}/{y}` +
+    `?url=/home/ubuntu/work/saved_data/collections/germany/2021_germany_cog.tif`,
+  minZoom: 6,
+  maxZoom: 22,
+})
+
 // The TileLayer per map type, keyed by the value the nav bar (buttons) sets
 const mapLayers = {
   osm: new TileLayer({ source: new OSM() }),
   germany: new TileLayer({ source: germanySource }),
+  'germany-slow': new TileLayer({ source: germanySourceOld }),
   orthophoto: new TileLayer({ source: orthophotoSource }),
 }
 
@@ -169,9 +178,10 @@ watch(() => mapStore.runTrigger, async () => {
         satSourceType = 'ortho'
         break
       case 'germany':
-        satSourceType = 'germany'
+      case 'germany-slow':
+        satSourceType = 'satellite'
         break
-      default: 
+      default:
         console.warn('OSM is not a valid prediction source')
         mapStore.isPredicting = false
         return
@@ -182,7 +192,7 @@ watch(() => mapStore.runTrigger, async () => {
     const requestBody = {
       bbox: mapStore.bbox,
       model_type: mapStore.modelType || "tree",  // 'tree' or 'zeroshot'
-      source_type: satSourceType,  // 'ortho' or 'germany'
+      source_type: satSourceType,  // 'ortho' or 'satellite'
     }
 
     if (requestBody.model_type === 'zeroshot') {
