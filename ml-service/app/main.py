@@ -15,7 +15,7 @@ async def lifespan(app: FastAPI):
     logger.info("Starting up ML service and loading models...")
 
     try:
-        offline = False  # set to True to load from local files, False to load from Hugging Face 
+        offline = True  # set to True to load from local files, False to load from Hugging Face 
 
         app.state.models = {
             "segformer": TCDSegformer(
