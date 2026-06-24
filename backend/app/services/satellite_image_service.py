@@ -7,6 +7,9 @@ from PIL import Image
 from app.core.config import settings
 from app.schemas.segmentation import BoundingBox, ImageInfo, SourceType
 
+# Disable Pillow decompression bomb pixel limit
+# Use carefully: large TIFFs may consume a lot of RAM when opened.
+Image.MAX_IMAGE_PIXELS = None
 
 def get_shared_storage_dir() -> Path:
     """
