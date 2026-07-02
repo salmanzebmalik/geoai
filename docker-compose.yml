@@ -1,0 +1,64 @@
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: geoai-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - geoai-network
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: geoai-backend
+    env_file:
+      - backend/.env
+    environment:
+      ML_SERVICE_URL: http://ml-service:8000
+      IMAGE_PIPELINE_URL: http://image-pipeline:8000
+      STORAGE_DIR: /app/storage
+    volumes:
+      - ./storage:/app/storage
+    expose:
+      - "8000"
+    networks:
+      - geoai-network
+
+  ml-service:
+    build:
+      context: .
+      dockerfile: ml-service/Dockerfile
+    container_name: geoai-ml-service
+    env_file:
+      - ml-service/.env
+    environment:
+      STORAGE_DIR: /app/storage
+    volumes:
+      - ./storage:/app/storage
+    expose:
+      - "8000"
+    networks:
+      - geoai-network
+
+  image-pipeline:
+    build:
+      context: .
+      dockerfile: image_pipeline/Dockerfile
+    container_name: geoai-image-pipeline
+    environment:
+      STORAGE_DIR: /app/storage
+    volumes:
+      - ./storage:/app/storage
+    expose:
+      - "8000"
+    networks:
+      - geoai-network
+
+networks:
+  geoai-network:
+    driver: bridge
