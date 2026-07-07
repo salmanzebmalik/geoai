@@ -6,6 +6,7 @@
           v-model="mapStore.mapType"
           rounded
           divided
+          variant="outlined"
           color="success"
           class="map-type-toggle"
         >
@@ -24,6 +25,7 @@
       <v-divider/>
     
       <v-list class="procedure" lines="one">
+        <!-- Area selection -->
           <v-list-item
             prepend-icon="mdi-numeric-1-circle"
             title="Area"
@@ -32,9 +34,7 @@
             @click="mapStore.triggerDrawing()"
             class="select-button"
             prepend-icon="mdi-select"
-            variant="tonal"
           >Select Area</v-btn>
-
           <div class="bbox-info" v-if="mapStore.bbox">
             <span>N {{ mapStore.bbox.max_lat.toFixed(5) }}</span>
             <span>S {{ mapStore.bbox.min_lat.toFixed(5) }}</span>
@@ -42,6 +42,7 @@
             <span>W {{ mapStore.bbox.min_lon.toFixed(5) }}</span>
             <span class="area">{{ formatArea(mapStore.areaSqm) }}</span>
           </div>
+
           <!-- Task selection  -->
           <v-list-item
             prepend-icon="mdi-numeric-2-circle"
@@ -59,7 +60,7 @@
           ></v-select>
 
           <template v-if="mapStore.selectedTask === 'Zero-Shot'">
-          <v-list-item prepend-icon="mdi-numeric-2-circle" title="Keyword" />
+          <v-list-item prepend-icon="mdi-plus" title="Keyword" />
           <v-text-field
             v-model="mapStore.keyword"
             placeholder="e.g., buildings, swimming pools, trees"
@@ -72,25 +73,32 @@
           />
         </template>
 
-
+        <!-- Model selection -->
           <v-list-item
             prepend-icon="mdi-numeric-3-circle"
             title="Model"
           ></v-list-item>
           <v-select
-            :items="['Model A', 'Model B', 'Model C']"
-            placeholder="Select Model"
+            :items="[mapStore.selectedTask === 'Zero-Shot' ? 'LangSAM' : 'TCD-Segformer-MIT-B5']"
+            :model-value="mapStore.selectedTask === 'Zero-Shot' ? 'LangSAM' : 'TCD-Segformer-MIT-B5'"
             variant="solo"
             density="compact"
             class="ml-task-dropdown"
             hide-details
-            disabled
           ></v-select>
+
+          <!-- Start prediction button-->
           <v-list-item
             prepend-icon="mdi-numeric-4-circle"
             title="Start Prediction"
           ></v-list-item>
-          <v-btn @click="mapStore.triggerRun()" prepend-icon="mdi-rocket-launch" class="run-btn" color="success">Run</v-btn>
+          <v-btn
+            @click="mapStore.triggerRun()"
+            prepend-icon="mdi-rocket-launch"
+            class="run-btn"
+            color="success"
+            :disabled="mapStore.mapType === 'osm' || !mapStore.bbox || !mapStore.selectedTask || (mapStore.selectedTask === 'Zero-Shot' && !mapStore.keyword)"
+          >Run</v-btn>
       </v-list>
 
       <template #append>
@@ -154,6 +162,14 @@ function onTaskChange() {
   width: 100%;
 }
 
+.map-type-toggle :deep(.v-btn:not(.v-btn--active)) {
+  color: white;
+}
+
+.map-type-toggle :deep(.v-btn) {
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
 .select-button {
   width: 90%;
   margin: 0 16px;
@@ -167,6 +183,11 @@ function onTaskChange() {
 .run-btn {
   width: 90%;
   margin: 0 16px;
+}
+
+.run-btn.v-btn--disabled {
+  color: rgba(255, 255, 255, 0.3);
+  background-color: rgba(255, 255, 255, 0.08);
 }
 
 .bottom-actions {

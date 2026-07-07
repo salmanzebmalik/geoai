@@ -141,6 +141,11 @@ onMounted(() => {
     }),
   })
 
+  const tileErrorHandler = () => mapStore.setError('Tile server could not be reached.')
+  for (const source of [orthophotoSource, germanySourceOld, germanySource]) {
+    source.on('tileloaderror', tileErrorHandler)
+  }
+
   // Apply whatever the store (nav bar buttons) has set as map type
   showMapLayer(mapStore.mapType)
 
@@ -217,11 +222,17 @@ watch(() => mapStore.runTrigger, async () => {
     }
 
     // Send bbox to backend for prediction
-    const response = await fetch('http://localhost:8002/api/segmentation/predict', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(requestBody),
-    })
+    let response
+    try {
+      response = await fetch('http://localhost:8002/api/segmentation/predict', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody),
+      })
+    } catch {
+      mapStore.setError('Backend server could not be reached.')
+      return
+    }
 
     console.log('Prediction request sent:', requestBody)
 
@@ -229,10 +240,12 @@ watch(() => mapStore.runTrigger, async () => {
     console.log('Prediction result recieved:', result)
 
     if (!response.ok) {
+      mapStore.setError('Prediction failed.')
       console.error('Prediction failed:', result.detail)
       return
     }
 
+    mapStore.clearError()
     predictionSource.clear()
     const features = new GeoJSON().readFeatures(result.prediction.geojson, {
       dataProjection: 'EPSG:4326',

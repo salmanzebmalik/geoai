@@ -20,6 +20,16 @@ export const useMapStore = defineStore('map', () => {
   const modelType = ref('tree')  // 'tree' or 'zeroshot'
   const keyword = ref('house')    // For zeroshot model
 
+  const errorMessage = ref(null)
+
+  function setError(msg) {
+    errorMessage.value = msg
+  }
+
+  function clearError() {
+    errorMessage.value = null
+  }
+ 
   const viewedPrediction = ref(null) // geojson of a past prediction selected in the history drawer
 
   function setViewedPrediction(geojson) {
@@ -52,5 +62,6 @@ export const useMapStore = defineStore('map', () => {
     startDrawingTrigger, triggerDrawing, mapType, setMapType, mapCenter, mapZoom, bbox, runTrigger, triggerRun, selectedTask, areaSqm, isPredicting,
     modelType, keyword,  setModelType, setKeyword,
     viewedPrediction, setViewedPrediction,
+    errorMessage, setError, clearError,
   }
 })
