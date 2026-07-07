@@ -57,7 +57,8 @@
 
 <script setup>
 import { ref } from 'vue'
-import { fetchPredictionHistory, fetchPredictionById } from '@/services/api'
+
+const API_BASE_URL = 'http://localhost:8002/api/segmentation'
 
 const drawerOpen = ref(false)
 const history = ref([])
@@ -78,7 +79,13 @@ async function loadHistory() {
   error.value = null
 
   try {
-    history.value = await fetchPredictionHistory()
+    const response = await fetch(`${API_BASE_URL}/results`)
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch prediction history')
+    }
+
+    history.value = await response.json()
   } catch (err) {
     error.value = err.message
   } finally {
@@ -101,7 +108,13 @@ async function downloadPrediction(item) {
   downloadingId.value = item.query_id
 
   try {
-    const result = await fetchPredictionById(item.query_id)
+    const response = await fetch(`${API_BASE_URL}/results/${item.query_id}`)
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch prediction result')
+    }
+
+    const result = await response.json()
     const geojson = result.prediction?.geojson
 
     if (!geojson) return
