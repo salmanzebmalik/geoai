@@ -1,8 +1,10 @@
 <template>
   <div class="home">
-    <MapView />
     <NavigationbarLeft />
-    <LoadingOverlay />
+    <div class="map-area">
+      <MapView />
+      <LoadingOverlay />
+    </div>
   </div>
 </template>
 
@@ -15,6 +17,11 @@ import LoadingOverlay from '../components/LoadingOverlay.vue'
 <style scoped>
 .home {
   height: 100%;
+  display: flex;
+}
+
+.map-area {
+  flex: 1;
   position: relative;
 }
 </style>
