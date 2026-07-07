@@ -20,6 +20,16 @@ export const useMapStore = defineStore('map', () => {
   const modelType = ref('tree')  // 'tree' or 'zeroshot'
   const keyword = ref('house')    // For zeroshot model
 
+  const errorMessage = ref(null)
+
+  function setError(msg) {
+    errorMessage.value = msg
+  }
+
+  function clearError() {
+    errorMessage.value = null
+  }
+
   function triggerDrawing() {
     startDrawingTrigger.value++ // jedes Increment = neues Zeichnen
   }
@@ -44,6 +54,7 @@ export const useMapStore = defineStore('map', () => {
 
   return {
     startDrawingTrigger, triggerDrawing, mapType, setMapType, mapCenter, mapZoom, bbox, runTrigger, triggerRun, selectedTask, areaSqm, isPredicting,
-    modelType, keyword,  setModelType, setKeyword,
+    modelType, keyword, setModelType, setKeyword,
+    errorMessage, setError, clearError,
   }
 })
