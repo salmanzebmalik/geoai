@@ -32,7 +32,13 @@
     </div>
 
     <v-list lines="two">
-      <v-list-item v-for="item in history" :key="item.query_id">
+      <v-list-item
+        v-for="item in history"
+        :key="item.query_id"
+        class="history-item"
+        :disabled="viewingId === item.query_id"
+        @click="viewPrediction(item)"
+      >
         <template #title>
           <span class="item-title">{{ formatLabel(item) }}</span>
         </template>
@@ -47,7 +53,7 @@
             variant="text"
             size="small"
             :loading="downloadingId === item.query_id"
-            @click="downloadPrediction(item)"
+            @click.stop="downloadPrediction(item)"
           />
         </template>
       </v-list-item>
@@ -57,14 +63,18 @@
 
 <script setup>
 import { ref } from 'vue'
+import { useMapStore } from '@/stores/map'
 
 const API_BASE_URL = 'http://localhost:8002/api/segmentation'
+
+const mapStore = useMapStore()
 
 const drawerOpen = ref(false)
 const history = ref([])
 const loading = ref(false)
 const error = ref(null)
 const downloadingId = ref(null)
+const viewingId = ref(null)
 
 function toggleDrawer() {
   drawerOpen.value = !drawerOpen.value
@@ -104,17 +114,21 @@ function formatDate(isoString) {
   return new Date(isoString).toLocaleString()
 }
 
+async function fetchResultById(queryId) {
+  const response = await fetch(`${API_BASE_URL}/results/${queryId}`)
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch prediction result')
+  }
+
+  return response.json()
+}
+
 async function downloadPrediction(item) {
   downloadingId.value = item.query_id
 
   try {
-    const response = await fetch(`${API_BASE_URL}/results/${item.query_id}`)
-
-    if (!response.ok) {
-      throw new Error('Failed to fetch prediction result')
-    }
-
-    const result = await response.json()
+    const result = await fetchResultById(item.query_id)
     const geojson = result.prediction?.geojson
 
     if (!geojson) return
@@ -136,6 +150,26 @@ async function downloadPrediction(item) {
     error.value = err.message
   } finally {
     downloadingId.value = null
+  }
+}
+
+async function viewPrediction(item) {
+  if (viewingId.value) return
+
+  viewingId.value = item.query_id
+
+  try {
+    const result = await fetchResultById(item.query_id)
+    const geojson = result.prediction?.geojson
+
+    if (!geojson) return
+
+    mapStore.setViewedPrediction(geojson)
+    drawerOpen.value = false
+  } catch (err) {
+    error.value = err.message
+  } finally {
+    viewingId.value = null
   }
 }
 </script>
@@ -176,5 +210,9 @@ async function downloadPrediction(item) {
 
 .item-title {
   font-weight: 500;
+}
+
+.history-item {
+  cursor: pointer;
 }
 </style>
