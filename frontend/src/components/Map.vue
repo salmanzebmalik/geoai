@@ -164,6 +164,23 @@ watch(() => mapStore.mapType, (type) => showMapLayer(type))
 // Nav bar "Select Area" -> start drawing
 watch(() => mapStore.startDrawingTrigger, () => startDrawing())
 
+// History drawer "view" click -> show that past prediction's polygons again
+watch(() => mapStore.viewedPrediction, (geojson) => {
+  if (!geojson) return
+
+  predictionSource.clear()
+  const features = new GeoJSON().readFeatures(geojson, {
+    dataProjection: 'EPSG:4326',
+    featureProjection: 'EPSG:3857',
+  })
+  predictionSource.addFeatures(features)
+
+  const extent = predictionSource.getExtent()
+  if (extent.every(Number.isFinite)) {
+    map.getView().fit(extent, { padding: [50, 50, 50, 50], maxZoom: 19, duration: 500 })
+  }
+})
+
 // Nav bar "Run" -> predict
 watch(() => mapStore.runTrigger, async () => {
   if (!mapStore.bbox) return
