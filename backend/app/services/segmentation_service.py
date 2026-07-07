@@ -135,9 +135,15 @@ def create_prediction(
         raise RuntimeError(f"Prediction failed: {str(e)}") from e
 
 
-def get_prediction_history(session: Session) -> list[PredictionHistoryItem]:
-    statement = select(SegmentationQuery).order_by(
-        SegmentationQuery.created_at.desc()
+def get_prediction_history(
+    session: Session,
+    limit: int = 10,
+) -> list[PredictionHistoryItem]:
+    statement = (
+        select(SegmentationQuery)
+        .where(SegmentationQuery.status == "completed")
+        .order_by(SegmentationQuery.created_at.desc())
+        .limit(limit)
     )
 
     results = session.exec(statement).all()
@@ -145,7 +151,6 @@ def get_prediction_history(session: Session) -> list[PredictionHistoryItem]:
     return [
         PredictionHistoryItem(
             query_id=item.id,
-            status=item.status,
             bbox=BoundingBox(
                 min_lat=item.min_lat,
                 max_lat=item.max_lat,
@@ -153,6 +158,9 @@ def get_prediction_history(session: Session) -> list[PredictionHistoryItem]:
                 max_lon=item.max_lon,
             ),
             created_at=item.created_at,
+            prediction_type=item.prediction_result.get("prediction_type"),
+            model_name=item.prediction_result.get("model_name"),
+            summary=item.prediction_result.get("summary"),
         )
         for item in results
     ]
