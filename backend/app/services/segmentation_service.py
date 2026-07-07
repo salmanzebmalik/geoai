@@ -137,7 +137,7 @@ def create_prediction(
 
 def get_prediction_history(
     session: Session,
-    limit: int = 5,
+    limit: int = 10,
 ) -> list[PredictionHistoryItem]:
     statement = (
         select(SegmentationQuery)
