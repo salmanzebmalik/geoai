@@ -1,6 +1,7 @@
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import FileResponse, JSONResponse
 from sqlmodel import Session
 
 from app.db.database import get_session
@@ -15,9 +16,9 @@ from app.services.satellite_image_service import fetch_satellite_image_from_titi
 from app.services.segmentation_service import (
     create_prediction,
     get_prediction_by_id,
+    get_prediction_geojson_source,
     get_prediction_history,
 )
-
 
 router = APIRouter()
 
@@ -105,3 +106,40 @@ def get_result_by_id(
         )
 
     return result
+
+@router.get("/results/{query_id}/geojson")
+def get_result_geojson(
+    query_id: UUID,
+    session: Session = Depends(get_session),
+):
+    try:
+        result_source = get_prediction_geojson_source(
+            query_id=query_id,
+            session=session,
+        )
+
+    except RuntimeError as e:
+        raise HTTPException(
+            status_code=500,
+            detail=str(e),
+        ) from e
+
+    if result_source is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Prediction GeoJSON file not found",
+        )
+
+    # Compatibility for historical database records.
+    if isinstance(result_source, dict):
+        return JSONResponse(
+            content=result_source,
+            media_type="application/geo+json",
+        )
+
+    # New results are streamed from shared storage.
+    return FileResponse(
+        path=result_source,
+        media_type="application/geo+json",
+        filename=f"prediction_{query_id}.geojson",
+    )

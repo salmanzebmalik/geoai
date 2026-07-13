@@ -65,7 +65,7 @@
 import { ref } from 'vue'
 import { useMapStore } from '@/stores/map'
 
-const API_BASE_URL = 'http://localhost:8002/api/segmentation'
+const API_BASE_URL = '/api/segmentation'
 
 const mapStore = useMapStore()
 
@@ -124,18 +124,45 @@ async function fetchResultById(queryId) {
   return response.json()
 }
 
+async function fetchGeoJSONResponse(result) {
+  const resultUrl = result.prediction?.result_url
+
+  if (!resultUrl) {
+    throw new Error(
+      'This prediction has no stored result file'
+    )
+  }
+
+  let response
+
+  try {
+    response = await fetch(resultUrl)
+  } catch {
+    throw new Error(
+      'The stored prediction file could not be reached'
+    )
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      'Failed to fetch prediction GeoJSON'
+    )
+  }
+
+  return response
+}
+
 async function downloadPrediction(item) {
   downloadingId.value = item.query_id
 
   try {
     const result = await fetchResultById(item.query_id)
-    const geojson = result.prediction?.geojson
 
-    if (!geojson) return
+    const geojsonResponse = await fetchGeoJSONResponse(
+      result
+    )
 
-    const blob = new Blob([JSON.stringify(geojson, null, 2)], {
-      type: 'application/geo+json',
-    })
+    const blob = await geojsonResponse.blob()
     const url = URL.createObjectURL(blob)
 
     const link = document.createElement('a')
@@ -160,9 +187,12 @@ async function viewPrediction(item) {
 
   try {
     const result = await fetchResultById(item.query_id)
-    const geojson = result.prediction?.geojson
 
-    if (!geojson) return
+    const geojsonResponse = await fetchGeoJSONResponse(
+      result
+    )
+
+    const geojson = await geojsonResponse.json()
 
     mapStore.setViewedPrediction(geojson)
     drawerOpen.value = false

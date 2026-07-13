@@ -224,7 +224,7 @@ watch(() => mapStore.runTrigger, async () => {
     // Send bbox to backend for prediction
     let response
     try {
-      response = await fetch('http://localhost:8002/api/segmentation/predict', {
+      response = await fetch('/api/segmentation/predict', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestBody),
@@ -246,8 +246,48 @@ watch(() => mapStore.runTrigger, async () => {
     }
 
     mapStore.clearError()
+
+    const resultUrl = result.prediction?.result_url
+
+    if (!resultUrl) {
+      mapStore.setError(
+        'Prediction completed, but no result URL was returned.'
+      )
+      return
+    }
+
+    let geojsonResponse
+
+    try {
+      geojsonResponse = await fetch(resultUrl)
+    } catch {
+      mapStore.setError(
+        'Prediction completed, but its result file could not be reached.'
+      )
+      return
+    }
+
+    if (!geojsonResponse.ok) {
+      mapStore.setError(
+        'Prediction completed, but its result file could not be loaded.'
+      )
+      return
+    }
+
+    let geojson
+
+    try {
+      geojson = await geojsonResponse.json()
+    } catch {
+      mapStore.setError(
+        'The stored prediction is not valid GeoJSON.'
+      )
+      return
+    }
+
     predictionSource.clear()
-    const features = new GeoJSON().readFeatures(result.prediction.geojson, {
+
+    const features = new GeoJSON().readFeatures(geojson, {
       dataProjection: 'EPSG:4326',
       featureProjection: 'EPSG:3857',
     })

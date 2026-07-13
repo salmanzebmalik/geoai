@@ -65,7 +65,8 @@ class GeoJSONFeatureCollection(BaseModel):
 class PredictionOutput(BaseModel):
     prediction_type: str
     model_name: str
-    geojson: GeoJSONFeatureCollection
+    result_url: str
+    feature_count: int
     summary: Optional[str] = None
 
 
