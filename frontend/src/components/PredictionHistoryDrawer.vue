@@ -194,7 +194,7 @@ async function viewPrediction(item) {
 
     const geojson = await geojsonResponse.json()
 
-    mapStore.setViewedPrediction(geojson)
+    mapStore.setViewedPrediction(geojson, item.query_id)
     drawerOpen.value = false
   } catch (err) {
     error.value = err.message

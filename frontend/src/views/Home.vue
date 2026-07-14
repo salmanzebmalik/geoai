@@ -7,6 +7,7 @@
       <ErrorOverlay />
     </div>
     <PredictionHistoryDrawer />
+    <ExportDialog />
   </div>
 </template>
 
@@ -16,6 +17,7 @@ import NavigationbarLeft from '../components/NavigationbarLeft.vue'
 import PredictionHistoryDrawer from '../components/PredictionHistoryDrawer.vue'
 import LoadingOverlay from '../components/LoadingOverlay.vue'
 import ErrorOverlay from '../components/ErrorOverlay.vue'
+import ExportDialog from '../components/ExportDialog.vue'
 </script>
 
 <style scoped>

@@ -14,6 +14,10 @@ export const useMapStore = defineStore('map', () => {
   const bbox = ref(null)
   const runTrigger = ref(0)
   const isPredicting = ref(false)
+  const isExporting = ref(false)
+  const exportDialogTrigger = ref(0)
+  const currentQueryId = ref(null)
+  const currentExport = ref(null)
 
   const areaSqm = ref(null)
 
@@ -32,8 +36,9 @@ export const useMapStore = defineStore('map', () => {
  
   const viewedPrediction = ref(null) // geojson of a past prediction selected in the history drawer
 
-  function setViewedPrediction(geojson) {
+  function setViewedPrediction(geojson, queryId = null) {
     viewedPrediction.value = geojson
+    if (queryId) currentQueryId.value = queryId
   }
 
   function triggerDrawing() {
@@ -46,6 +51,19 @@ export const useMapStore = defineStore('map', () => {
 
   function triggerRun() {
     runTrigger.value++
+  }
+
+  function openExportDialog() {
+    exportDialogTrigger.value++
+  }
+
+  function setCurrentPrediction(queryId, geojson = null) {
+    currentQueryId.value = queryId
+    if (geojson) viewedPrediction.value = geojson
+  }
+
+  function setCurrentExport(value) {
+    currentExport.value = value
   }
 
   // 
@@ -63,5 +81,7 @@ export const useMapStore = defineStore('map', () => {
     modelType, keyword,  setModelType, setKeyword,
     viewedPrediction, setViewedPrediction,
     errorMessage, setError, clearError,
+    isExporting, exportDialogTrigger, openExportDialog,
+    currentQueryId, setCurrentPrediction, currentExport, setCurrentExport,
   }
 })
