@@ -41,9 +41,9 @@
 //            &rescale=0,3000                     <- reflectance -> 0..255
 //            &nodata=0                           <- scene edges transparent
 //
-// Reach the server with:  ssh -N -L 10002:localhost:10002 geoai
+// Reach the server with:  ssh -N -L 8000:localhost:8000 geoai
 
-var TITILER = "http://localhost:10002";
+var TITILER = "http://localhost:8000";
 
 // One collection per year (data: 2018-2024). Searching all of them at once is
 // fine — years outside the chosen timeframe simply contribute no scenes.
@@ -94,7 +94,7 @@ async function showTimeframe() {
 
   if (imageryLayer) map.removeLayer(imageryLayer);
   imageryLayer = L.tileLayer(tileUrl, {
-    minZoom: 7,        // below this a tile spans too many scenes -> slow
+    minZoom: 9,        // below this a tile spans too many scenes -> slow
     maxNativeZoom: 14, // 10 m bands stop gaining detail around here
     maxZoom: 19,
     attribution: "Sentinel-2 L2A via titiler-pgstac",
