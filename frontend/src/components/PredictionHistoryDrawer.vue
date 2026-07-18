@@ -2,13 +2,13 @@
   <v-btn
     icon="mdi-history"
     class="history-toggle"
-    :class="{ 'history-toggle--shifted': drawerOpen }"
+    :class="{ 'history-toggle--shifted': mapStore.historyDrawerOpen }"
     color="success"
     @click="toggleDrawer"
   />
 
   <v-navigation-drawer
-    v-model="drawerOpen"
+    v-model="mapStore.historyDrawerOpen"
     location="end"
     temporary
     width="340"
@@ -69,7 +69,6 @@ const API_BASE_URL = '/api/segmentation'
 
 const mapStore = useMapStore()
 
-const drawerOpen = ref(false)
 const history = ref([])
 const loading = ref(false)
 const error = ref(null)
@@ -77,9 +76,9 @@ const downloadingId = ref(null)
 const viewingId = ref(null)
 
 function toggleDrawer() {
-  drawerOpen.value = !drawerOpen.value
+  mapStore.historyDrawerOpen = !mapStore.historyDrawerOpen
 
-  if (drawerOpen.value && history.value.length === 0) {
+  if (mapStore.historyDrawerOpen && history.value.length === 0) {
     loadHistory()
   }
 }
@@ -195,7 +194,7 @@ async function viewPrediction(item) {
     const geojson = await geojsonResponse.json()
 
     mapStore.setViewedPrediction(geojson)
-    drawerOpen.value = false
+    mapStore.historyDrawerOpen = false
   } catch (err) {
     error.value = err.message
   } finally {
