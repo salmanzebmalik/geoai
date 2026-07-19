@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8" />
+<title>Sentinel-2 via STAC search — example</title>
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.css"/>
+<style>
+  html, body { height: 100%; margin: 0; }
+  #map { position: absolute; inset: 0; }
+  #panel {
+    position: absolute; top: 10px; right: 10px; z-index: 1000;
+    background: rgba(30,36,43,.92); color: #eee; font: 13px monospace;
+    padding: 10px; border-radius: 8px; display: flex; flex-direction: column; gap: 6px;
+  }
+  #status { font-size: 11px; max-width: 220px; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<div id="panel">
+  <input type="date" id="dateFrom" value="2020-06-01" min="2018-01-01" max="2024-12-31" />
+  <input type="date" id="dateTo"   value="2020-08-31" min="2018-01-01" max="2024-12-31" />
+  <button id="searchBtn">Search</button>
+  <div id="status"></div>
+</div>
+
+<script>
+// How titiler-pgstac works, in two steps:
+//
+//   1. Register a STAC search (which collections, which timeframe):
+//        POST /searches/register  ->  {"id": "<search_id>", ...}
+//
+//   2. Use that id in a normal XYZ tile URL, exactly like the plain titiler
+//      /cog/tiles example in this directory — the search id replaces the
+//      "url=<file>" parameter:
+//        /searches/<search_id>/tiles/WebMercatorQuad/{z}/{x}/{y}
+//            ?assets=B04&assets=B03&assets=B02   <- true-color bands
+//            &rescale=0,3000                     <- reflectance -> 0..255
+//            &nodata=0                           <- scene edges transparent
+//
+// Reach the server with:  ssh -N -L 8000:localhost:8000 geoai
+
+var TITILER = "http://localhost:8000";
+
+// One collection per year (data: 2018-2024). Searching all of them at once is
+// fine — years outside the chosen timeframe simply contribute no scenes.
+var COLLECTIONS = [
+  "sentinel-2-l2a-worldwide-2018",
+  "sentinel-2-l2a-worldwide-2019",
+  "sentinel-2-l2a-worldwide-2020",
+  "sentinel-2-l2a-worldwide-2021",
+  "sentinel-2-l2a-worldwide-2022",
+  "sentinel-2-l2a-worldwide-2023",
+  "sentinel-2-l2a-worldwide-2024",
+];
+
+var map = L.map("map").setView([51.2, 10.4], 8);
+L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  maxZoom: 19,
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+}).addTo(map);
+
+var imageryLayer = null;
+var statusEl = document.getElementById("status");
+
+async function showTimeframe() {
+  var from = document.getElementById("dateFrom").value;
+  var to = document.getElementById("dateTo").value;
+
+  // step 1: register the search, get an id
+  var response = await fetch(TITILER + "/searches/register", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      collections: COLLECTIONS,
+      datetime: from + "T00:00:00Z/" + to + "T23:59:59Z",
+    }),
+  });
+  if (!response.ok) {
+    statusEl.textContent = "search failed: HTTP " + response.status;
+    return;
+  }
+  var search = await response.json();
+
+  // step 2: search id + x/y/z + render params = tile URL
+  var tileUrl = TITILER + "/searches/" + search.id +
+    "/tiles/WebMercatorQuad/{z}/{x}/{y}" +
+    "?assets=B04&assets=B03&assets=B02" +
+    "&rescale=0,3000" +
+    "&nodata=0";
+
+  if (imageryLayer) map.removeLayer(imageryLayer);
+  imageryLayer = L.tileLayer(tileUrl, {
+    minZoom: 9,        // below this a tile spans too many scenes -> slow
+    maxNativeZoom: 14, // 10 m bands stop gaining detail around here
+    maxZoom: 19,
+    attribution: "Sentinel-2 L2A via titiler-pgstac",
+  }).addTo(map);
+
+  statusEl.textContent = "search id: " + search.id + "\n" + from + " → " + to +
+    (map.getZoom() < 7 ? "\n(zoom in to 7+ to see imagery)" : "");
+}
+
+document.getElementById("searchBtn").onclick = showTimeframe;
+</script>
+</body>
+</html>
