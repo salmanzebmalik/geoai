@@ -92,6 +92,22 @@ const predictionLayer = new VectorLayer({
 })
 let draw = null
 
+// Display prediction result on the map and zoom
+function displayPrediction(geojson) {
+  predictionSource.clear()
+  const features = new GeoJSON().readFeatures(geojson, {
+    dataProjection: 'EPSG:4326',
+    featureProjection: 'EPSG:3857',
+  })
+  predictionSource.addFeatures(features)
+
+  // zoom in
+  const extent = predictionSource.getExtent()
+  if (extent.every(Number.isFinite)) {
+    map.getView().fit(extent, { padding: [50, 50, 50, 50], maxZoom: 19, duration: 500 })
+  }
+}
+
 function startDrawing() {
   vectorSource.clear()
   if (draw) map.removeInteraction(draw)
@@ -172,18 +188,7 @@ watch(() => mapStore.startDrawingTrigger, () => startDrawing())
 // History drawer "view" click -> show that past prediction's polygons again
 watch(() => mapStore.viewedPrediction, (geojson) => {
   if (!geojson) return
-
-  predictionSource.clear()
-  const features = new GeoJSON().readFeatures(geojson, {
-    dataProjection: 'EPSG:4326',
-    featureProjection: 'EPSG:3857',
-  })
-  predictionSource.addFeatures(features)
-
-  const extent = predictionSource.getExtent()
-  if (extent.every(Number.isFinite)) {
-    map.getView().fit(extent, { padding: [50, 50, 50, 50], maxZoom: 19, duration: 500 })
-  }
+  displayPrediction(geojson)
 })
 
 // Nav bar "Run" -> predict
@@ -285,19 +290,7 @@ watch(() => mapStore.runTrigger, async () => {
       return
     }
 
-    predictionSource.clear()
-
-    const features = new GeoJSON().readFeatures(geojson, {
-      dataProjection: 'EPSG:4326',
-      featureProjection: 'EPSG:3857',
-    })
-
-    predictionSource.addFeatures(features)
-
-    const extent = predictionSource.getExtent()
-    if (extent.every(Number.isFinite)) {
-      map.getView().fit(extent, { padding: [50, 50, 50, 50], maxZoom: 19, duration: 500 })
-    }
+    displayPrediction(geojson)
   } finally {
     mapStore.isPredicting = false
   }
