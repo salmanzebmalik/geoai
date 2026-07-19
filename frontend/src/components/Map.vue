@@ -293,6 +293,11 @@ watch(() => mapStore.runTrigger, async () => {
     })
 
     predictionSource.addFeatures(features)
+
+    const extent = predictionSource.getExtent()
+    if (extent.every(Number.isFinite)) {
+      map.getView().fit(extent, { padding: [50, 50, 50, 50], maxZoom: 19, duration: 500 })
+    }
   } finally {
     mapStore.isPredicting = false
   }
