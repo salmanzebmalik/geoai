@@ -26,9 +26,9 @@ cleanup() {
 trap cleanup SIGINT SIGTERM
 
 # Start all services in the background with logs
-echo "Starting ml-service on port 8000..."
+echo "Starting ml-service on port 8002..."
 cd "$SCRIPT_DIR/ml-service"
-uvicorn app.main:app --host 127.0.0.1 --port 8000 &
+uvicorn app.main:app --host 127.0.0.1 --port 8002 &
 ML_PID=$!
 
 echo "Starting image-pipeline (Titiler) on port 8001..."
@@ -36,9 +36,9 @@ cd "$SCRIPT_DIR/image_pipeline"
 uvicorn titiler_app:app --host 127.0.0.1 --port 8001 &
 TITILER_PID=$!
 
-echo "Starting backend on port 8002..."
+echo "Starting backend on port 8000..."
 cd "$SCRIPT_DIR/backend"
-uvicorn app.main:app --host 127.0.0.1 --port 8002 &
+uvicorn app.main:app --host 127.0.0.1 --port 8000 &
 BACKEND_PID=$!
 
 # Wait for services
