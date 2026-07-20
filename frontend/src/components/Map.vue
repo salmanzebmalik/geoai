@@ -24,7 +24,7 @@ const mapContainer = ref(null)
 let map = null
 
 // titiler URL, server must be running for the XYZ layers to work
-const TITILER_URL = 'http://localhost:8001' 
+const TITILER_URL = import.meta.env.VITE_TITILER_URL || '/image-api'
 
 // source for NRW orthophoto imagery
 const orthophotoSource = new XYZ({
