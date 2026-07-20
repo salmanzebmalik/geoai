@@ -2,13 +2,13 @@
   <v-btn
     icon="mdi-history"
     class="history-toggle"
-    :class="{ 'history-toggle--shifted': drawerOpen }"
+    :class="{ 'history-toggle--shifted': mapStore.historyDrawerOpen }"
     color="success"
     @click="toggleDrawer"
   />
 
   <v-navigation-drawer
-    v-model="drawerOpen"
+    v-model="mapStore.historyDrawerOpen"
     location="end"
     temporary
     width="340"
@@ -65,21 +65,21 @@
 import { ref } from 'vue'
 import { useMapStore } from '@/stores/map'
 
-const API_BASE_URL = '/api/segmentation'
+const API_BASE_URL = '/api/segmentation' // backend API
 
-const mapStore = useMapStore()
+const mapStore = useMapStore() // Pinia store
 
-const drawerOpen = ref(false)
 const history = ref([])
 const loading = ref(false)
 const error = ref(null)
 const downloadingId = ref(null)
 const viewingId = ref(null)
 
-function toggleDrawer() {
-  drawerOpen.value = !drawerOpen.value
 
-  if (drawerOpen.value && history.value.length === 0) {
+function toggleDrawer() {
+  mapStore.historyDrawerOpen = !mapStore.historyDrawerOpen
+
+  if (mapStore.historyDrawerOpen && history.value.length === 0) {
     loadHistory()
   }
 }
@@ -103,17 +103,7 @@ async function loadHistory() {
   }
 }
 
-function formatLabel(item) {
-  if (!item.prediction_type) return 'Prediction'
-  return item.prediction_type
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, (char) => char.toUpperCase())
-}
-
-function formatDate(isoString) {
-  return new Date(isoString).toLocaleString()
-}
-
+// fetches single prediction result by query_id
 async function fetchResultById(queryId) {
   const response = await fetch(`${API_BASE_URL}/results/${queryId}`)
 
@@ -124,8 +114,9 @@ async function fetchResultById(queryId) {
   return response.json()
 }
 
+// helper function to fetch the GeoJSON file from the result object
 async function fetchGeoJSONResponse(result) {
-  const resultUrl = result.prediction?.result_url
+  const resultUrl = result.prediction?.result_url  // geoJson file URL from the result object
 
   if (!resultUrl) {
     throw new Error(
@@ -152,27 +143,29 @@ async function fetchGeoJSONResponse(result) {
   return response
 }
 
+// download the GeoJSON file for a specific prediction
 async function downloadPrediction(item) {
-  downloadingId.value = item.query_id
+  downloadingId.value = item.query_id 
 
   try {
-    const result = await fetchResultById(item.query_id)
+    const result = await fetchResultById(item.query_id) // fetch the result object for the given query_id
 
     const geojsonResponse = await fetchGeoJSONResponse(
       result
     )
 
-    const blob = await geojsonResponse.blob()
-    const url = URL.createObjectURL(blob)
+    // convert the response to a Blob object and create a temporary URL for it
+    const blob = await geojsonResponse.blob() 
+    const url = URL.createObjectURL(blob) 
 
-    const link = document.createElement('a')
+    const link = document.createElement('a') // create a temporary anchor element for downloading
     link.href = url
     link.download = `prediction_${item.query_id}.geojson`
     document.body.appendChild(link)
     link.click()
     link.remove()
 
-    URL.revokeObjectURL(url)
+    URL.revokeObjectURL(url) // revoke the temporary URL to free up memory
   } catch (err) {
     error.value = err.message
   } finally {
@@ -180,6 +173,7 @@ async function downloadPrediction(item) {
   }
 }
 
+// view a specific prediction on the map
 async function viewPrediction(item) {
   if (viewingId.value) return
 
@@ -195,12 +189,24 @@ async function viewPrediction(item) {
     const geojson = await geojsonResponse.json()
 
     mapStore.setViewedPrediction(geojson)
-    drawerOpen.value = false
+    mapStore.historyDrawerOpen = false
   } catch (err) {
     error.value = err.message
   } finally {
     viewingId.value = null
   }
+}
+
+// Format task label
+function formatLabel(item) {
+  if (!item.prediction_type) return 'Prediction'
+  return item.prediction_type
+    .replace(/_/g, ' ') // replace underscores with spaces
+    .replace(/\b\w/g, (char) => char.toUpperCase()) // capitalize first letter of each word
+}
+
+function formatDate(isoString) {
+  return new Date(isoString).toLocaleString()
 }
 </script>
 

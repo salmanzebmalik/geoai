@@ -5,6 +5,7 @@
       <MapView />
       <LoadingOverlay />
       <ErrorOverlay />
+      <Legend />
     </div>
     <PredictionHistoryDrawer />
   </div>
@@ -16,6 +17,7 @@ import NavigationbarLeft from '../components/NavigationbarLeft.vue'
 import PredictionHistoryDrawer from '../components/PredictionHistoryDrawer.vue'
 import LoadingOverlay from '../components/LoadingOverlay.vue'
 import ErrorOverlay from '../components/ErrorOverlay.vue'
+import Legend from '../components/Legend.vue'
 </script>
 
 <style scoped>
