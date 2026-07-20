@@ -1,19 +1,12 @@
 from pathlib import Path
-
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-ML_SERVICE_DIR = Path(__file__).resolve().parents[2]
-REPOSITORY_ROOT = ML_SERVICE_DIR.parent
-ENV_FILE = ML_SERVICE_DIR / ".env"
-DEFAULT_SHARED_STORAGE = REPOSITORY_ROOT / "storage"
-
-
 class Settings(BaseSettings):
-    shared_storage_dir: str = str(DEFAULT_SHARED_STORAGE)
+    shared_storage_dir: str = "/home/ubuntu/work/saved_data/salman/geoai/storage"
 
     model_config = SettingsConfigDict(
-        env_file=ENV_FILE,
+        env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore",
     )

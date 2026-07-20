@@ -1,12 +1,11 @@
 from uuid import UUID
-from pathlib import Path
-from app.core.config import settings
 
 from sqlmodel import Session, select
 
 from app.db.models import SegmentationQuery
 from app.schemas.segmentation import (
     BoundingBox,
+    GeoJSONFeatureCollection,
     ImageInfo,
     PredictionHistoryItem,
     PredictionOutput,
@@ -36,70 +35,21 @@ def validate_bbox(bbox: BoundingBox) -> None:
     if not (-180 <= bbox.max_lon <= 180):
         raise ValueError("max_lon must be between -180 and 180")
 
-def build_result_url(query_id: UUID | str) -> str:
-    return f"/api/segmentation/results/{query_id}/geojson"
 
-
-def build_prediction_output_from_ml_result(
-    query_id: UUID | str,
-    ml_result: dict,
-) -> PredictionOutput:
-    """
-    Build the public response sent to the frontend.
-
-    The internal result_path is deliberately excluded.
-    """
-
-    return PredictionOutput(
-        prediction_type=ml_result["prediction_type"],
-        model_name=ml_result["model_name"],
-        result_url=build_result_url(query_id),
-        feature_count=ml_result["feature_count"],
-        summary=ml_result.get("summary"),
+def create_empty_geojson() -> GeoJSONFeatureCollection:
+    return GeoJSONFeatureCollection(
+        type="FeatureCollection",
+        features=[],
     )
 
 
-def build_stored_prediction_metadata(
-    ml_result: dict,
-) -> dict:
-    """
-    Build the lightweight metadata stored in PostgreSQL.
-
-    The database stores the internal result_path but not the GeoJSON.
-    """
-
-    return {
-        "prediction_type": ml_result["prediction_type"],
-        "model_name": ml_result["model_name"],
-        "result_path": ml_result["result_path"],
-        "feature_count": ml_result["feature_count"],
-        "summary": ml_result.get("summary"),
-    }
-
-
-def resolve_prediction_result_path(
-    stored_path: str,
-) -> Path:
-    """
-    Resolve and validate a result path reported by the ML service.
-    """
-
-    storage_root = settings.shared_storage_path
-    result_path = (storage_root / stored_path).resolve()
-
-    try:
-        result_path.relative_to(storage_root)
-    except ValueError as e:
-        raise RuntimeError(
-            "Stored prediction path is outside shared storage"
-        ) from e
-
-    if not result_path.is_file():
-        raise FileNotFoundError(
-            f"Prediction result file not found: {stored_path}"
-        )
-
-    return result_path
+def build_prediction_output_from_ml_result(ml_result: dict) -> PredictionOutput:
+    return PredictionOutput(
+        prediction_type=ml_result["prediction_type"],
+        model_name=ml_result["model_name"],
+        geojson=GeoJSONFeatureCollection(**ml_result["geojson"]),
+        summary=ml_result.get("summary"),
+    )
 
 
 def create_prediction(
@@ -154,22 +104,13 @@ def create_prediction(
             keyword=request.keyword,
         )
 
-        resolve_prediction_result_path(
-            ml_result["result_path"]
-        )
-
-        prediction_output = build_prediction_output_from_ml_result(
-            query_id=db_query.id,
-            ml_result=ml_result,
-        )
+        prediction_output = build_prediction_output_from_ml_result(ml_result)
 
         db_query.status = "completed"
         db_query.image_url = image_info.image_url
         db_query.image_width = image_info.width
         db_query.image_height = image_info.height
-        db_query.prediction_result = (
-            build_stored_prediction_metadata(ml_result)
-        )
+        db_query.prediction_result = prediction_output.model_dump()
 
         session.add(db_query)
         session.commit()
@@ -194,15 +135,9 @@ def create_prediction(
         raise RuntimeError(f"Prediction failed: {str(e)}") from e
 
 
-def get_prediction_history(
-    session: Session,
-    limit: int = 10,
-) -> list[PredictionHistoryItem]:
-    statement = (
-        select(SegmentationQuery)
-        .where(SegmentationQuery.status == "completed")
-        .order_by(SegmentationQuery.created_at.desc())
-        .limit(limit)
+def get_prediction_history(session: Session) -> list[PredictionHistoryItem]:
+    statement = select(SegmentationQuery).order_by(
+        SegmentationQuery.created_at.desc()
     )
 
     results = session.exec(statement).all()
@@ -210,6 +145,7 @@ def get_prediction_history(
     return [
         PredictionHistoryItem(
             query_id=item.id,
+            status=item.status,
             bbox=BoundingBox(
                 min_lat=item.min_lat,
                 max_lat=item.max_lat,
@@ -217,9 +153,6 @@ def get_prediction_history(
                 max_lon=item.max_lon,
             ),
             created_at=item.created_at,
-            prediction_type=item.prediction_result.get("prediction_type"),
-            model_name=item.prediction_result.get("model_name"),
-            summary=item.prediction_result.get("summary"),
         )
         for item in results
     ]
@@ -251,30 +184,7 @@ def get_prediction_by_id(
     prediction = None
 
     if result.prediction_result:
-        stored_result = result.prediction_result
-        legacy_geojson = stored_result.get("geojson")
-        result_path = stored_result.get("result_path")
-
-        has_legacy_geojson = isinstance(
-            legacy_geojson,
-            dict,
-        )
-
-        if result_path or has_legacy_geojson:
-            feature_count = stored_result.get(
-                "feature_count",
-                len(legacy_geojson.get("features", []))
-                if has_legacy_geojson
-                else 0,
-            )
-
-            prediction = PredictionOutput(
-                prediction_type=stored_result["prediction_type"],
-                model_name=stored_result["model_name"],
-                result_url=build_result_url(result.id),
-                feature_count=feature_count,
-                summary=stored_result.get("summary"),
-            )
+        prediction = PredictionOutput(**result.prediction_result)
 
     return PredictionResponse(
         query_id=result.id,
@@ -284,43 +194,3 @@ def get_prediction_by_id(
         prediction=prediction,
         created_at=result.created_at,
     )
-    
-def get_prediction_geojson_source(
-    query_id: UUID,
-    session: Session,
-) -> Path | dict | None:
-    """
-    Return the prediction result source.
-
-    New results return a Path to the stored GeoJSON file.
-    Historical results return their embedded GeoJSON dictionary.
-    """
-
-    result = session.get(
-        SegmentationQuery,
-        query_id,
-    )
-
-    if result is None:
-        return None
-
-    if result.status != "completed":
-        return None
-
-    stored_result = result.prediction_result or {}
-    stored_path = stored_result.get("result_path")
-
-    if stored_path:
-        try:
-            return resolve_prediction_result_path(
-                stored_path
-            )
-        except FileNotFoundError:
-            return None
-
-    legacy_geojson = stored_result.get("geojson")
-
-    if isinstance(legacy_geojson, dict):
-        return legacy_geojson
-
-    return None

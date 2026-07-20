@@ -1,4 +1,4 @@
-<!-- THIS COMPONENT IS DEPRECATED  -->
+<!-- THIS COMPONENT IS DEPRECTED  -->
 <!-- It uses the sentinel images from Copernicus Hub
 - to use it, create a Copernicus account + set up a Dashboard & Configuration
 - add the Service endpoint ID to the .env file as VITE_SENTINELHUB_INSTANCE_ID=your_id

@@ -19,27 +19,6 @@ def get_ml_endpoint(model_type: ModelType) -> str:
 
     raise ValueError(f"Unsupported model_type: {model_type}")
 
-def get_shared_storage_relative_path(path: str | Path) -> str:
-    """
-    Convert an absolute shared-storage path into a storage-relative path.
-
-    Example:
-        /server/storage/queries/123/input.tiff
-    becomes:
-        queries/123/input.tiff
-    """
-
-    storage_root = settings.shared_storage_path
-    resolved_path = Path(path).resolve()
-
-    try:
-        relative_path = resolved_path.relative_to(storage_root)
-    except ValueError as e:
-        raise ValueError(
-            f"Path is outside shared storage: {resolved_path}"
-        ) from e
-
-    return relative_path.as_posix()
 
 def call_ml_service(
     query_id: str,
@@ -62,15 +41,11 @@ def call_ml_service(
     endpoint = get_ml_endpoint(model_type)
     url = f"{settings.ml_service_url}{endpoint}"
 
-    relative_input_image_path = get_shared_storage_relative_path(
-        input_image_path
-    )
-
-    output_dir = Path(relative_input_image_path).parent.as_posix()
+    output_dir = str(Path(input_image_path).parent)
 
     payload = {
         "query_id": query_id,
-        "input_image_path": relative_input_image_path,
+        "input_image_path": input_image_path,
         "output_dir": output_dir,
         "min_lon": bbox.min_lon,
         "min_lat": bbox.min_lat,

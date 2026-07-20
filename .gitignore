@@ -164,9 +164,3 @@ package-lock.json
 # ============================================================
 
 .python-version
-
-# --- prefixed venvs (venv_titiler etc.), service runtime artifacts, installers ---
-venv*/
-*.log.old
-*.pid
-Miniforge3-*.sh
