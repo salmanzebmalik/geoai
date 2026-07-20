@@ -7,7 +7,6 @@ import rasterio
 from rasterio.transform import from_bounds, xy
 import geopandas as gpd
 from shapely.geometry import box as shp_box
-from deepforest import main
 
 from app.utils.logger import get_logger
 logger = get_logger(__name__)
@@ -20,6 +19,8 @@ class DeepForestPipeline:
 
     def __init__(self, checkpoint_path: str | None = None, patch_size: int = 400,
                  overlap: float = 0.1, score_min: float = 0.3):
+        from deepforest import main  
+
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.patch_size = patch_size
         self.overlap = overlap

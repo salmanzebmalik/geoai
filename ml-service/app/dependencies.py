@@ -14,3 +14,17 @@ def get_satlas_tree_model(request: Request):
     if model is None:
         raise HTTPException(status_code=503, detail="Satellite tree model not trained yet (run satlas_tree_5m.ipynb)")
     return model
+
+
+def get_unet_tree_model(request: Request):
+    model = request.app.state.models.get("unet_tree")
+    if model is None:
+        raise HTTPException(status_code=503, detail="UNet tree model not trained yet (run tree_crown_5m.ipynb)")
+    return model
+
+
+def get_deepforest_model(request: Request):
+    model = request.app.state.models.get("deepforest")
+    if model is None:
+        raise HTTPException(status_code=503, detail="DeepForest model not available (pip install deepforest)")
+    return model

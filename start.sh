@@ -26,19 +26,19 @@ cleanup() {
 trap cleanup SIGINT SIGTERM
 
 # Start all services in the background with logs
-echo "Starting ml-service on port 8010..."
+echo "Starting ml-service on port 8002..."
 cd "$SCRIPT_DIR/ml-service"
-uvicorn app.main:app --host 127.0.0.1 --port 8010 &
+uvicorn app.main:app --host 127.0.0.1 --port 8002 &
 ML_PID=$!
 
-echo "Starting image-pipeline (Titiler) on port 8011..."
+echo "Starting image-pipeline (Titiler) on port 8001..."
 # reuse launch_titiler.sh so the DB URL + GDAL/ulimit tuning stay in one place
 ( cd "$SCRIPT_DIR/image_pipeline" && bash launch_titiler.sh ) &
 TITILER_PID=$!
 
-echo "Starting backend on port 8012..."
+echo "Starting backend on port 8000..."
 cd "$SCRIPT_DIR/backend"
-uvicorn app.main:app --host 127.0.0.1 --port 8012 &
+uvicorn app.main:app --host 127.0.0.1 --port 8000 &
 BACKEND_PID=$!
 
 # Wait for services
