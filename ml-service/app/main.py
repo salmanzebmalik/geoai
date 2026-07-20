@@ -6,6 +6,9 @@ from fastapi import FastAPI
 from app.api.router import api_router
 from app.models.tree_pipeline import TCDSegformer
 from app.models.sam_pipeline import LangSAMPipeline
+from app.models.satlas_tree_pipeline import SatlasTreePipeline
+from app.models.unet_tree_pipeline import UNetTreePipeline
+from app.models.deepforest_pipeline import DeepForestPipeline
 
 from app.utils.logger import get_logger
 logger = get_logger(__name__)
@@ -29,6 +32,27 @@ async def lifespan(app: FastAPI):
                 offline=offline,
             ),
         }
+
+        # satellite (~5m) tree model — weights come from satlas_tree_5m.ipynb, optional
+        try:
+            app.state.models["satlas_tree"] = SatlasTreePipeline(patch_size=512, overlap=64)
+        except FileNotFoundError as e:
+            app.state.models["satlas_tree"] = None
+            logger.warning(f"Satlas tree model not loaded: {e}")
+
+        # second 5m tree model — UNet from tree_crown_5m.ipynb, optional
+        try:
+            app.state.models["unet_tree"] = UNetTreePipeline()
+        except Exception as e:
+            app.state.models["unet_tree"] = None
+            logger.warning(f"UNet tree model not loaded: {e}")
+
+        # 10cm ortho per-tree crown detector (DeepForest)
+        try:
+            app.state.models["deepforest"] = DeepForestPipeline()
+        except Exception as e:
+            app.state.models["deepforest"] = None
+            logger.warning(f"DeepForest model not loaded: {e}")
 
         logger.info("Models loaded successfully")
 

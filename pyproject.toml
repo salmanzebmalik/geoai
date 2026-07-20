@@ -108,6 +108,7 @@ dependencies = [
     "stac-pydantic==3.6.0",
     "titiler-extensions==2.0.5",
     "truststore==0.10.4",
+    "deepforest>=2.1.0",
 ]
 
 [tool.uv.sources]
