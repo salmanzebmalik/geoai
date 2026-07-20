@@ -15,4 +15,4 @@ export VSI_CACHE_SIZE=536870912
 export TITILER_PGSTAC_SEARCH_TIME_LIMIT=10
 
 ./venv_titiler_pgstac/bin/uvicorn titiler_app:app \
-  --host 127.0.0.1 --port 8000 --workers 2 2>&1 | tee -a titiler.log
+  --host 127.0.0.1 --port 8011 --workers 2 2>&1 | tee -a titiler.log
