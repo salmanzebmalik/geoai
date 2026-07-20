@@ -1,4 +1,4 @@
-from fastapi import Request
+from fastapi import HTTPException, Request
 
 
 def get_segformer_model(request: Request):
@@ -7,3 +7,10 @@ def get_segformer_model(request: Request):
 
 def get_lang_sam_model(request: Request):
     return request.app.state.models["lang_sam"]
+
+
+def get_satlas_tree_model(request: Request):
+    model = request.app.state.models.get("satlas_tree")
+    if model is None:
+        raise HTTPException(status_code=503, detail="Satellite tree model not trained yet (run satlas_tree_5m.ipynb)")
+    return model

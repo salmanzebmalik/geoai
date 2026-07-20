@@ -74,6 +74,9 @@ dependencies = [
     "sqlmodel==0.0.38",
     "psycopg2-binary==2.9.12",
     "portalocker>=3.2.0",
+    "titiler-pgstac==3.0.0",
+    "satlaspretrain-models>=0.3.1",
+    "psycopg[binary,pool]>=3.3.4",
 ]
 
 [tool.uv.sources]

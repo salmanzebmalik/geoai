@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from app.api.router import api_router
 from app.models.tree_pipeline import TCDSegformer
 from app.models.sam_pipeline import LangSAMPipeline
+from app.models.satlas_tree_pipeline import SatlasTreePipeline
 
 from app.utils.logger import get_logger
 logger = get_logger(__name__)
@@ -29,6 +30,13 @@ async def lifespan(app: FastAPI):
                 offline=offline,
             ),
         }
+
+        # satellite (~5m) tree model — weights come from satlas_tree_5m.ipynb, optional
+        try:
+            app.state.models["satlas_tree"] = SatlasTreePipeline(patch_size=512, overlap=64)
+        except FileNotFoundError as e:
+            app.state.models["satlas_tree"] = None
+            logger.warning(f"Satlas tree model not loaded: {e}")
 
         logger.info("Models loaded successfully")
 
