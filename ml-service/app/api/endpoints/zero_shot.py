@@ -4,10 +4,8 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.dependencies import get_lang_sam_model
 from app.schemas.prediction import ZeroShotPredictionRequest, PredictionResponse
-from app.services.storage_service import (
-    read_image_from_shared_storage,
-    save_geojson_to_shared_storage,
-)
+from app.schemas.geojson import GeoJSONFeatureCollection
+from app.services.storage_service import read_image_from_shared_storage
 from app.services.inference_service import run_zero_shot_detection
 
 
@@ -43,22 +41,15 @@ async def predict_zero_shot(
             keyword=request.keyword,
         )
 
-        feature_count = len(geojson_dict.get("features", []))
-
-        result_path = save_geojson_to_shared_storage(
-            query_id=query_id,
-            geojson=geojson_dict,
-            output_dir=request.output_dir,
-        )
+        feature_collection = GeoJSONFeatureCollection(**geojson_dict)
 
         return PredictionResponse(
             query_id=query_id,
             status="completed",
             model_name="lang-sam",
             prediction_type="zero_shot_detection",
-            result_path=result_path,
-            feature_count=feature_count,
-            summary=f"Found {feature_count} {request.keyword} polygons/clusters",
+            geojson=feature_collection,
+            summary=f"Found {len(feature_collection.features)} {request.keyword} polygons/clusters",
         )
 
     except HTTPException:

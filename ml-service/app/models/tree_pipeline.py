@@ -9,6 +9,10 @@ import rasterio
 from rasterio.windows import Window
 from transformers import AutoImageProcessor, SegformerForSemanticSegmentation
 from tqdm import tqdm
+import geopandas as gpd
+from rasterio.features import shapes
+from shapely.geometry import shape
+from rasterio.transform import from_bounds
 from app.models.model_downloader import ensure_segformer_models
 
 from app.utils.logger import get_logger
@@ -136,5 +140,35 @@ class TCDSegformer:
                         failed += 1
                         continue
                 elapsed = time.time() - start_time
-                logger.info(f"Inference complete | tiles: {processed}/{total_tiles} | failed: {failed} | time: {elapsed:.2f}s")
+                logger.info(f"Inference complete | tiles: {processed}/{total_tiles} | failed: {failed} | time: {elapsed:.2f}s") 
                 return full_mask
+
+    @staticmethod
+    def bbox_to_tree_geojson(bbox_coords, mask):
+        logger.info(f"Converting mask to GeoJSON | bbox: {bbox_coords}")
+        start_time = time.time()
+        min_lon, min_lat, max_lon, max_lat = bbox_coords
+        height, width = mask.shape
+        transform = from_bounds(min_lon, min_lat, max_lon, max_lat, width, height)
+        results = []
+        for geom, value in shapes(mask, mask=(mask == 1), transform=transform):
+            results.append(
+                {
+                    "geometry": shape(geom),
+                    "properties": {"class": "tree", "area_m2": None},
+                }
+            )
+        if not results:
+            logger.warning("No trees detected in mask")
+            return {"type": "FeatureCollection", "features": []}
+
+        # CREATING GDF
+        logger.info(f"Creating GeoDataFrame with {len(results)} trees")
+        gdf = gpd.GeoDataFrame.from_features(results, crs="EPSG:4326")
+        gdf_projected = gdf.to_crs("EPSG:3857")
+        gdf["area_m2"] = gdf_projected.geometry.area
+        print("GeoJSON result: ", gdf)
+
+        elapsed = time.time() - start_time
+        logger.info(f"GeoJSON conversion complete | trees: {len(gdf)} | avg area: {gdf['area_m2'].mean():.2f}m² | time: {elapsed:.2f}s")
+        return gdf

@@ -7,8 +7,12 @@ from PIL import Image
 from lang_sam import LangSAM  # https://github.com/luca-medeiros/lang-segment-anything.git
 import rasterio
 from rasterio.windows import Window
+from rasterio.features import shapes
+from shapely.geometry import shape
+from rasterio.transform import from_bounds
+import geopandas as gpd
 from tqdm import tqdm
-from typing import Optional
+from typing import Optional, Tuple, List
 from app.models.model_downloader import ensure_langsam_models
 
 
@@ -121,3 +125,34 @@ class LangSAMPipeline:
             elapsed = time.time() - start_time
             logger.info(f"Inference complete ===> tiles: {processed}/{total_tiles} | failed: {failed} | time: {elapsed:.2f}s")
             return full_mask.astype(np.uint8)
+        
+    
+    @staticmethod
+    def bbox_to_tree_geojson(bbox_coords, mask, keyword: str = "tree") -> gpd.GeoDataFrame:
+        logger.info(f"Converting mask to GeoJSON | bbox: {bbox_coords}")
+        start_time = time.time()
+
+        min_lon, min_lat, max_lon, max_lat = bbox_coords
+        height, width = mask.shape
+        transform = from_bounds(min_lon, min_lat, max_lon, max_lat, width, height)
+        results = []
+        for geom, value in shapes(mask.astype(np.uint8), mask=(mask == 1), transform=transform):
+            results.append(
+                {
+                    "geometry": shape(geom),
+                    "properties": {"class": keyword, "area_m2": None},
+                }
+            )
+        if not results:
+            logger.warning(f"No {keyword}s detected in mask")
+            return gpd.GeoDataFrame({"geometry": []}, crs="EPSG:4326")
+        
+        # Create GDF
+        logger.info(f"Creating GeoDataFrame with {len(results)} {keyword}s")
+        gdf = gpd.GeoDataFrame.from_features(results, crs="EPSG:4326")
+        gdf_projected = gdf.to_crs("EPSG:3857")
+        gdf["area_m2"] = gdf_projected.geometry.area
+        
+        elapsed = time.time() - start_time
+        logger.info(f"GeoJSON conversion complete | {keyword}s: {len(gdf)} | avg area: {gdf['area_m2'].mean():.2f}m² | time: {elapsed:.2f}s")
+        return gdf

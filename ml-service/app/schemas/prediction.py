@@ -26,6 +26,5 @@ class PredictionResponse(BaseModel):
     status: str
     model_name: str
     prediction_type: str
-    result_path: str
-    feature_count: int
+    geojson: GeoJSONFeatureCollection
     summary: str

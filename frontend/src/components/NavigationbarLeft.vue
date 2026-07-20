@@ -1,13 +1,11 @@
 <template>
   <v-navigation-drawer permanent width="300" color="#1b2e1b">
-    <!--  Map picker -->
       <div class="map-picker">
         <p class="picker-label">Map</p>
         <v-btn-toggle
           v-model="mapStore.mapType"
           rounded
           divided
-          variant="outlined"
           color="success"
           class="map-type-toggle"
         >
@@ -26,18 +24,17 @@
       <v-divider/>
     
       <v-list class="procedure" lines="one">
-        <!-- Area selection -->
           <v-list-item
             prepend-icon="mdi-numeric-1-circle"
             title="Area"
           ></v-list-item>
-          
           <v-btn
             @click="mapStore.triggerDrawing()"
             class="select-button"
             prepend-icon="mdi-select"
+            variant="tonal"
           >Select Area</v-btn>
-          
+
           <div class="bbox-info" v-if="mapStore.bbox">
             <span>N {{ mapStore.bbox.max_lat.toFixed(5) }}</span>
             <span>S {{ mapStore.bbox.min_lat.toFixed(5) }}</span>
@@ -45,13 +42,11 @@
             <span>W {{ mapStore.bbox.min_lon.toFixed(5) }}</span>
             <span class="area">{{ formatArea(mapStore.areaSqm) }}</span>
           </div>
-
           <!-- Task selection  -->
           <v-list-item
             prepend-icon="mdi-numeric-2-circle"
             title="Task"
           ></v-list-item>
-          
           <v-select
             :items="['Tree Detection', 'Zero-Shot']"
             placeholder="Select Task"
@@ -64,7 +59,7 @@
           ></v-select>
 
           <template v-if="mapStore.selectedTask === 'Zero-Shot'">
-          <v-list-item prepend-icon="mdi-plus" title="Keyword" />
+          <v-list-item prepend-icon="mdi-numeric-2-circle" title="Keyword" />
           <v-text-field
             v-model="mapStore.keyword"
             placeholder="e.g., buildings, swimming pools, trees"
@@ -77,35 +72,40 @@
           />
         </template>
 
-        <!-- Model selection -->
+
           <v-list-item
             prepend-icon="mdi-numeric-3-circle"
             title="Model"
           ></v-list-item>
-          
           <v-select
-            :items="[mapStore.selectedTask === 'Zero-Shot' ? 'LangSAM' : 'TCD-Segformer-MIT-B5']"
-            :model-value="mapStore.selectedTask === 'Zero-Shot' ? 'LangSAM' : 'TCD-Segformer-MIT-B5'"
+            :items="['Model A', 'Model B', 'Model C']"
+            placeholder="Select Model"
             variant="solo"
             density="compact"
             class="ml-task-dropdown"
             hide-details
+            disabled
           ></v-select>
-
-          <!-- Start prediction button-->
           <v-list-item
             prepend-icon="mdi-numeric-4-circle"
             title="Start Prediction"
           ></v-list-item>
-          
-          <v-btn
-            @click="mapStore.triggerRun()"
-            prepend-icon="mdi-rocket-launch"
-            class="run-btn"
-            color="success"
-            :disabled="mapStore.mapType === 'osm' || !mapStore.bbox || !mapStore.selectedTask || (mapStore.selectedTask === 'Zero-Shot' && !mapStore.keyword)"
-          >Run</v-btn>
+          <v-btn @click="mapStore.triggerRun()" prepend-icon="mdi-rocket-launch" class="run-btn" color="success">Run</v-btn>
       </v-list>
+
+      <template #append>
+        <div class="bottom-actions">
+          <v-btn
+            size="small"
+            variant="tonal"
+            density="comfortable"
+            :color="mapStore.mapType === 'germany-slow' ? 'success' : 'grey'"
+            @click="mapStore.setMapType('germany-slow')"
+          >
+            germany slow
+          </v-btn>
+        </div>
+      </template>
   </v-navigation-drawer>
 </template>
 
@@ -121,7 +121,7 @@ function formatArea(sqm) {
     : `${Math.round(sqm)} m²`
 }
 
-// Update model type based on selected task
+
 function onTaskChange() {
   if (mapStore.selectedTask === 'Zero-Shot') {
     mapStore.modelType = 'zeroshot'
@@ -143,21 +143,15 @@ function onTaskChange() {
 }
 
 .picker-label {
+  color: "white";
   font-size: 11px;
   text-transform: uppercase;
+  letter-spacing: 0.08em;
   margin-bottom: 10px;
 }
 
 .map-type-toggle {
   width: 100%;
-}
-
-.map-type-toggle :deep(.v-btn:not(.v-btn--active)) {
-  color: white;
-}
-
-.map-type-toggle :deep(.v-btn) {
-  border-color: rgba(255, 255, 255, 0.2);
 }
 
 .select-button {
@@ -173,11 +167,6 @@ function onTaskChange() {
 .run-btn {
   width: 90%;
   margin: 0 16px;
-}
-
-.run-btn.v-btn--disabled {
-  opacity: 40%;
-  background-color: grey;
 }
 
 .bottom-actions {
