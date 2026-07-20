@@ -15,6 +15,10 @@ export const useMapStore = defineStore('map', () => {
   const modelType = ref('tree')  // 'tree' or 'zeroshot'
   const keyword = ref('house')    // For zeroshot model
 
+  const hasPrediction = ref(false) // whether the prediction overlay currently has polygons shown on the map
+
+  const historyDrawerOpen = ref(false) // whether the prediction history drawer is open
+
   // triggers
   const startDrawingTrigger = ref(0)
   const runTrigger = ref(0)
@@ -66,6 +70,8 @@ export const useMapStore = defineStore('map', () => {
     startDrawingTrigger, triggerDrawing, mapType, setMapType, mapCenter, mapZoom, bbox, runTrigger, triggerRun, selectedTask, areaSqm, isPredicting,
     modelType, keyword,  setModelType, setKeyword,
     viewedPrediction, setViewedPrediction,
+    hasPrediction,
+    historyDrawerOpen,
     errorMessage, setError, clearError,
   }
 })
