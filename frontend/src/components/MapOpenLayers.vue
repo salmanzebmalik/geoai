@@ -1,4 +1,4 @@
-<!-- THIS COMPONENT IS DEPRECTED  -->
+<!-- THIS COMPONENT IS DEPRECATED  -->
 <!-- All functionality is bundled in Map.vue now, this component will be deleted soon (probably) -->
 
 

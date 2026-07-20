@@ -65,7 +65,8 @@ class GeoJSONFeatureCollection(BaseModel):
 class PredictionOutput(BaseModel):
     prediction_type: str
     model_name: str
-    geojson: GeoJSONFeatureCollection
+    result_url: str
+    feature_count: int
     summary: Optional[str] = None
 
 
@@ -80,6 +81,8 @@ class PredictionResponse(BaseModel):
 
 class PredictionHistoryItem(BaseModel):
     query_id: UUID
-    status: str
     bbox: BoundingBox
     created_at: datetime
+    prediction_type: Optional[str] = None
+    model_name: Optional[str] = None
+    summary: Optional[str] = None

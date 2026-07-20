@@ -31,30 +31,35 @@
 import { ref, watch } from 'vue'
 import { useMapStore } from '@/stores/map'
 
-const mapStore = useMapStore()
+const mapStore = useMapStore() // Pinia store
 
 const visible = ref(false)
 const progress = ref(0)
 let timer = null
 
-// Watch for changes in the `isPredicting` state from the map store to show/hide the overlay and update progress
+// simulated progress bar based on area size
 watch(() => mapStore.isPredicting, (predicting) => {
   if (predicting) {
     progress.value = 0
     visible.value = true
 
+    // estimation for total time based on area size (min 500ms)
     const totalMs = Math.max((mapStore.areaSqm ?? 0) / 1_000_000 * 30000, 500)
-    const tickMs = 100
-    const maxProgress = 95
+    const tickMs = 100 // update progress every 100ms
+    const maxProgress = 95 // don't reach 100% until prediction is done
 
+    // timer to update progress bar
     timer = setInterval(() => {
       progress.value = Math.min(progress.value + (tickMs / totalMs) * maxProgress, maxProgress)
     }, tickMs)
+  
   } else {
     clearInterval(timer)
     timer = null
-    progress.value = 100
+
     // Keep the overlay visible for a short moment to show 100% progress, then hide it
+    progress.value = 100
+  
     setTimeout(() => {
       visible.value = false
       progress.value = 0
@@ -66,10 +71,7 @@ watch(() => mapStore.isPredicting, (predicting) => {
 <style scoped>
 .overlay-wrapper {
   position: absolute;
-  left: 300px;
-  right: 0;
-  top: 0;
-  bottom: 0;
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;

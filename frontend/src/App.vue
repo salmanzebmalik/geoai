@@ -20,11 +20,7 @@ import { RouterView } from 'vue-router'
 </script>
 
 <style>
-.v-main {
-  background-color: white;
-}
-
-.v-app-bar {
+.v-main, .v-app-bar {
   background-color: white;
 }
 

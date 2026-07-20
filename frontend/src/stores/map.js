@@ -2,37 +2,34 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
 export const useMapStore = defineStore('map', () => {
-  const startDrawingTrigger = ref(0)
-
+  // === Map state ===
   const mapType = ref('orthophoto') // default map type
-
-  const selectedTask = ref('Tree Detection')
-
   const mapCenter = ref([7.6261, 51.9607]) // default Münster coordinates
   const mapZoom = ref(13.5) // default zoom level
 
+  // === User selection ===
   const bbox = ref(null)
-  const runTrigger = ref(0)
-  const isPredicting = ref(false)
-
   const areaSqm = ref(null)
-
+  
+  const selectedTask = ref('Tree Detection')
   const modelType = ref('tree')  // 'tree' or 'zeroshot'
   const keyword = ref('house')    // For zeroshot model
 
-  function triggerDrawing() {
-    startDrawingTrigger.value++ // jedes Increment = neues Zeichnen
-  }
+  // triggers
+  const startDrawingTrigger = ref(0)
+  const runTrigger = ref(0)
+  
+  const isPredicting = ref(false) // for loading display
 
+  const viewedPrediction = ref(null) // geojson of a past prediction selected in the history drawer
+
+  const errorMessage = ref(null) // error handling
+
+  // User selection
   function setMapType(type) {
     mapType.value = type
   }
 
-  function triggerRun() {
-    runTrigger.value++
-  }
-
-  // 
   function setModelType(type) {
     modelType.value = type
   }
@@ -41,9 +38,34 @@ export const useMapStore = defineStore('map', () => {
     keyword.value = text
   }
 
+  // Set triggers
+  function triggerDrawing() {
+    startDrawingTrigger.value++ // jedes Increment = neues Zeichnen
+  }  
+
+  function triggerRun() {
+    runTrigger.value++
+  }
+
+  // set geojson of pas prediction
+  function setViewedPrediction(geojson) {
+    viewedPrediction.value = geojson
+  }
+
+  // error handling
+  function setError(msg) {
+    errorMessage.value = msg
+  }
+
+  function clearError() {
+    errorMessage.value = null
+  }
+  
 
   return {
     startDrawingTrigger, triggerDrawing, mapType, setMapType, mapCenter, mapZoom, bbox, runTrigger, triggerRun, selectedTask, areaSqm, isPredicting,
     modelType, keyword,  setModelType, setKeyword,
+    viewedPrediction, setViewedPrediction,
+    errorMessage, setError, clearError,
   }
 })
