@@ -32,8 +32,8 @@ uvicorn app.main:app --host 127.0.0.1 --port 8010 &
 ML_PID=$!
 
 echo "Starting image-pipeline (Titiler) on port 8011..."
-cd "$SCRIPT_DIR/image_pipeline"
-uvicorn titiler_app:app --host 127.0.0.1 --port 8011 &
+# reuse launch_titiler.sh so the DB URL + GDAL/ulimit tuning stay in one place
+( cd "$SCRIPT_DIR/image_pipeline" && bash launch_titiler.sh ) &
 TITILER_PID=$!
 
 echo "Starting backend on port 8012..."

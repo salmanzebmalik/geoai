@@ -14,5 +14,6 @@ export VSI_CACHE_SIZE=536870912
 # seconds before a mosaic tile's pgstac search gives up
 export TITILER_PGSTAC_SEARCH_TIME_LIMIT=10
 
-./venv_titiler_pgstac/bin/uvicorn titiler_app:app \
+# titiler now lives in the consolidated root .venv (not the old venv_titiler_pgstac)
+../.venv/bin/uvicorn titiler_app:app \
   --host 127.0.0.1 --port 8011 --workers 2 2>&1 | tee -a titiler.log
