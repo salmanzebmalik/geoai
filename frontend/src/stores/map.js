@@ -2,21 +2,16 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
 export const useMapStore = defineStore('map', () => {
-  const startDrawingTrigger = ref(0)
-
+  // === Map state ===
   const mapType = ref('orthophoto') // default map type
-
-  const selectedTask = ref('Tree Detection')
-
   const mapCenter = ref([7.6261, 51.9607]) // default Münster coordinates
   const mapZoom = ref(13.5) // default zoom level
 
+  // === User selection ===
   const bbox = ref(null)
-  const runTrigger = ref(0)
-  const isPredicting = ref(false)
-
   const areaSqm = ref(null)
-
+  
+  const selectedTask = ref('Tree Detection')
   const modelType = ref('tree')  // 'tree' or 'zeroshot'
   const keyword = ref('house')    // For zeroshot model
 
@@ -24,35 +19,21 @@ export const useMapStore = defineStore('map', () => {
 
   const historyDrawerOpen = ref(false) // whether the prediction history drawer is open
 
-  const errorMessage = ref(null)
+  // triggers
+  const startDrawingTrigger = ref(0)
+  const runTrigger = ref(0)
+  
+  const isPredicting = ref(false) // for loading display
 
-  function setError(msg) {
-    errorMessage.value = msg
-  }
-
-  function clearError() {
-    errorMessage.value = null
-  }
- 
   const viewedPrediction = ref(null) // geojson of a past prediction selected in the history drawer
 
-  function setViewedPrediction(geojson) {
-    viewedPrediction.value = geojson
-  }
+  const errorMessage = ref(null) // error handling
 
-  function triggerDrawing() {
-    startDrawingTrigger.value++ // jedes Increment = neues Zeichnen
-  }
-
+  // User selection
   function setMapType(type) {
     mapType.value = type
   }
 
-  function triggerRun() {
-    runTrigger.value++
-  }
-
-  // 
   function setModelType(type) {
     modelType.value = type
   }
@@ -61,6 +42,29 @@ export const useMapStore = defineStore('map', () => {
     keyword.value = text
   }
 
+  // Set triggers
+  function triggerDrawing() {
+    startDrawingTrigger.value++ // jedes Increment = neues Zeichnen
+  }  
+
+  function triggerRun() {
+    runTrigger.value++
+  }
+
+  // set geojson of pas prediction
+  function setViewedPrediction(geojson) {
+    viewedPrediction.value = geojson
+  }
+
+  // error handling
+  function setError(msg) {
+    errorMessage.value = msg
+  }
+
+  function clearError() {
+    errorMessage.value = null
+  }
+  
 
   return {
     startDrawingTrigger, triggerDrawing, mapType, setMapType, mapCenter, mapZoom, bbox, runTrigger, triggerRun, selectedTask, areaSqm, isPredicting,

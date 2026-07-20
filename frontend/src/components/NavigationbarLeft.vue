@@ -1,5 +1,6 @@
 <template>
   <v-navigation-drawer permanent width="300" color="#1b2e1b">
+    <!--  Map picker -->
       <div class="map-picker">
         <p class="picker-label">Map</p>
         <v-btn-toggle
@@ -30,11 +31,13 @@
             prepend-icon="mdi-numeric-1-circle"
             title="Area"
           ></v-list-item>
+          
           <v-btn
             @click="mapStore.triggerDrawing()"
             class="select-button"
             prepend-icon="mdi-select"
           >Select Area</v-btn>
+          
           <div class="bbox-info" v-if="mapStore.bbox">
             <div class="bbox-coords">
               <span>N {{ mapStore.bbox.max_lat.toFixed(5) }}</span>
@@ -53,6 +56,7 @@
             prepend-icon="mdi-numeric-2-circle"
             title="Task"
           ></v-list-item>
+          
           <v-select
             :items="['Tree Detection', 'Zero-Shot']"
             placeholder="Select Task"
@@ -83,6 +87,7 @@
             prepend-icon="mdi-numeric-3-circle"
             title="Model"
           ></v-list-item>
+          
           <v-select
             :items="[mapStore.selectedTask === 'Zero-Shot' ? 'LangSAM' : 'TCD-Segformer-MIT-B5']"
             :model-value="mapStore.selectedTask === 'Zero-Shot' ? 'LangSAM' : 'TCD-Segformer-MIT-B5'"
@@ -97,6 +102,7 @@
             prepend-icon="mdi-numeric-4-circle"
             title="Start Prediction"
           ></v-list-item>
+          
           <v-btn
             @click="mapStore.triggerRun()"
             prepend-icon="mdi-rocket-launch"
@@ -105,20 +111,6 @@
             :disabled="mapStore.mapType === 'osm' || !mapStore.bbox || !mapStore.selectedTask || (mapStore.selectedTask === 'Zero-Shot' && !mapStore.keyword)"
           >Run</v-btn>
       </v-list>
-
-      <template #append>
-        <div class="bottom-actions">
-          <v-btn
-            size="small"
-            variant="tonal"
-            density="comfortable"
-            :color="mapStore.mapType === 'germany-slow' ? 'success' : 'grey'"
-            @click="mapStore.setMapType('germany-slow')"
-          >
-            germany slow
-          </v-btn>
-        </div>
-      </template>
   </v-navigation-drawer>
 </template>
 
@@ -141,7 +133,7 @@ function formatSoccerFields(sqm) {
   return (sqm / SOCCER_FIELD_SQM).toFixed(0)
 }
 
-
+// Update model type based on selected task
 function onTaskChange() {
   if (mapStore.selectedTask === 'Zero-Shot') {
     mapStore.modelType = 'zeroshot'
@@ -163,10 +155,8 @@ function onTaskChange() {
 }
 
 .picker-label {
-  color: "white";
   font-size: 11px;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
   margin-bottom: 10px;
 }
 
@@ -198,8 +188,8 @@ function onTaskChange() {
 }
 
 .run-btn.v-btn--disabled {
-  color: rgba(255, 255, 255, 0.3);
-  background-color: rgba(255, 255, 255, 0.08);
+  opacity: 40%;
+  background-color: grey;
 }
 
 .bottom-actions {
