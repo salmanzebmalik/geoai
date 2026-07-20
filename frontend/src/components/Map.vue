@@ -81,6 +81,10 @@ const predictionLayer = new VectorLayer({
     stroke: new Stroke({ color: '#00c864', width: 1.5 }),
   }),
 })
+predictionSource.on(['addfeature', 'clear'], () => {
+  mapStore.hasPrediction = predictionSource.getFeatures().length > 0
+})
+
 let draw = null
 
 // Display prediction result on the map and zoom

@@ -39,11 +39,16 @@
           >Select Area</v-btn>
           
           <div class="bbox-info" v-if="mapStore.bbox">
-            <span>N {{ mapStore.bbox.max_lat.toFixed(5) }}</span>
-            <span>S {{ mapStore.bbox.min_lat.toFixed(5) }}</span>
-            <span>E {{ mapStore.bbox.max_lon.toFixed(5) }}</span>
-            <span>W {{ mapStore.bbox.min_lon.toFixed(5) }}</span>
-            <span class="area">{{ formatArea(mapStore.areaSqm) }}</span>
+            <div class="bbox-coords">
+              <span>N {{ mapStore.bbox.max_lat.toFixed(5) }}</span>
+              <span>S {{ mapStore.bbox.min_lat.toFixed(5) }}</span>
+              <span>E {{ mapStore.bbox.max_lon.toFixed(5) }}</span>
+              <span>W {{ mapStore.bbox.min_lon.toFixed(5) }}</span>
+            </div>
+            <div class="bbox-area">
+              <span class="area">{{ formatArea(mapStore.areaSqm) }}</span>
+              <span class="area-fields">~ {{ formatSoccerFields(mapStore.areaSqm) }} soccer fields</span>
+            </div>
           </div>
 
           <!-- Task selection  -->
@@ -121,6 +126,13 @@ function formatArea(sqm) {
     : `${Math.round(sqm)} m²`
 }
 
+const SOCCER_FIELD_SQM = 7140
+
+function formatSoccerFields(sqm) {
+  if (sqm == null) return ''
+  return (sqm / SOCCER_FIELD_SQM).toFixed(0)
+}
+
 // Update model type based on selected task
 function onTaskChange() {
   if (mapStore.selectedTask === 'Zero-Shot') {
@@ -187,13 +199,43 @@ function onTaskChange() {
 }
 
 .bbox-info {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   width: 90%;
   margin: 8px 16px;
-  padding: 8px;
+  padding: 10px 12px;
+  background-color: rgba(139, 195, 74, 0.1);
+  border: 1px solid rgba(139, 195, 74, 0.2);
+  border-radius: 8px;
   font-size: 12px;
-  text-align: center;
+}
+
+.bbox-coords {
+  display: grid;
+  grid-template-columns: auto auto;
+  column-gap: 8px;
+  row-gap: 2px;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.bbox-area {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.area {
+  color: #a5d6a7;
+  white-space: nowrap;
+}
+
+.area-fields {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.5);
+  white-space: nowrap;
 }
 </style>
