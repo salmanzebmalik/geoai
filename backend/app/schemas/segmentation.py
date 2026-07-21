@@ -2,11 +2,13 @@ from datetime import datetime
 from typing import Any, Dict, List, Literal, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 SourceType = Literal["satellite", "ortho"]
 ModelType = Literal["tree", "tree_satlas", "tree_unet", "tree_deepforest", "zeroshot"]
+VectorFormat = Literal["geojson", "gpkg", "flatgeobuf", "shapefile"]
+GeometryType = Literal["Polygon", "MultiPolygon"]
 
 
 class BoundingBox(BaseModel):
@@ -24,11 +26,39 @@ class PredictionRequest(BaseModel):
     model_type: ModelType = "tree"
 
     # Only used when model_type = "zeroshot".
-    # If omitted, backend sends "tree" as default keyword.
+    # Supply either one keyword or the keywords list below.
     keyword: Optional[str] = None
+
+    # Multiple zero-shot terms are evaluated one after another and merged.
+    keywords: List[str] = Field(default_factory=list, max_length=20)
 
     # Optional source selection for tiTiler.
     source_type: SourceType = "satellite"
+
+    @model_validator(mode="after")
+    def validate_model_parameters(self) -> "PredictionRequest":
+        self.keyword = self.keyword.strip() if self.keyword else None
+        self.keywords = list(
+            dict.fromkeys(term.strip() for term in self.keywords if term.strip())
+        )
+
+        if self.model_type == "zeroshot" and not (self.keyword or self.keywords):
+            raise ValueError(
+                "keyword or keywords is required when model_type is 'zeroshot'"
+            )
+
+        if self.model_type == "tree":
+            self.keyword = None
+            self.keywords = []
+
+        return self
+
+    def requested_keywords(self) -> List[str]:
+        return list(
+            dict.fromkeys(
+                ([self.keyword] if self.keyword else []) + self.keywords
+            )
+        )
 
 
 class FetchImageRequest(BaseModel):
@@ -86,3 +116,113 @@ class PredictionHistoryItem(BaseModel):
     prediction_type: Optional[str] = None
     model_name: Optional[str] = None
     summary: Optional[str] = None
+    keywords: List[str] = Field(default_factory=list)
+
+
+class ExportFilterOptions(BaseModel):
+    min_area_m2: Optional[float] = Field(default=None, ge=0)
+    max_area_m2: Optional[float] = Field(default=None, ge=0)
+    min_confidence: Optional[float] = Field(default=None, ge=0, le=1)
+    geometry_types: List[GeometryType] = Field(default_factory=list)
+    labels: List[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_area_range(self) -> "ExportFilterOptions":
+        if (
+            self.min_area_m2 is not None
+            and self.max_area_m2 is not None
+            and self.min_area_m2 > self.max_area_m2
+        ):
+            raise ValueError("min_area_m2 must not exceed max_area_m2")
+        self.labels = list(
+            dict.fromkeys(label.strip() for label in self.labels if label.strip())
+        )
+        return self
+
+
+class ExportOptions(BaseModel):
+    include_geojson: bool = True
+    include_annotated_tiff: bool = True
+    include_mask_tiff: bool = False
+    include_metadata: bool = True
+    include_zip: bool = True
+    overlay_color: str = "#ff0000"
+    overlay_opacity: float = Field(default=0.45, ge=0, le=1)
+    output_crs: str = "EPSG:4326"
+    vector_formats: List[VectorFormat] = Field(
+        default_factory=lambda: ["geojson"]
+    )
+    filters: ExportFilterOptions = Field(default_factory=ExportFilterOptions)
+
+    @field_validator("overlay_color")
+    @classmethod
+    def validate_overlay_color(cls, value: str) -> str:
+        value = value.strip().lower()
+        if len(value) != 7 or not value.startswith("#"):
+            raise ValueError("overlay_color must use #RRGGBB notation")
+        try:
+            int(value[1:], 16)
+        except ValueError as error:
+            raise ValueError("overlay_color must use #RRGGBB notation") from error
+        return value
+
+    @field_validator("output_crs")
+    @classmethod
+    def validate_output_crs(cls, value: str) -> str:
+        from rasterio.crs import CRS
+
+        try:
+            return CRS.from_user_input(value).to_string()
+        except Exception as error:
+            raise ValueError(f"Invalid output_crs: {value}") from error
+
+    @model_validator(mode="after")
+    def normalize_formats(self) -> "ExportOptions":
+        self.vector_formats = list(dict.fromkeys(self.vector_formats))
+        if self.include_geojson and "geojson" not in self.vector_formats:
+            self.vector_formats.insert(0, "geojson")
+        if not self.include_geojson and "geojson" in self.vector_formats:
+            self.vector_formats.remove("geojson")
+        if not any(
+            (
+                self.vector_formats,
+                self.include_annotated_tiff,
+                self.include_mask_tiff,
+                self.include_metadata,
+                self.include_zip,
+            )
+        ):
+            raise ValueError("At least one export artifact must be selected")
+        return self
+
+
+class ExportRequest(BaseModel):
+    query_id: UUID
+    options: ExportOptions = Field(default_factory=ExportOptions)
+
+
+class PredictionExportRequest(PredictionRequest):
+    export: ExportOptions = Field(default_factory=ExportOptions)
+
+
+class ExportArtifact(BaseModel):
+    name: str
+    media_type: str
+    download_url: str
+
+
+class ExportResponse(BaseModel):
+    export_id: UUID
+    query_id: UUID
+    created_at: datetime
+    model_type: Optional[ModelType] = None
+    keywords: List[str] = Field(default_factory=list)
+    source_feature_count: int
+    exported_feature_count: int
+    output_crs: str
+    artifacts: List[ExportArtifact]
+
+
+class PredictionExportResponse(BaseModel):
+    prediction: PredictionResponse
+    export: ExportResponse

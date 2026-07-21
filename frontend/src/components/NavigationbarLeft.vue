@@ -32,12 +32,23 @@
             title="Area"
           ></v-list-item>
           
-          <v-btn
-            @click="mapStore.triggerDrawing()"
-            class="select-button"
-            prepend-icon="mdi-select"
-          >Select Area</v-btn>
-          
+          <div class="area-buttons">
+            <v-btn
+              @click="mapStore.triggerDrawing()"
+              class="select-button"
+              prepend-icon="mdi-select"
+            >Select Area</v-btn>
+
+            <v-btn
+              @click="mapStore.coordinateInputOpen = true"
+              class="input-coords-button"
+              aria-label="Enter coordinates manually"
+              variant="tonal"
+            >
+              <v-icon icon="mdi-form-textbox" />
+            </v-btn>
+          </div>
+
           <div class="bbox-info" v-if="mapStore.bbox">
             <div class="bbox-coords">
               <span>N {{ mapStore.bbox.max_lat.toFixed(5) }}</span>
@@ -58,21 +69,22 @@
           ></v-list-item>
           
           <v-select
-            :items="['Tree Detection', 'Zero-Shot']"
-            placeholder="Select Task"
+            :items="availableTasks"
+            :disabled="!availableTasks.length"
+            :placeholder="availableTasks.length ? 'Select Task' : 'No tasks available'"
             variant="solo"
             density="compact"
             class="ml-task-dropdown"
             hide-details
-            v-model="mapStore.selectedTask" 
+            v-model="mapStore.selectedTask"
             @update:model-value="onTaskChange"
           ></v-select>
 
           <template v-if="mapStore.selectedTask === 'Zero-Shot'">
-          <v-list-item prepend-icon="mdi-plus" title="Keyword" />
+          <v-list-item prepend-icon="mdi-plus" title="Keywords" />
           <v-text-field
             v-model="mapStore.keyword"
-            placeholder="e.g., buildings, swimming pools, trees"
+            placeholder="buildings, pools, cars"
             variant="solo"
             density="compact"
             class="ml-task-dropdown"
@@ -100,7 +112,7 @@
 
           <!-- Start prediction button-->
           <v-list-item
-            prepend-icon="mdi-numeric-4-circle"
+            prepend-icon="mdi-numeric-3-circle"
             title="Start Prediction"
           ></v-list-item>
           
@@ -109,8 +121,21 @@
             prepend-icon="mdi-rocket-launch"
             class="run-btn"
             color="success"
-            :disabled="mapStore.mapType === 'osm' || !mapStore.bbox || !mapStore.selectedTask || (mapStore.selectedTask === 'Zero-Shot' && !mapStore.keyword)"
+            :disabled="mapStore.mapType === 'osm' || !mapStore.bbox || !mapStore.selectedTask || (mapStore.selectedTask === 'Zero-Shot' && !mapStore.keyword.trim())"
           >Run</v-btn>
+
+          <v-list-item
+            prepend-icon="mdi-numeric-5-circle"
+            title="Export"
+          ></v-list-item>
+          <v-btn
+            @click="mapStore.openExportDialog()"
+            prepend-icon="mdi-tray-arrow-down"
+            class="run-btn"
+            color="success"
+            variant="tonal"
+            :disabled="!mapStore.currentQueryId"
+          >Export options</v-btn>
       </v-list>
   </v-navigation-drawer>
 </template>
@@ -199,14 +224,35 @@ function onTaskChange() {
   border-color: rgba(255, 255, 255, 0.2);
 }
 
-.select-button {
+.area-buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   width: 90%;
   margin: 0 16px;
+}
+
+.select-button {
+  flex: 1;
+  min-width: 0;
+}
+
+.input-coords-button {
+  flex-shrink: 0;
+  min-width: 0;
+  padding: 0 14px;
 }
 
 .ml-task-dropdown {
   width: 90%;
   margin: 0 16px;
+}
+
+.model-label {
+  width: 90%;
+  margin: 6px 16px 0;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .run-btn {

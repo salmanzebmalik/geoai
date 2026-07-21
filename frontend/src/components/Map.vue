@@ -11,6 +11,8 @@ import OSM from 'ol/source/OSM'
 import XYZ from 'ol/source/XYZ'
 import VectorLayer from 'ol/layer/Vector.js'
 import VectorSource from 'ol/source/Vector.js'
+import Feature from 'ol/Feature.js'
+import Polygon from 'ol/geom/Polygon.js'
 import Draw, { createBox } from 'ol/interaction/Draw.js'
 import GeoJSON from 'ol/format/GeoJSON.js'
 import { Style, Fill, Stroke } from 'ol/style'
@@ -140,6 +142,33 @@ function startDrawing() {
   map.addInteraction(draw) // activate drawing interaction
 }
 
+// Draw the box for a manually-entered bbox (mapStore.bbox already holds min/max lon/lat)
+function drawManualBbox() {
+  const bbox = mapStore.bbox
+  if (!bbox) return
+
+  if (draw) {
+    map.removeInteraction(draw) // cancel an in-progress hand-draw, if any
+    draw = null
+  }
+  vectorSource.clear()
+
+  const ring = [
+    [bbox.min_lon, bbox.min_lat],
+    [bbox.max_lon, bbox.min_lat],
+    [bbox.max_lon, bbox.max_lat],
+    [bbox.min_lon, bbox.max_lat],
+    [bbox.min_lon, bbox.min_lat],
+  ].map((coord) => fromLonLat(coord))
+  const geometry = new Polygon([ring])
+  vectorSource.addFeature(new Feature(geometry))
+
+  mapStore.areaSqm = getArea(geometry) // same spherical calculation as the draw tool
+
+  // Manual coordinates can be far from the current view, so bring them into frame
+  map.getView().fit(geometry.getExtent(), { padding: [50, 50, 50, 50], maxZoom: 19, duration: 500 })
+}
+
 // OpenLayers map setup
 onMounted(() => {
   map = new Map({
@@ -185,6 +214,9 @@ watch(() => mapStore.mapType, (type) => showMapLayer(type))
 // Nav bar "Select Area" -> start drawing
 watch(() => mapStore.startDrawingTrigger, () => startDrawing())
 
+// Manual coordinate input -> redraw box + recompute area from mapStore.bbox
+watch(() => mapStore.manualBboxTrigger, () => drawManualBbox())
+
 // History drawer click -> show past prediction's polygons
 watch(() => mapStore.viewedPrediction, (geojson) => {
   if (!geojson) return
@@ -221,7 +253,16 @@ watch(() => mapStore.runTrigger, async () => {
     }
 
     if (requestBody.model_type === 'zeroshot') {
-      requestBody.keyword = mapStore.keyword
+      const keywords = mapStore.keyword
+        .split(',')
+        .map((term) => term.trim())
+        .filter(Boolean)
+
+      if (keywords.length === 1) {
+        requestBody.keyword = keywords[0]
+      } else {
+        requestBody.keywords = keywords
+      }
     }
 
     // Send prediction request to backend
@@ -294,6 +335,7 @@ watch(() => mapStore.runTrigger, async () => {
     }
 
     displayPrediction(geojson)
+    mapStore.setCurrentPrediction(result.query_id, geojson)
   } finally {
     mapStore.isPredicting = false
   }
