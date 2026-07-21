@@ -2,18 +2,24 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
 export const useMapStore = defineStore('map', () => {
-  // Map state
-  const mapType = ref('orthophoto')
-  const mapCenter = ref([7.6261, 51.9607])
-  const mapZoom = ref(13.5)
+  // === Map state ===
+  const mapType = ref('orthophoto') // default map type
+  const mapCenter = ref([7.6261, 51.9607]) // default Münster coordinates
+  const mapZoom = ref(13.5) // default zoom level
 
-  // User selection
+  // === User selection ===
   const bbox = ref(null)
   const areaSqm = ref(null)
+  
   const selectedTask = ref('Tree Detection')
-  const modelType = ref('tree')
-  const keyword = ref('house')
+  const modelType = ref('tree')  // 'tree' or 'zeroshot'
+  const keyword = ref('house')    // For zeroshot model
 
+  const coordinateInputOpen = ref(false) // whether the manual coordinate input overlay is open
+
+  // triggers
+  const manualBboxTrigger = ref(0)
+  
   // Prediction and export state
   const hasPrediction = ref(false)
   const viewedPrediction = ref(null)
@@ -49,6 +55,10 @@ export const useMapStore = defineStore('map', () => {
     runTrigger.value++
   }
 
+  function triggerManualBboxUpdate() {
+    manualBboxTrigger.value++ // tells Map.vue to redraw the box after a manual coordinate entry
+  }
+
   function openExportDialog() {
     exportDialogTrigger.value++
   }
@@ -76,35 +86,15 @@ export const useMapStore = defineStore('map', () => {
   }
 
   return {
-    mapType,
-    mapCenter,
-    mapZoom,
-    bbox,
-    areaSqm,
-    selectedTask,
-    modelType,
-    keyword,
-    hasPrediction,
-    viewedPrediction,
-    currentQueryId,
-    currentExport,
-    isPredicting,
-    isExporting,
-    historyDrawerOpen,
-    startDrawingTrigger,
-    runTrigger,
-    exportDialogTrigger,
-    errorMessage,
-    setMapType,
-    setModelType,
-    setKeyword,
-    triggerDrawing,
-    triggerRun,
-    openExportDialog,
-    setViewedPrediction,
-    setCurrentPrediction,
-    setCurrentExport,
-    setError,
-    clearError,
+    mapType, setMapType, mapCenter, mapZoom,
+    bbox, areaSqm, selectedTask, modelType, keyword, setModelType, setKeyword,
+    hasPrediction, viewedPrediction, currentQueryId, currentExport, isPredicting, isExporting,
+    historyDrawerOpen, coordinateInputOpen,
+    startDrawingTrigger, triggerDrawing,
+    runTrigger, triggerRun,
+    manualBboxTrigger, triggerManualBboxUpdate,
+    exportDialogTrigger, openExportDialog,
+    setViewedPrediction, setCurrentPrediction, setCurrentExport,
+    errorMessage, setError, clearError,
   }
 })
