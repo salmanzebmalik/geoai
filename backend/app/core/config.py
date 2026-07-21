@@ -51,7 +51,7 @@ class Settings:
 
     titiler_base_url: str = os.getenv(
         "TITILER_BASE_URL",
-        "http://127.0.0.1:8011",
+        "http://127.0.0.1:8041",
     ).rstrip("/")
 
     # -----------------------------

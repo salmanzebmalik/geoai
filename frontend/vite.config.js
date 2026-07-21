@@ -27,7 +27,7 @@ export default defineConfig({
         changeOrigin: true,
       },
       '/image-api': {
-        target: 'http://127.0.0.1:8011',
+        target: 'http://127.0.0.1:8041',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/image-api/, ''),
       },

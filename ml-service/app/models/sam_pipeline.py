@@ -44,24 +44,25 @@ class LangSAMPipeline:
         else:
             self.device = device
 
-        if offline:
-            # set directory paths for local model files
-            current_dir = Path(__file__).parent.resolve()
-            model_dir = current_dir.parent / "models" / "local_langsam"
+        with torch.autocast(device_type="cuda", enabled=False):
+            if offline:
+                # set directory paths for local model files
+                current_dir = Path(__file__).parent.resolve()
+                model_dir = current_dir.parent / "models" / "local_langsam"
 
-            ensure_langsam_models(model_dir)  # will download if missing (with lock)
+                ensure_langsam_models(model_dir)  # will download if missing (with lock)
 
-            sam_ckpt_path = f"{model_dir}/sam2.1_hiera_large.pt"
-            gdino_model_path = f"{model_dir}/groundingdino_hf_model"
+                sam_ckpt_path = f"{model_dir}/sam2.1_hiera_large.pt"
+                gdino_model_path = f"{model_dir}/groundingdino_hf_model"
 
-            self.model = LangSAM(
-                sam_type="sam2.1_hiera_large",
-                sam_ckpt_path=sam_ckpt_path,
-                gdino_model_ckpt_path=gdino_model_path,
-                gdino_processor_ckpt_path=gdino_model_path,
-            )
-        else:  # online
-            self.model = LangSAM()
+                self.model = LangSAM(
+                    sam_type="sam2.1_hiera_large",
+                    sam_ckpt_path=sam_ckpt_path,
+                    gdino_model_ckpt_path=gdino_model_path,
+                    gdino_processor_ckpt_path=gdino_model_path,
+                )
+            else:  # online
+                self.model = LangSAM()
 
     def get_full_mask_from_bytes(self, image_bytes: bytes, keyword: str = "tree") -> np.ndarray:
         start_time = time.time()
