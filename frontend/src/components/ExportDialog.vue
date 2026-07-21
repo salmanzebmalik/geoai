@@ -1,31 +1,39 @@
 <template>
-  <v-dialog v-model="open" max-width="760" scrollable>
-    <v-card>
-      <v-card-title>Export annotations</v-card-title>
-      <v-card-subtitle>
+  <v-dialog v-model="open" max-width="680" scrollable>
+    <v-card class="export-dialog-card" theme="dark" rounded="lg" elevation="16">
+      <v-card-title class="export-title">
+        <v-icon icon="mdi-tray-arrow-down" size="small" />
+        Export annotations
+      </v-card-title>
+      <v-card-subtitle class="export-subtitle">
         Prediction {{ mapStore.currentQueryId }}
       </v-card-subtitle>
 
-      <v-card-text>
-        <v-row dense>
-          <v-col cols="12" sm="6">
-            <v-text-field
-              v-model="form.overlay_color"
-              label="Overlay color"
-              type="color"
-            />
-          </v-col>
-          <v-col cols="12" sm="6">
+      <v-card-text class="export-content">
+        <div class="export-controls">
+          <v-text-field
+            v-model="form.overlay_color"
+            label="Overlay color"
+            type="color"
+            variant="outlined"
+            density="comfortable"
+            hide-details
+          />
+
+          <div class="opacity-control">
+            <div class="control-label">Opacity</div>
             <v-slider
               v-model="form.overlay_opacity"
-              label="Opacity"
               :min="0"
               :max="1"
               :step="0.05"
               thumb-label
+              color="success"
+              track-color="grey-darken-1"
+              hide-details
             />
-          </v-col>
-        </v-row>
+          </div>
+        </div>
 
         <v-alert v-if="error" type="error" variant="tonal" class="mt-4">
           {{ error }}
@@ -71,7 +79,7 @@
         </div>
       </v-card-text>
 
-      <v-card-actions>
+      <v-card-actions class="export-actions">
         <v-spacer />
         <v-btn variant="text" @click="open = false">Close</v-btn>
         <v-btn
@@ -153,6 +161,57 @@ function download(artifact) {
 </script>
 
 <style scoped>
+.export-dialog-card {
+  padding: 8px;
+  color: #f2f7f3;
+  background:
+    linear-gradient(145deg, rgba(36, 66, 45, 0.38), transparent 45%),
+    #111c15;
+  border: 1px solid rgba(126, 190, 143, 0.18);
+}
+
+.export-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 20px 8px;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.export-subtitle {
+  padding: 0 20px 14px;
+  color: rgba(226, 239, 229, 0.68);
+}
+
+.export-content {
+  padding: 16px 20px;
+}
+
+.export-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+}
+
+.opacity-control {
+  padding: 0 4px 4px;
+}
+
+.control-label {
+  margin-bottom: 8px;
+  color: rgba(242, 247, 243, 0.78);
+  font-size: 0.82rem;
+}
+
+.export-actions {
+  padding: 10px 16px 14px;
+}
+
 .section-title {
   font-size: 0.9rem;
   font-weight: 600;
