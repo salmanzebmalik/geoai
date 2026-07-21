@@ -6,8 +6,12 @@ cd "$SCRIPT_DIR"
 
 echo "Working directory: $(pwd)"
 
-pkill -f uvicorn || true
+#pkill -f uvicorn || true
 sleep 2
+
+# Run each background job in its own process group so cleanup() can kill a
+# job's children too (e.g. the uvicorn+tee pipeline inside launch_titiler.sh)
+set -m
 
 if [ ! -d ".venv" ]; then
     echo "ERROR: Virtual environment not found at .venv/ in the repository root."
@@ -15,11 +19,13 @@ if [ ! -d ".venv" ]; then
 fi
 source .venv/bin/activate
 
-# Function to stop all background processes on exit
+# Function to stop only the processes (and their children) this script started
 cleanup() {
     echo "Shutting down services..."
-    pkill -f uvicorn || true
-    pkill -f "npm run dev" || true
+    for pid in "$ML_PID" "$TITILER_PID" "$BACKEND_PID" "$FRONTEND_PID"; do
+        [ -n "$pid" ] || continue
+        kill -TERM -- "-$pid" 2>/dev/null || kill -TERM "$pid" 2>/dev/null || true
+    done
     exit 0
 }
 
@@ -50,6 +56,7 @@ echo "Press Ctrl+C to stop all services"
 
 cd "$SCRIPT_DIR/frontend"
 npm run dev &
+FRONTEND_PID=$!
 
 # Wait for all background processes
 wait
