@@ -89,8 +89,11 @@
           ></v-list-item>
           
           <v-select
-            :items="[mapStore.selectedTask === 'Zero-Shot' ? 'LangSAM' : 'TCD-Segformer-MIT-B5']"
-            :model-value="mapStore.selectedTask === 'Zero-Shot' ? 'LangSAM' : 'TCD-Segformer-MIT-B5'"
+            :items="modelOptions"
+            item-title="title"
+            item-value="value"
+            v-model="mapStore.modelType"
+            :disabled="mapStore.selectedTask === 'Zero-Shot'"
             variant="solo"
             density="compact"
             class="ml-task-dropdown"
@@ -115,9 +118,24 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import { useMapStore } from '@/stores/map'
 
 const mapStore = useMapStore()
+
+// value = model_type sent to the backend, which picks the ml-service endpoint
+const TREE_MODELS = [
+  { title: 'TCD-Segformer (10cm ortho)', value: 'tree' },
+  { title: 'DeepForest boxes (10cm ortho)', value: 'tree_deepforest' },
+  { title: 'Satlas (5m satellite)', value: 'tree_satlas' },
+  { title: 'UNet (5m satellite)', value: 'tree_unet' },
+]
+
+const modelOptions = computed(() =>
+  mapStore.selectedTask === 'Zero-Shot'
+    ? [{ title: 'LangSAM', value: 'zeroshot' }]
+    : TREE_MODELS
+)
 
 function formatArea(sqm) {
   if (sqm == null) return ''

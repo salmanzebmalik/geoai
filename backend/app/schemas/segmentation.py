@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 
 
 SourceType = Literal["satellite", "ortho"]
-ModelType = Literal["tree", "zeroshot"]
+ModelType = Literal["tree", "tree_satlas", "tree_unet", "tree_deepforest", "zeroshot"]
 
 
 class BoundingBox(BaseModel):

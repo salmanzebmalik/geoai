@@ -35,7 +35,7 @@ class Settings:
     # -----------------------------
     ml_service_url: str = os.getenv(
         "ML_SERVICE_URL",
-        "http://127.0.0.1:8000",
+        "http://127.0.0.1:8002",  # ML service, per PORTS.md (8000 is the nginx gateway)
     ).rstrip("/")
 
     titiler_base_url: str = os.getenv(

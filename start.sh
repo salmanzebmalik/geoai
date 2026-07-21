@@ -36,9 +36,9 @@ echo "Starting image-pipeline (Titiler) on port 8001..."
 ( cd "$SCRIPT_DIR/image_pipeline" && bash launch_titiler.sh ) &
 TITILER_PID=$!
 
-echo "Starting backend on port 8000..."
+echo "Starting backend on port 8003..."
 cd "$SCRIPT_DIR/backend"
-uvicorn app.main:app --host 127.0.0.1 --port 8000 &
+uvicorn app.main:app --host 127.0.0.1 --port 8003 &
 BACKEND_PID=$!
 
 # Wait for services
