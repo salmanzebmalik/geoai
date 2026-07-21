@@ -33,14 +33,15 @@ class Settings:
     # -----------------------------
     # External services
     # -----------------------------
+    # dev ports: 8000-8003 are taken by the production stack (see PORTS.md), so use 801x
     ml_service_url: str = os.getenv(
         "ML_SERVICE_URL",
-        "http://127.0.0.1:8002",  # ML service, per PORTS.md (8000 is the nginx gateway)
+        "http://127.0.0.1:8012",
     ).rstrip("/")
 
     titiler_base_url: str = os.getenv(
         "TITILER_BASE_URL",
-        "http://127.0.0.1:8001",
+        "http://127.0.0.1:8011",
     ).rstrip("/")
 
     # -----------------------------

@@ -89,10 +89,8 @@
           ></v-list-item>
           
           <v-select
-            :items="modelOptions"
-            item-title="title"
-            item-value="value"
-            v-model="mapStore.modelType"
+            :items="modelLabels"
+            v-model="selectedModel"
             :disabled="mapStore.selectedTask === 'Zero-Shot'"
             variant="solo"
             density="compact"
@@ -136,6 +134,17 @@ const modelOptions = computed(() =>
     ? [{ title: 'LangSAM', value: 'zeroshot' }]
     : TREE_MODELS
 )
+
+const modelLabels = computed(() => modelOptions.value.map(m => m.title))
+
+const selectedModel = computed({
+  get: () => modelOptions.value.find(m => m.value === mapStore.modelType)?.title
+             ?? modelOptions.value[0].title,
+  set: (title) => {
+    const match = modelOptions.value.find(m => m.title === title)
+    if (match) mapStore.modelType = match.value
+  },
+})
 
 function formatArea(sqm) {
   if (sqm == null) return ''
