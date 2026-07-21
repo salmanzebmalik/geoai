@@ -112,7 +112,7 @@
 
           <!-- Start prediction button-->
           <v-list-item
-            prepend-icon="mdi-numeric-3-circle"
+            prepend-icon="mdi-numeric-4-circle"
             title="Start Prediction"
           ></v-list-item>
           
@@ -141,10 +141,28 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 import { useMapStore } from '@/stores/map'
 
 const mapStore = useMapStore()
+
+const TASK_OPTIONS_BY_MAP_TYPE = {
+  orthophoto: [
+    { title: 'Tree Detection', value: 'Tree Detection' },
+    { title: 'Segment Anything', value: 'Zero-Shot' },
+  ],
+  germany: [],
+  osm: [],
+}
+
+const availableTasks = computed(() => TASK_OPTIONS_BY_MAP_TYPE[mapStore.mapType] ?? [])
+
+watch(() => mapStore.mapType, () => {
+  if (!availableTasks.value.some((t) => t.value === mapStore.selectedTask)) {
+    mapStore.selectedTask = null
+    onTaskChange()
+  }
+})
 
 // value = model_type sent to the backend, which picks the ml-service endpoint
 const TREE_MODELS = [
@@ -246,13 +264,6 @@ function onTaskChange() {
 .ml-task-dropdown {
   width: 90%;
   margin: 0 16px;
-}
-
-.model-label {
-  width: 90%;
-  margin: 6px 16px 0;
-  font-size: 14px;
-  color: rgba(255, 255, 255, 0.7);
 }
 
 .run-btn {
