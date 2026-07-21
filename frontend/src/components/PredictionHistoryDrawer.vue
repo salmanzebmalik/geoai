@@ -49,11 +49,10 @@
 
         <template #append>
           <v-btn
-            icon="mdi-download"
+            icon="mdi-tray-arrow-down"
             variant="text"
             size="small"
-            :loading="downloadingId === item.query_id"
-            @click.stop="downloadPrediction(item)"
+            @click.stop="exportPrediction(item)"
           />
         </template>
       </v-list-item>
@@ -72,7 +71,6 @@ const mapStore = useMapStore() // Pinia store
 const history = ref([])
 const loading = ref(false)
 const error = ref(null)
-const downloadingId = ref(null)
 const viewingId = ref(null)
 
 
@@ -143,34 +141,13 @@ async function fetchGeoJSONResponse(result) {
   return response
 }
 
-// download the GeoJSON file for a specific prediction
-async function downloadPrediction(item) {
-  downloadingId.value = item.query_id 
-
-  try {
-    const result = await fetchResultById(item.query_id) // fetch the result object for the given query_id
-
-    const geojsonResponse = await fetchGeoJSONResponse(
-      result
-    )
-
-    // convert the response to a Blob object and create a temporary URL for it
-    const blob = await geojsonResponse.blob() 
-    const url = URL.createObjectURL(blob) 
-
-    const link = document.createElement('a') // create a temporary anchor element for downloading
-    link.href = url
-    link.download = `prediction_${item.query_id}.geojson`
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-
-    URL.revokeObjectURL(url) // revoke the temporary URL to free up memory
-  } catch (err) {
-    error.value = err.message
-  } finally {
-    downloadingId.value = null
+// open the export dialog for a specific past prediction
+function exportPrediction(item) {
+  if (mapStore.currentQueryId !== item.query_id) {
+    mapStore.setCurrentExport(null)
   }
+  mapStore.setCurrentPrediction(item.query_id)
+  mapStore.openExportDialog()
 }
 
 // view a specific prediction on the map
