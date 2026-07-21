@@ -27,6 +27,8 @@ export const useMapStore = defineStore('map', () => {
   const startDrawingTrigger = ref(0)
   const runTrigger = ref(0)
   const exportDialogTrigger = ref(0)
+  const detailsDialogTrigger = ref(0)
+  const currentDetailsItem = ref(null)
   const errorMessage = ref(null)
 
   function setMapType(type) {
@@ -51,6 +53,11 @@ export const useMapStore = defineStore('map', () => {
 
   function openExportDialog() {
     exportDialogTrigger.value++
+  }
+
+  function openDetailsDialog(item) {
+    currentDetailsItem.value = item
+    detailsDialogTrigger.value++
   }
 
   function setViewedPrediction(geojson, queryId = null) {
@@ -94,6 +101,8 @@ export const useMapStore = defineStore('map', () => {
     startDrawingTrigger,
     runTrigger,
     exportDialogTrigger,
+    detailsDialogTrigger,
+    currentDetailsItem,
     errorMessage,
     setMapType,
     setModelType,
@@ -101,6 +110,7 @@ export const useMapStore = defineStore('map', () => {
     triggerDrawing,
     triggerRun,
     openExportDialog,
+    openDetailsDialog,
     setViewedPrediction,
     setCurrentPrediction,
     setCurrentExport,

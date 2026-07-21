@@ -49,6 +49,12 @@
 
         <template #append>
           <v-btn
+            icon="mdi-information-outline"
+            variant="text"
+            size="small"
+            @click.stop="showDetails(item)"
+          />
+          <v-btn
             icon="mdi-tray-arrow-down"
             variant="text"
             size="small"
@@ -139,6 +145,11 @@ async function fetchGeoJSONResponse(result) {
   }
 
   return response
+}
+
+// open the details popup for a specific past prediction
+function showDetails(item) {
+  mapStore.openDetailsDialog(item)
 }
 
 // open the export dialog for a specific past prediction
