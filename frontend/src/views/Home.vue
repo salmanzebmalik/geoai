@@ -9,6 +9,7 @@
       <Legend />
     </div>
     <PredictionHistoryDrawer />
+    <ExportDialog />
   </div>
 </template>
 
@@ -20,6 +21,7 @@ import LoadingOverlay from '../components/LoadingOverlay.vue'
 import ErrorOverlay from '../components/ErrorOverlay.vue'
 import InputCoordinatesOverlay from '../components/InputCoordinatesOverlay.vue'
 import Legend from '../components/Legend.vue'
+import ExportDialog from '../components/ExportDialog.vue'
 </script>
 
 <style scoped>

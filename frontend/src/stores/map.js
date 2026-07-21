@@ -15,24 +15,26 @@ export const useMapStore = defineStore('map', () => {
   const modelType = ref('tree')  // 'tree' or 'zeroshot'
   const keyword = ref('house')    // For zeroshot model
 
-  const hasPrediction = ref(false) // whether the prediction overlay currently has polygons shown on the map
-
-  const historyDrawerOpen = ref(false) // whether the prediction history drawer is open
-
   const coordinateInputOpen = ref(false) // whether the manual coordinate input overlay is open
 
   // triggers
-  const startDrawingTrigger = ref(0)
-  const runTrigger = ref(0)
   const manualBboxTrigger = ref(0)
   
-  const isPredicting = ref(false) // for loading display
+  // Prediction and export state
+  const hasPrediction = ref(false)
+  const viewedPrediction = ref(null)
+  const currentQueryId = ref(null)
+  const currentExport = ref(null)
+  const isPredicting = ref(false)
+  const isExporting = ref(false)
 
-  const viewedPrediction = ref(null) // geojson of a past prediction selected in the history drawer
+  // UI state and triggers
+  const historyDrawerOpen = ref(false)
+  const startDrawingTrigger = ref(0)
+  const runTrigger = ref(0)
+  const exportDialogTrigger = ref(0)
+  const errorMessage = ref(null)
 
-  const errorMessage = ref(null) // error handling
-
-  // User selection
   function setMapType(type) {
     mapType.value = type
   }
@@ -45,10 +47,9 @@ export const useMapStore = defineStore('map', () => {
     keyword.value = text
   }
 
-  // Set triggers
   function triggerDrawing() {
-    startDrawingTrigger.value++ // jedes Increment = neues Zeichnen
-  }  
+    startDrawingTrigger.value++
+  }
 
   function triggerRun() {
     runTrigger.value++
@@ -58,29 +59,42 @@ export const useMapStore = defineStore('map', () => {
     manualBboxTrigger.value++ // tells Map.vue to redraw the box after a manual coordinate entry
   }
 
-  // set geojson of pas prediction
-  function setViewedPrediction(geojson) {
-    viewedPrediction.value = geojson
+  function openExportDialog() {
+    exportDialogTrigger.value++
   }
 
-  // error handling
-  function setError(msg) {
-    errorMessage.value = msg
+  function setViewedPrediction(geojson, queryId = null) {
+    viewedPrediction.value = geojson
+    if (queryId) currentQueryId.value = queryId
+  }
+
+  function setCurrentPrediction(queryId, geojson = null) {
+    currentQueryId.value = queryId
+    if (geojson) viewedPrediction.value = geojson
+  }
+
+  function setCurrentExport(value) {
+    currentExport.value = value
+  }
+
+  function setError(message) {
+    errorMessage.value = message
   }
 
   function clearError() {
     errorMessage.value = null
   }
-  
 
   return {
-    startDrawingTrigger, triggerDrawing, mapType, setMapType, mapCenter, mapZoom, bbox, runTrigger, triggerRun, selectedTask, areaSqm, isPredicting,
+    mapType, setMapType, mapCenter, mapZoom,
+    bbox, areaSqm, selectedTask, modelType, keyword, setModelType, setKeyword,
+    hasPrediction, viewedPrediction, currentQueryId, currentExport, isPredicting, isExporting,
+    historyDrawerOpen, coordinateInputOpen,
+    startDrawingTrigger, triggerDrawing,
+    runTrigger, triggerRun,
     manualBboxTrigger, triggerManualBboxUpdate,
-    modelType, keyword,  setModelType, setKeyword,
-    viewedPrediction, setViewedPrediction,
-    hasPrediction,
-    historyDrawerOpen,
-    coordinateInputOpen,
+    exportDialogTrigger, openExportDialog,
+    setViewedPrediction, setCurrentPrediction, setCurrentExport,
     errorMessage, setError, clearError,
   }
 })

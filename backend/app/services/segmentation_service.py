@@ -1,5 +1,7 @@
-from uuid import UUID
+import json
+import os
 from pathlib import Path
+from uuid import UUID
 from app.core.config import settings
 
 from sqlmodel import Session, select
@@ -61,6 +63,7 @@ def build_prediction_output_from_ml_result(
 
 def build_stored_prediction_metadata(
     ml_result: dict,
+    request: PredictionRequest | None = None,
 ) -> dict:
     """
     Build the lightweight metadata stored in PostgreSQL.
@@ -68,12 +71,74 @@ def build_stored_prediction_metadata(
     The database stores the internal result_path but not the GeoJSON.
     """
 
-    return {
+    metadata = {
         "prediction_type": ml_result["prediction_type"],
         "model_name": ml_result["model_name"],
         "result_path": ml_result["result_path"],
         "feature_count": ml_result["feature_count"],
         "summary": ml_result.get("summary"),
+    }
+    if request is not None:
+        metadata.update(
+            model_type=request.model_type,
+            keywords=request.requested_keywords(),
+            source_type=request.source_type,
+        )
+    return metadata
+
+
+def run_prediction_models(
+    query_id: str,
+    image_path: str,
+    request: PredictionRequest,
+) -> dict:
+    """Run one tree model or all requested zero-shot terms."""
+    keywords = request.requested_keywords() if request.model_type == "zeroshot" else [None]
+    results: list[dict] = []
+    merged_features: list[dict] = []
+
+    for keyword in keywords:
+        result = call_ml_service(
+            query_id=query_id,
+            bbox=request.bbox,
+            input_image_path=image_path,
+            model_type=request.model_type,
+            keyword=keyword,
+        )
+        result_path = resolve_prediction_result_path(result["result_path"])
+        payload = json.loads(result_path.read_text(encoding="utf-8"))
+        for feature in payload.get("features", []):
+            if keyword:
+                properties = feature.setdefault("properties", {})
+                properties.setdefault("class", keyword)
+                properties["keyword"] = keyword
+            merged_features.append(feature)
+        results.append(result)
+
+    if len(results) == 1:
+        return results[0]
+
+    final_path = resolve_prediction_result_path(results[-1]["result_path"])
+    temporary = final_path.with_suffix(final_path.suffix + ".tmp")
+    temporary.write_text(
+        json.dumps(
+            {
+                "type": "FeatureCollection",
+                "name": "zero_shot_predictions",
+                "features": merged_features,
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    os.replace(temporary, final_path)
+    return {
+        **results[-1],
+        "feature_count": len(merged_features),
+        "summary": (
+            f"Found {len(merged_features)} polygons/clusters for "
+            + ", ".join(keywords)
+        ),
     }
 
 
@@ -146,12 +211,10 @@ def create_prediction(
             source_type=request.source_type,
         )
 
-        ml_result = call_ml_service(
+        ml_result = run_prediction_models(
             query_id=query_id,
-            bbox=request.bbox,
-            input_image_path=image_path,
-            model_type=request.model_type,
-            keyword=request.keyword,
+            image_path=image_path,
+            request=request,
         )
 
         resolve_prediction_result_path(
@@ -168,7 +231,7 @@ def create_prediction(
         db_query.image_width = image_info.width
         db_query.image_height = image_info.height
         db_query.prediction_result = (
-            build_stored_prediction_metadata(ml_result)
+            build_stored_prediction_metadata(ml_result, request=request)
         )
 
         session.add(db_query)
@@ -284,7 +347,8 @@ def get_prediction_by_id(
         prediction=prediction,
         created_at=result.created_at,
     )
-    
+
+
 def get_prediction_geojson_source(
     query_id: UUID,
     session: Session,

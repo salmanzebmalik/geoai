@@ -253,7 +253,16 @@ watch(() => mapStore.runTrigger, async () => {
     }
 
     if (requestBody.model_type === 'zeroshot') {
-      requestBody.keyword = mapStore.keyword
+      const keywords = mapStore.keyword
+        .split(',')
+        .map((term) => term.trim())
+        .filter(Boolean)
+
+      if (keywords.length === 1) {
+        requestBody.keyword = keywords[0]
+      } else {
+        requestBody.keywords = keywords
+      }
     }
 
     // Send prediction request to backend
@@ -326,6 +335,7 @@ watch(() => mapStore.runTrigger, async () => {
     }
 
     displayPrediction(geojson)
+    mapStore.setCurrentPrediction(result.query_id, geojson)
   } finally {
     mapStore.isPredicting = false
   }
