@@ -6,6 +6,7 @@ from PIL import Image
 
 from app.core.config import settings
 from app.schemas.segmentation import BoundingBox, ImageInfo, SourceType
+from app.utils.crs import best_crs_for_bbox
 
 # Disable Pillow decompression bomb pixel limit
 # Use carefully: large TIFFs may consume a lot of RAM when opened.
@@ -43,6 +44,18 @@ def build_titiler_request(
     source_type: SourceType = "satellite",
 ) -> tuple[str, dict]:
     bbox_string = bbox_to_titiler_string(bbox)
+    
+    dst_crs = best_crs_for_bbox(
+        min_lon=bbox.min_lon,
+        min_lat=bbox.min_lat,
+        max_lon=bbox.max_lon,
+        max_lat=bbox.max_lat,
+    )
+
+    # Both default to nearest, which aliases the imagery. "resampling" covers the read,
+    # "reproject" the warp into dst_crs; the crop feeds a segmentation model, so smooth
+    # edges matter more than the slightly cheaper interpolation.
+    resampling = {"resampling": "cubic", "reproject": "cubic"}
 
     if source_type == "satellite":
         endpoint = f"{settings.titiler_base_url}/cog/bbox/{bbox_string}.tif"
@@ -50,6 +63,8 @@ def build_titiler_request(
             "url": settings.satellite_vrt_path,
             "bidx": [3, 2, 1],
             "rescale": "0,3000",
+            "dst_crs": dst_crs,
+            **resampling,
         }
         return endpoint, params
 
@@ -57,6 +72,8 @@ def build_titiler_request(
         endpoint = f"{settings.titiler_base_url}/mosaicjson/bbox/{bbox_string}.tif"
         params = {
             "url": settings.ortho_mosaic_path,
+            "dst_crs": dst_crs,
+            **resampling,
         }
         return endpoint, params
 
