@@ -43,7 +43,16 @@
           </template>
 
           <template #subtitle>
-            <span>{{ formatDate(item.created_at) }}</span>
+            <span class="item-subtitle">
+              <span class="item-date">{{ formatDate(item.created_at) }}</span>
+              <v-chip
+                v-if="isZeroShot(item)"
+                size="x-small"
+                variant="tonal"
+                color="success"
+                class="keyword-chip"
+              >{{ resolveKeyword(item) || 'Unknown' }}</v-chip>
+            </span>
           </template>
 
           <template #append>
@@ -70,11 +79,11 @@
             </div>
             <div class="detail-row">
               <span class="detail-label">Model</span>
-              <span class="detail-value">{{ item.model_name || 'Unknown' }}</span>
+              <v-chip size="small" variant="tonal" color="secondary">{{ item.model_name || 'Unknown' }}</v-chip>
             </div>
             <div v-if="isZeroShot(item)" class="detail-row">
               <span class="detail-label">Keyword</span>
-              <span class="detail-value">{{ resolveKeyword(item) || 'Unknown' }}</span>
+              <v-chip size="small" variant="tonal" color="success">{{ resolveKeyword(item) || 'Unknown' }}</v-chip>
             </div>
             <div class="detail-row">
               <span class="detail-label">Coordinates</span>
@@ -308,6 +317,27 @@ function formatDate(isoString) {
 
 .item-title {
   font-weight: 500;
+}
+
+.history-item :deep(.v-list-item-subtitle) {
+  opacity: 1 !important;
+}
+
+.item-subtitle {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  opacity: 1;
+}
+
+.item-date {
+  font-size: 0.75rem;
+  opacity: 1;
+}
+
+.keyword-chip {
+  pointer-events: none;
 }
 
 .history-item {
