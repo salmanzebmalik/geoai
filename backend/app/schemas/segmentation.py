@@ -116,6 +116,7 @@ class PredictionHistoryItem(BaseModel):
     prediction_type: Optional[str] = None
     model_name: Optional[str] = None
     summary: Optional[str] = None
+    keywords: List[str] = Field(default_factory=list)
 
 
 class ExportFilterOptions(BaseModel):

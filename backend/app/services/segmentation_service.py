@@ -283,6 +283,7 @@ def get_prediction_history(
             prediction_type=item.prediction_result.get("prediction_type"),
             model_name=item.prediction_result.get("model_name"),
             summary=item.prediction_result.get("summary"),
+            keywords=item.prediction_result.get("keywords", []),
         )
         for item in results
     ]
