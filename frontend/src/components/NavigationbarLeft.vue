@@ -69,10 +69,10 @@
           ></v-select>
 
           <template v-if="mapStore.selectedTask === 'Zero-Shot'">
-          <v-list-item prepend-icon="mdi-plus" title="Keyword" />
+          <v-list-item prepend-icon="mdi-plus" title="Keywords" />
           <v-text-field
             v-model="mapStore.keyword"
-            placeholder="e.g., buildings, swimming pools, trees"
+            placeholder="buildings, pools, cars"
             variant="solo"
             density="compact"
             class="ml-task-dropdown"
@@ -108,8 +108,21 @@
             prepend-icon="mdi-rocket-launch"
             class="run-btn"
             color="success"
-            :disabled="mapStore.mapType === 'osm' || !mapStore.bbox || !mapStore.selectedTask || (mapStore.selectedTask === 'Zero-Shot' && !mapStore.keyword)"
+            :disabled="mapStore.mapType === 'osm' || !mapStore.bbox || !mapStore.selectedTask || (mapStore.selectedTask === 'Zero-Shot' && !mapStore.keyword.trim())"
           >Run</v-btn>
+
+          <v-list-item
+            prepend-icon="mdi-numeric-5-circle"
+            title="Export"
+          ></v-list-item>
+          <v-btn
+            @click="mapStore.openExportDialog()"
+            prepend-icon="mdi-tray-arrow-down"
+            class="run-btn"
+            color="success"
+            variant="tonal"
+            :disabled="!mapStore.currentQueryId"
+          >Export options</v-btn>
       </v-list>
   </v-navigation-drawer>
 </template>

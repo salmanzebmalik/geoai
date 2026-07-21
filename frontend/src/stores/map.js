@@ -2,34 +2,33 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
 export const useMapStore = defineStore('map', () => {
-  // === Map state ===
-  const mapType = ref('orthophoto') // default map type
-  const mapCenter = ref([7.6261, 51.9607]) // default Münster coordinates
-  const mapZoom = ref(13.5) // default zoom level
-
-  // === User selection ===
-  const bbox = ref(null)
-  const areaSqm = ref(null)
-  
-  const selectedTask = ref('Tree Detection')
-  const modelType = ref('tree')  // 'tree' or 'zeroshot'
-  const keyword = ref('house')    // For zeroshot model
-
-  const hasPrediction = ref(false) // whether the prediction overlay currently has polygons shown on the map
-
-  const historyDrawerOpen = ref(false) // whether the prediction history drawer is open
-
-  // triggers
-  const startDrawingTrigger = ref(0)
-  const runTrigger = ref(0)
-  
-  const isPredicting = ref(false) // for loading display
-
-  const viewedPrediction = ref(null) // geojson of a past prediction selected in the history drawer
-
-  const errorMessage = ref(null) // error handling
+  // Map state
+  const mapType = ref('orthophoto')
+  const mapCenter = ref([7.6261, 51.9607])
+  const mapZoom = ref(13.5)
 
   // User selection
+  const bbox = ref(null)
+  const areaSqm = ref(null)
+  const selectedTask = ref('Tree Detection')
+  const modelType = ref('tree')
+  const keyword = ref('house')
+
+  // Prediction and export state
+  const hasPrediction = ref(false)
+  const viewedPrediction = ref(null)
+  const currentQueryId = ref(null)
+  const currentExport = ref(null)
+  const isPredicting = ref(false)
+  const isExporting = ref(false)
+
+  // UI state and triggers
+  const historyDrawerOpen = ref(false)
+  const startDrawingTrigger = ref(0)
+  const runTrigger = ref(0)
+  const exportDialogTrigger = ref(0)
+  const errorMessage = ref(null)
+
   function setMapType(type) {
     mapType.value = type
   }
@@ -42,36 +41,70 @@ export const useMapStore = defineStore('map', () => {
     keyword.value = text
   }
 
-  // Set triggers
   function triggerDrawing() {
-    startDrawingTrigger.value++ // jedes Increment = neues Zeichnen
-  }  
+    startDrawingTrigger.value++
+  }
 
   function triggerRun() {
     runTrigger.value++
   }
 
-  // set geojson of pas prediction
-  function setViewedPrediction(geojson) {
-    viewedPrediction.value = geojson
+  function openExportDialog() {
+    exportDialogTrigger.value++
   }
 
-  // error handling
-  function setError(msg) {
-    errorMessage.value = msg
+  function setViewedPrediction(geojson, queryId = null) {
+    viewedPrediction.value = geojson
+    if (queryId) currentQueryId.value = queryId
+  }
+
+  function setCurrentPrediction(queryId, geojson = null) {
+    currentQueryId.value = queryId
+    if (geojson) viewedPrediction.value = geojson
+  }
+
+  function setCurrentExport(value) {
+    currentExport.value = value
+  }
+
+  function setError(message) {
+    errorMessage.value = message
   }
 
   function clearError() {
     errorMessage.value = null
   }
-  
 
   return {
-    startDrawingTrigger, triggerDrawing, mapType, setMapType, mapCenter, mapZoom, bbox, runTrigger, triggerRun, selectedTask, areaSqm, isPredicting,
-    modelType, keyword,  setModelType, setKeyword,
-    viewedPrediction, setViewedPrediction,
+    mapType,
+    mapCenter,
+    mapZoom,
+    bbox,
+    areaSqm,
+    selectedTask,
+    modelType,
+    keyword,
     hasPrediction,
+    viewedPrediction,
+    currentQueryId,
+    currentExport,
+    isPredicting,
+    isExporting,
     historyDrawerOpen,
-    errorMessage, setError, clearError,
+    startDrawingTrigger,
+    runTrigger,
+    exportDialogTrigger,
+    errorMessage,
+    setMapType,
+    setModelType,
+    setKeyword,
+    triggerDrawing,
+    triggerRun,
+    openExportDialog,
+    setViewedPrediction,
+    setCurrentPrediction,
+    setCurrentExport,
+    setError,
+    clearError,
   }
 })
