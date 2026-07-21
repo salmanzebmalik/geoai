@@ -1,3 +1,4 @@
+import os
 from contextlib import asynccontextmanager
 
 import torch
@@ -30,6 +31,9 @@ async def lifespan(app: FastAPI):
                 patch_size=1024,
                 overlap=128,
                 offline=offline,
+                # TODO: Adapt lines below
+                text_threshold=0.2,
+                box_threshold=0.3
             ),
         }
 

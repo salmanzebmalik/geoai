@@ -4,6 +4,9 @@ import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import vueDevTools from 'vite-plugin-vue-devtools'
 
+const BACKEND_PORT = process.env.BACKEND_PORT || 8013 // fallback to 8013
+const TITILER_PORT = process.env.TITILER_PORT || 8041
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
@@ -23,11 +26,11 @@ export default defineConfig({
     },
     proxy: {
       '/api': {
-        target: 'http://127.0.0.1:8013',
+        target: `http://127.0.0.1:${BACKEND_PORT}`,
         changeOrigin: true,
       },
       '/image-api': {
-        target: 'http://127.0.0.1:8041',
+        target: `http://127.0.0.1:${TITILER_PORT}`,
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/image-api/, ''),
       },

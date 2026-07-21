@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../ports.sh"
+
 # pgstac database (conda postgres, TCP only); "titiler" is a read-only role
 export DATABASE_URL="postgresql://titiler@127.0.0.1:5432/stac"
 
@@ -16,4 +19,4 @@ export TITILER_PGSTAC_SEARCH_TIME_LIMIT=10
 
 # titiler now lives in the consolidated root .venv (not the old venv_titiler_pgstac)
 ../.venv/bin/uvicorn titiler_app:app \
-  --host 127.0.0.1 --port 8041 --workers 2 2>&1 | tee -a titiler.log
+  --host 127.0.0.1 --port "$TITILER_PORT" --workers 2 2>&1 | tee -a titiler.log
