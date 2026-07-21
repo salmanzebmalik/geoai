@@ -5,7 +5,6 @@ import numpy as np
 import torch
 import rasterio
 from rasterio.windows import Window
-import satlaspretrain_models as spm
 
 from app.utils.logger import get_logger
 logger = get_logger(__name__)
@@ -18,6 +17,7 @@ class SatlasTreePipeline:
     fine-tuned on tcd@~5m (see satlas_tree_5m.ipynb) """
 
     def __init__(self, weights_path: str | None = None, patch_size: int = 512, overlap: int = 64):
+        import satlaspretrain_models as spm  # lazy
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.patch_size = patch_size
         self.overlap = overlap

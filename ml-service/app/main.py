@@ -36,7 +36,7 @@ async def lifespan(app: FastAPI):
         # satellite (~5m) tree model — weights come from satlas_tree_5m.ipynb, optional
         try:
             app.state.models["satlas_tree"] = SatlasTreePipeline(patch_size=512, overlap=64)
-        except FileNotFoundError as e:
+        except Exception as e:
             app.state.models["satlas_tree"] = None
             logger.warning(f"Satlas tree model not loaded: {e}")
 

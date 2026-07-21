@@ -16,6 +16,11 @@ export default defineConfig({
     },
   },
   server: {
+    watch: {
+      usePolling: true,
+      interval: 400,
+      ignored: ['**/node_modules/**', '**/dist/**', '**/../storage/**'],
+    },
     proxy: {
       '/api': {
         target: 'http://127.0.0.1:8013',
