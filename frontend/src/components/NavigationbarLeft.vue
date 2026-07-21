@@ -32,12 +32,23 @@
             title="Area"
           ></v-list-item>
           
-          <v-btn
-            @click="mapStore.triggerDrawing()"
-            class="select-button"
-            prepend-icon="mdi-select"
-          >Select Area</v-btn>
-          
+          <div class="area-buttons">
+            <v-btn
+              @click="mapStore.triggerDrawing()"
+              class="select-button"
+              prepend-icon="mdi-select"
+            >Select Area</v-btn>
+
+            <v-btn
+              @click="mapStore.coordinateInputOpen = true"
+              class="input-coords-button"
+              aria-label="Enter coordinates manually"
+              variant="tonal"
+            >
+              <v-icon icon="mdi-form-textbox" />
+            </v-btn>
+          </div>
+
           <div class="bbox-info" v-if="mapStore.bbox">
             <div class="bbox-coords">
               <span>N {{ mapStore.bbox.max_lat.toFixed(5) }}</span>
@@ -172,9 +183,23 @@ function onTaskChange() {
   border-color: rgba(255, 255, 255, 0.2);
 }
 
-.select-button {
+.area-buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   width: 90%;
   margin: 0 16px;
+}
+
+.select-button {
+  flex: 1;
+  min-width: 0;
+}
+
+.input-coords-button {
+  flex-shrink: 0;
+  min-width: 0;
+  padding: 0 14px;
 }
 
 .ml-task-dropdown {

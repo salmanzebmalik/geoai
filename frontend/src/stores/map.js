@@ -19,9 +19,12 @@ export const useMapStore = defineStore('map', () => {
 
   const historyDrawerOpen = ref(false) // whether the prediction history drawer is open
 
+  const coordinateInputOpen = ref(false) // whether the manual coordinate input overlay is open
+
   // triggers
   const startDrawingTrigger = ref(0)
   const runTrigger = ref(0)
+  const manualBboxTrigger = ref(0)
   
   const isPredicting = ref(false) // for loading display
 
@@ -51,6 +54,10 @@ export const useMapStore = defineStore('map', () => {
     runTrigger.value++
   }
 
+  function triggerManualBboxUpdate() {
+    manualBboxTrigger.value++ // tells Map.vue to redraw the box after a manual coordinate entry
+  }
+
   // set geojson of pas prediction
   function setViewedPrediction(geojson) {
     viewedPrediction.value = geojson
@@ -68,10 +75,12 @@ export const useMapStore = defineStore('map', () => {
 
   return {
     startDrawingTrigger, triggerDrawing, mapType, setMapType, mapCenter, mapZoom, bbox, runTrigger, triggerRun, selectedTask, areaSqm, isPredicting,
+    manualBboxTrigger, triggerManualBboxUpdate,
     modelType, keyword,  setModelType, setKeyword,
     viewedPrediction, setViewedPrediction,
     hasPrediction,
     historyDrawerOpen,
+    coordinateInputOpen,
     errorMessage, setError, clearError,
   }
 })
