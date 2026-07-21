@@ -151,38 +151,47 @@ const TASK_OPTIONS_BY_MAP_TYPE = {
     { title: 'Tree Detection', value: 'Tree Detection' },
     { title: 'Segment Anything', value: 'Zero-Shot' },
   ],
-  germany: [],
+  germany: [
+    { title: 'Tree Detection', value: 'Tree Detection' },
+  ],
   osm: [],
 }
 
 const availableTasks = computed(() => TASK_OPTIONS_BY_MAP_TYPE[mapStore.mapType] ?? [])
 
-watch(() => mapStore.mapType, () => {
-  if (!availableTasks.value.some((t) => t.value === mapStore.selectedTask)) {
-    mapStore.selectedTask = null
-    onTaskChange()
-  }
-})
-
-// value = model_type sent to the backend, which picks the ml-service endpoint
-const TREE_MODELS = [
-  { title: 'TCD-Segformer (10cm ortho)', value: 'tree' },
-  { title: 'DeepForest boxes (10cm ortho)', value: 'tree_deepforest' },
-  { title: 'Satlas (5m satellite)', value: 'tree_satlas' },
-  { title: 'UNet (5m satellite)', value: 'tree_unet' },
-]
+// only the models that match the current dataset's resolution are displayed 
+const TREE_MODELS_BY_MAP_TYPE = {
+  orthophoto: [
+    { title: 'TCD-Segformer (10cm ortho)', value: 'tree' },
+    { title: 'DeepForest boxes (10cm ortho)', value: 'tree_deepforest' },
+  ],
+  germany: [
+    { title: 'Satlas (5m satellite)', value: 'tree_satlas' },
+    { title: 'UNet (5m satellite)', value: 'tree_unet' },
+  ],
+  osm: [],
+}
 
 const modelOptions = computed(() =>
   mapStore.selectedTask === 'Zero-Shot'
     ? [{ title: 'LangSAM', value: 'zeroshot' }]
-    : TREE_MODELS
+    : TREE_MODELS_BY_MAP_TYPE[mapStore.mapType] ?? []
 )
+
+
+watch(() => mapStore.mapType, () => {
+  if (!availableTasks.value.some((t) => t.value === mapStore.selectedTask)) {
+    mapStore.selectedTask = null
+  }
+  onTaskChange()
+})
 
 const modelLabels = computed(() => modelOptions.value.map(m => m.title))
 
 const selectedModel = computed({
   get: () => modelOptions.value.find(m => m.value === mapStore.modelType)?.title
-             ?? modelOptions.value[0].title,
+             ?? modelOptions.value[0]?.title
+             ?? null,
   set: (title) => {
     const match = modelOptions.value.find(m => m.title === title)
     if (match) mapStore.modelType = match.value
@@ -207,9 +216,12 @@ function formatSoccerFields(sqm) {
 function onTaskChange() {
   if (mapStore.selectedTask === 'Zero-Shot') {
     mapStore.modelType = 'zeroshot'
-  } else {
-    mapStore.modelType = 'tree'
+  } else if (mapStore.selectedTask) {
+    mapStore.modelType = modelOptions.value[0]?.value ?? null
     mapStore.keyword = ''   // clear keyword for non zero shot
+  } else {
+    mapStore.modelType = null
+    mapStore.keyword = ''
   }
 }
 
