@@ -34,6 +34,12 @@ class Settings:
         if origin.strip()
     ]
 
+
+    cors_origin_regex: str = os.getenv(
+        "BACKEND_CORS_ORIGIN_REGEX",
+        r"http://(localhost|127\.0\.0\.1):(517[3-9]|518[0-9])$",
+    )
+
     # -----------------------------
     # External services
     # -----------------------------
@@ -52,7 +58,8 @@ class Settings:
     # Shared storage
     # -----------------------------
     shared_storage_dir: str = os.getenv(
-        str(REPOSITORY_ROOT / "storage")
+        "SHARED_STORAGE_DIR",
+        str(REPOSITORY_ROOT / "storage"),
     )
 
     # -----------------------------
