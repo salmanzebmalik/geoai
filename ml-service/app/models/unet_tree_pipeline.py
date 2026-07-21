@@ -45,7 +45,7 @@ class UNetTreePipeline:
         x = np.array(img_pil).transpose(2, 0, 1).astype(np.float32) / 255.0
         x = torch.from_numpy(x).unsqueeze(0).to(self.device)
 
-        prob = torch.sigmoid(self.model(x)).cpu().numpy().squeeze()  # (input_h, input_w)
+        prob = torch.sigmoid(self.model(x)).float().cpu().numpy().squeeze()  # (input_h, input_w)
         prob_pil = Image.fromarray((prob * 255).astype(np.uint8)).resize((orig_w, orig_h), Image.NEAREST)
         mask = ((np.array(prob_pil) / 255.0) > self.threshold).astype(np.uint8)
         logger.info(f"UNet inference complete | {time.time() - start:.2f}s")

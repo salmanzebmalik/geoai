@@ -94,7 +94,21 @@
           />
         </template>
 
-          <p class="model-label">Model used: {{ selectedModel || 'No model available' }}</p>
+        <!-- Model selection -->
+          <v-list-item
+            prepend-icon="mdi-numeric-3-circle"
+            title="Model"
+          ></v-list-item>
+          
+          <v-select
+            :items="modelLabels"
+            v-model="selectedModel"
+            :disabled="mapStore.selectedTask === 'Zero-Shot'"
+            variant="solo"
+            density="compact"
+            class="ml-task-dropdown"
+            hide-details
+          ></v-select>
 
           <!-- Start prediction button-->
           <v-list-item
@@ -127,34 +141,34 @@
 </template>
 
 <script setup>
-import { computed, watch } from 'vue'
+import { computed } from 'vue'
 import { useMapStore } from '@/stores/map'
 
 const mapStore = useMapStore()
 
-// Which tasks and their model are offered for each map type
-const TASK_OPTIONS_BY_MAP_TYPE = {
-  orthophoto: [
-    { title: 'Tree Detection', value: 'Tree Detection', model: 'TCD-Segformer-MIT-B5' },
-    { title: 'Segment Anything', value: 'Zero-Shot', model: 'LangSAM' },
-  ],
-  germany: [],
-  osm: [],
-}
+// value = model_type sent to the backend, which picks the ml-service endpoint
+const TREE_MODELS = [
+  { title: 'TCD-Segformer (10cm ortho)', value: 'tree' },
+  { title: 'DeepForest boxes (10cm ortho)', value: 'tree_deepforest' },
+  { title: 'Satlas (5m satellite)', value: 'tree_satlas' },
+  { title: 'UNet (5m satellite)', value: 'tree_unet' },
+]
 
-const availableTasks = computed(() => TASK_OPTIONS_BY_MAP_TYPE[mapStore.mapType] ?? [])
+const modelOptions = computed(() =>
+  mapStore.selectedTask === 'Zero-Shot'
+    ? [{ title: 'LangSAM', value: 'zeroshot' }]
+    : TREE_MODELS
+)
 
-const selectedModel = computed(() => {
-  const task = availableTasks.value.find((t) => t.value === mapStore.selectedTask)
-  return task ? task.model : null
-})
+const modelLabels = computed(() => modelOptions.value.map(m => m.title))
 
-// Reset the task if it isn't offered anymore after switching map types
-watch(() => mapStore.mapType, () => {
-  if (!availableTasks.value.some((t) => t.value === mapStore.selectedTask)) {
-    mapStore.selectedTask = null
-    onTaskChange()
-  }
+const selectedModel = computed({
+  get: () => modelOptions.value.find(m => m.value === mapStore.modelType)?.title
+             ?? modelOptions.value[0].title,
+  set: (title) => {
+    const match = modelOptions.value.find(m => m.title === title)
+    if (match) mapStore.modelType = match.value
+  },
 })
 
 function formatArea(sqm) {

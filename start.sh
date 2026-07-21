@@ -6,11 +6,9 @@ cd "$SCRIPT_DIR"
 
 echo "Working directory: $(pwd)"
 
-#pkill -f uvicorn || true
 sleep 2
 
-# Run each background job in its own process group so cleanup() can kill a
-# job's children too (e.g. the uvicorn+tee pipeline inside launch_titiler.sh)
+# each job in its own process group, so cleanup() can kill its children too
 set -m
 
 if [ ! -d ".venv" ]; then
@@ -19,7 +17,12 @@ if [ ! -d ".venv" ]; then
 fi
 source .venv/bin/activate
 
-# Function to stop only the processes (and their children) this script started
+source "$SCRIPT_DIR/ports.sh"
+# Reads the ports from ports.sh
+export TITILER_PORT ML_SERVICE_PORT BACKEND_PORT
+export TITILER_BASE_URL="http://127.0.0.1:$TITILER_PORT"
+export ML_SERVICE_URL="http://127.0.0.1:$ML_SERVICE_PORT"
+
 cleanup() {
     echo "Shutting down services..."
     for pid in "$ML_PID" "$TITILER_PID" "$BACKEND_PID" "$FRONTEND_PID"; do
@@ -32,19 +35,19 @@ cleanup() {
 trap cleanup SIGINT SIGTERM
 
 # Start all services in the background with logs
-echo "Starting ml-service on port 8002..."
+echo "Starting ml-service on port $ML_SERVICE_PORT..."
 cd "$SCRIPT_DIR/ml-service"
-uvicorn app.main:app --host 127.0.0.1 --port 8002 &
+uvicorn app.main:app --host 127.0.0.1 --port "$ML_SERVICE_PORT" &
 ML_PID=$!
 
-echo "Starting image-pipeline (Titiler) on port 8001..."
+echo "Starting image-pipeline (Titiler) on port $TITILER_PORT..."
 # reuse launch_titiler.sh so the DB URL + GDAL/ulimit tuning stay in one place
 ( cd "$SCRIPT_DIR/image_pipeline" && bash launch_titiler.sh ) &
 TITILER_PID=$!
 
-echo "Starting backend on port 8000..."
+echo "Starting backend on port $BACKEND_PORT..."
 cd "$SCRIPT_DIR/backend"
-uvicorn app.main:app --host 127.0.0.1 --port 8000 &
+uvicorn app.main:app --host 127.0.0.1 --port "$BACKEND_PORT" &
 BACKEND_PID=$!
 
 # Wait for services

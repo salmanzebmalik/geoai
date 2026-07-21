@@ -8,6 +8,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
+
+REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
+
+
 class Settings:
     # -----------------------------
     # App
@@ -30,17 +34,24 @@ class Settings:
         if origin.strip()
     ]
 
+
+    cors_origin_regex: str = os.getenv(
+        "BACKEND_CORS_ORIGIN_REGEX",
+        r"http://(localhost|127\.0\.0\.1):(517[3-9]|518[0-9])$",
+    )
+
     # -----------------------------
     # External services
     # -----------------------------
+    # dev ports: 8000-8003 are taken by the production stack (see PORTS.md), so use 801x
     ml_service_url: str = os.getenv(
         "ML_SERVICE_URL",
-        "http://127.0.0.1:8000",
+        "http://127.0.0.1:8012",
     ).rstrip("/")
 
     titiler_base_url: str = os.getenv(
         "TITILER_BASE_URL",
-        "http://127.0.0.1:8001",
+        "http://127.0.0.1:8041",
     ).rstrip("/")
 
     # -----------------------------
@@ -48,7 +59,7 @@ class Settings:
     # -----------------------------
     shared_storage_dir: str = os.getenv(
         "SHARED_STORAGE_DIR",
-        "storage",
+        str(REPOSITORY_ROOT / "storage"),
     )
 
     # -----------------------------

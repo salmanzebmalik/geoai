@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 SourceType = Literal["satellite", "ortho"]
-ModelType = Literal["tree", "zeroshot"]
+ModelType = Literal["tree", "tree_satlas", "tree_unet", "tree_deepforest", "zeroshot"]
 VectorFormat = Literal["geojson", "gpkg", "flatgeobuf", "shapefile"]
 GeometryType = Literal["Polygon", "MultiPolygon"]
 
