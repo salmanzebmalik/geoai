@@ -16,13 +16,6 @@
         />
         <div class="progress-label">{{ Math.round(progress) }}%</div>
       </v-card-text>
-
-      <v-card-actions class="justify-end">
-        <!-- TODO: really cancel prediction if clicked -->
-        <v-btn variant="tonal" color="white" size="small">
-          Cancel prediction
-        </v-btn>
-      </v-card-actions>
     </v-card>
   </div>
 </template>

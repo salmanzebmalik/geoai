@@ -69,13 +69,14 @@
           ></v-list-item>
           
           <v-select
-            :items="['Tree Detection', 'Zero-Shot']"
-            placeholder="Select Task"
+            :items="availableTasks"
+            :disabled="!availableTasks.length"
+            :placeholder="availableTasks.length ? 'Select Task' : 'No tasks available'"
             variant="solo"
             density="compact"
             class="ml-task-dropdown"
             hide-details
-            v-model="mapStore.selectedTask" 
+            v-model="mapStore.selectedTask"
             @update:model-value="onTaskChange"
           ></v-select>
 
@@ -93,24 +94,11 @@
           />
         </template>
 
-        <!-- Model selection -->
-          <v-list-item
-            prepend-icon="mdi-numeric-3-circle"
-            title="Model"
-          ></v-list-item>
-          
-          <v-select
-            :items="[mapStore.selectedTask === 'Zero-Shot' ? 'LangSAM' : 'TCD-Segformer-MIT-B5']"
-            :model-value="mapStore.selectedTask === 'Zero-Shot' ? 'LangSAM' : 'TCD-Segformer-MIT-B5'"
-            variant="solo"
-            density="compact"
-            class="ml-task-dropdown"
-            hide-details
-          ></v-select>
+          <p class="model-label">Model used: {{ selectedModel || 'No model available' }}</p>
 
           <!-- Start prediction button-->
           <v-list-item
-            prepend-icon="mdi-numeric-4-circle"
+            prepend-icon="mdi-numeric-3-circle"
             title="Start Prediction"
           ></v-list-item>
           
@@ -126,9 +114,35 @@
 </template>
 
 <script setup>
+import { computed, watch } from 'vue'
 import { useMapStore } from '@/stores/map'
 
 const mapStore = useMapStore()
+
+// Which tasks and their model are offered for each map type
+const TASK_OPTIONS_BY_MAP_TYPE = {
+  orthophoto: [
+    { title: 'Tree Detection', value: 'Tree Detection', model: 'TCD-Segformer-MIT-B5' },
+    { title: 'Segment Anything', value: 'Zero-Shot', model: 'LangSAM' },
+  ],
+  germany: [],
+  osm: [],
+}
+
+const availableTasks = computed(() => TASK_OPTIONS_BY_MAP_TYPE[mapStore.mapType] ?? [])
+
+const selectedModel = computed(() => {
+  const task = availableTasks.value.find((t) => t.value === mapStore.selectedTask)
+  return task ? task.model : null
+})
+
+// Reset the task if it isn't offered anymore after switching map types
+watch(() => mapStore.mapType, () => {
+  if (!availableTasks.value.some((t) => t.value === mapStore.selectedTask)) {
+    mapStore.selectedTask = null
+    onTaskChange()
+  }
+})
 
 function formatArea(sqm) {
   if (sqm == null) return ''
@@ -205,6 +219,13 @@ function onTaskChange() {
 .ml-task-dropdown {
   width: 90%;
   margin: 0 16px;
+}
+
+.model-label {
+  width: 90%;
+  margin: 6px 16px 0;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .run-btn {
