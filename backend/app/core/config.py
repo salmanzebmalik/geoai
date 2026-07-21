@@ -8,6 +8,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
+
+REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
+
+
 class Settings:
     # -----------------------------
     # App
@@ -48,8 +52,7 @@ class Settings:
     # Shared storage
     # -----------------------------
     shared_storage_dir: str = os.getenv(
-        "SHARED_STORAGE_DIR",
-        "storage",
+        str(REPOSITORY_ROOT / "storage")
     )
 
     # -----------------------------
