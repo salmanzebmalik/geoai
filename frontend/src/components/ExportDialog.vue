@@ -8,32 +8,14 @@
 
       <v-card-text>
         <v-row dense>
-          <v-col cols="12">
-            <v-select
-              v-model="form.vector_formats"
-              :items="vectorFormats"
-              item-title="title"
-              item-value="value"
-              label="Vector formats"
-              multiple
-              chips
-            />
-          </v-col>
           <v-col cols="12" sm="6">
-            <v-combobox
-              v-model="form.output_crs"
-              :items="['EPSG:4326', 'EPSG:3857', 'EPSG:25832']"
-              label="Output CRS"
-            />
-          </v-col>
-          <v-col cols="12" sm="3">
             <v-text-field
               v-model="form.overlay_color"
               label="Overlay color"
               type="color"
             />
           </v-col>
-          <v-col cols="12" sm="3">
+          <v-col cols="12" sm="6">
             <v-slider
               v-model="form.overlay_opacity"
               label="Opacity"
@@ -44,48 +26,6 @@
             />
           </v-col>
         </v-row>
-
-        <div class="option-grid">
-          <v-checkbox v-model="form.include_annotated_tiff" label="Annotated GeoTIFF" hide-details />
-          <v-checkbox v-model="form.include_mask_tiff" label="Mask GeoTIFF" hide-details />
-          <v-checkbox v-model="form.include_metadata" label="Metadata JSON" hide-details />
-          <v-checkbox v-model="form.include_zip" label="ZIP bundle" hide-details />
-        </div>
-
-        <v-expansion-panels variant="accordion" class="mt-4">
-          <v-expansion-panel title="Feature filters">
-            <v-expansion-panel-text>
-              <v-row dense>
-                <v-col cols="12" sm="4">
-                  <v-text-field v-model.number="form.filters.min_area_m2" type="number" min="0" label="Min. area (m²)" clearable />
-                </v-col>
-                <v-col cols="12" sm="4">
-                  <v-text-field v-model.number="form.filters.max_area_m2" type="number" min="0" label="Max. area (m²)" clearable />
-                </v-col>
-                <v-col cols="12" sm="4">
-                  <v-text-field v-model.number="form.filters.min_confidence" type="number" min="0" max="1" step="0.05" label="Min. confidence" clearable />
-                </v-col>
-                <v-col cols="12" sm="6">
-                  <v-select
-                    v-model="form.filters.geometry_types"
-                    :items="['Polygon', 'MultiPolygon']"
-                    label="Geometry types"
-                    multiple
-                    clearable
-                  />
-                </v-col>
-                <v-col cols="12" sm="6">
-                  <v-text-field
-                    v-model="labels"
-                    label="Labels (comma-separated)"
-                    placeholder="building, car"
-                    clearable
-                  />
-                </v-col>
-              </v-row>
-            </v-expansion-panel-text>
-          </v-expansion-panel>
-        </v-expansion-panels>
 
         <v-alert v-if="error" type="error" variant="tonal" class="mt-4">
           {{ error }}
@@ -138,7 +78,6 @@
           color="success"
           prepend-icon="mdi-export"
           :loading="mapStore.isExporting"
-          :disabled="!hasOutput"
           @click="createExport"
         >Create export</v-btn>
       </v-card-actions>
@@ -147,46 +86,18 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref, watch } from 'vue'
+import { reactive, ref, watch } from 'vue'
 import { useMapStore } from '@/stores/map'
 
 const mapStore = useMapStore()
 const open = ref(false)
 const error = ref(null)
-const labels = ref('')
 const history = ref([])
 
-const vectorFormats = [
-  { title: 'GeoJSON', value: 'geojson' },
-  { title: 'GeoPackage', value: 'gpkg' },
-  { title: 'FlatGeobuf', value: 'flatgeobuf' },
-  { title: 'Shapefile (ZIP)', value: 'shapefile' },
-]
-
 const form = reactive({
-  vector_formats: ['geojson'],
-  output_crs: 'EPSG:4326',
   overlay_color: '#ff0000',
   overlay_opacity: 0.45,
-  include_annotated_tiff: true,
-  include_mask_tiff: false,
-  include_metadata: true,
-  include_zip: true,
-  filters: {
-    min_area_m2: null,
-    max_area_m2: null,
-    min_confidence: null,
-    geometry_types: [],
-  },
 })
-
-const hasOutput = computed(() => (
-  form.vector_formats.length > 0
-  || form.include_annotated_tiff
-  || form.include_mask_tiff
-  || form.include_metadata
-  || form.include_zip
-))
 
 watch(() => mapStore.exportDialogTrigger, () => {
   open.value = true
@@ -212,14 +123,13 @@ async function createExport() {
   try {
     const options = {
       ...form,
-      include_geojson: form.vector_formats.includes('geojson'),
-      filters: {
-        ...form.filters,
-        labels: labels.value
-          .split(',')
-          .map((label) => label.trim())
-          .filter(Boolean),
-      },
+      vector_formats: ['geojson'],
+      output_crs: 'EPSG:4326',
+      include_geojson: true,
+      include_annotated_tiff: true,
+      include_mask_tiff: true,
+      include_metadata: true,
+      include_zip: true,
     }
     const response = await fetch('/api/segmentation/exports', {
       method: 'POST',
@@ -243,11 +153,6 @@ function download(artifact) {
 </script>
 
 <style scoped>
-.option-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
 .section-title {
   font-size: 0.9rem;
   font-weight: 600;
