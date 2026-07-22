@@ -113,6 +113,16 @@ dependencies = [
     "segmentation-models-pytorch>=0.5.0",
 ]
 
+[project.scripts]
+geoai = "geoai_cli.cli:main"
+
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["geoai_cli"]
+
 [tool.uv.sources]
 lang-sam = { git = "https://github.com/luca-medeiros/lang-segment-anything.git" }
 
