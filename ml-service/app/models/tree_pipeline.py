@@ -1,11 +1,8 @@
-import os
 from pathlib import Path
-import sys
 from typing import Optional
 
 import numpy as np
 import torch
-import rasterio
 from rasterio.windows import Window
 from transformers import AutoImageProcessor, SegformerForSemanticSegmentation
 from tqdm import tqdm
@@ -13,7 +10,6 @@ from app.models.model_downloader import ensure_segformer_models
 
 from app.utils.logger import get_logger
 logger = get_logger(__name__)
-import time
 from app.utils.tiling import read_rgb, tiled_mask
 
 class TCDSegformer:

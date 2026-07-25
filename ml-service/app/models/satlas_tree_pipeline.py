@@ -1,9 +1,7 @@
 from pathlib import Path
-import time
 
 import numpy as np
 import torch
-import rasterio
 from app.utils.tiling import tiled_mask
 from app.utils.logger import get_logger
 logger = get_logger(__name__)

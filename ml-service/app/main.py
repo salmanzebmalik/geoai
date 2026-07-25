@@ -1,5 +1,4 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
-import os
 from contextlib import asynccontextmanager
 import sys
 import threading

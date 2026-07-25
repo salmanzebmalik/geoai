@@ -1,5 +1,4 @@
 from pathlib import Path
-import time
 
 import numpy as np
 import torch
@@ -8,10 +7,6 @@ from lang_sam import LangSAM  # https://github.com/luca-medeiros/lang-segment-an
 import contextlib
 import io
 
-# if torch.cuda.is_available():
-#     torch.autocast(device_type="cuda", enabled=False).__enter__()
-
-import rasterio
 from rasterio.windows import Window
 from typing import Optional
 
