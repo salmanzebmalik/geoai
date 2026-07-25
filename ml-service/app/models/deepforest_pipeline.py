@@ -19,7 +19,7 @@ class DeepForestPipeline:
     - This models keeps the bounding boxes, so it does not go through instancing.py"""
 
     def __init__(self, checkpoint_path: str | None = None, patch_size: int = 400,
-                 overlap: float = 0.1, score_min: float = 0.3):
+                 overlap: float = 0.1, score_min: float = 0.1):
         from deepforest import main  
 
         self.device = "cuda" if torch.cuda.is_available() else "cpu"

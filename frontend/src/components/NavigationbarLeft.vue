@@ -94,11 +94,25 @@
           />
         </template>
 
-          <p class="model-label">Model used: {{ selectedModel || 'No model available' }}</p>
+        <!-- Model selection -->
+          <v-list-item
+            prepend-icon="mdi-numeric-3-circle"
+            title="Model"
+          ></v-list-item>
+          
+          <v-select
+            :items="modelLabels"
+            v-model="selectedModel"
+            :disabled="mapStore.selectedTask === 'Zero-Shot'"
+            variant="solo"
+            density="compact"
+            class="ml-task-dropdown"
+            hide-details
+          ></v-select>
 
           <!-- Start prediction button-->
           <v-list-item
-            prepend-icon="mdi-numeric-3-circle"
+            prepend-icon="mdi-numeric-4-circle"
             title="Start Prediction"
           ></v-list-item>
           
@@ -132,29 +146,56 @@ import { useMapStore } from '@/stores/map'
 
 const mapStore = useMapStore()
 
-// Which tasks and their model are offered for each map type
 const TASK_OPTIONS_BY_MAP_TYPE = {
   orthophoto: [
-    { title: 'Tree Detection', value: 'Tree Detection', model: 'TCD-Segformer-MIT-B5' },
-    { title: 'Segment Anything', value: 'Zero-Shot', model: 'LangSAM' },
+    { title: 'Tree Detection', value: 'Tree Detection' },
+    { title: 'Segment Anything', value: 'Zero-Shot' },
   ],
-  germany: [],
+  germany: [
+    { title: 'Tree Detection', value: 'Tree Detection' },
+  ],
   osm: [],
 }
 
 const availableTasks = computed(() => TASK_OPTIONS_BY_MAP_TYPE[mapStore.mapType] ?? [])
 
-const selectedModel = computed(() => {
-  const task = availableTasks.value.find((t) => t.value === mapStore.selectedTask)
-  return task ? task.model : null
-})
+// only the models that match the current dataset's resolution are displayed 
+const TREE_MODELS_BY_MAP_TYPE = {
+  orthophoto: [
+    { title: 'TCD-Segformer (10cm ortho)', value: 'tree' },
+    { title: 'DeepForest boxes (10cm ortho)', value: 'tree_deepforest' },
+  ],
+  germany: [
+    { title: 'Satlas (5m satellite)', value: 'tree_satlas' },
+    { title: 'UNet (5m satellite)', value: 'tree_unet' },
+  ],
+  osm: [],
+}
 
-// Reset the task if it isn't offered anymore after switching map types
+const modelOptions = computed(() =>
+  mapStore.selectedTask === 'Zero-Shot'
+    ? [{ title: 'LangSAM', value: 'zeroshot' }]
+    : TREE_MODELS_BY_MAP_TYPE[mapStore.mapType] ?? []
+)
+
+
 watch(() => mapStore.mapType, () => {
   if (!availableTasks.value.some((t) => t.value === mapStore.selectedTask)) {
     mapStore.selectedTask = null
-    onTaskChange()
   }
+  onTaskChange()
+})
+
+const modelLabels = computed(() => modelOptions.value.map(m => m.title))
+
+const selectedModel = computed({
+  get: () => modelOptions.value.find(m => m.value === mapStore.modelType)?.title
+             ?? modelOptions.value[0]?.title
+             ?? null,
+  set: (title) => {
+    const match = modelOptions.value.find(m => m.title === title)
+    if (match) mapStore.modelType = match.value
+  },
 })
 
 function formatArea(sqm) {
@@ -175,9 +216,12 @@ function formatSoccerFields(sqm) {
 function onTaskChange() {
   if (mapStore.selectedTask === 'Zero-Shot') {
     mapStore.modelType = 'zeroshot'
-  } else {
-    mapStore.modelType = 'tree'
+  } else if (mapStore.selectedTask) {
+    mapStore.modelType = modelOptions.value[0]?.value ?? null
     mapStore.keyword = ''   // clear keyword for non zero shot
+  } else {
+    mapStore.modelType = null
+    mapStore.keyword = ''
   }
 }
 
@@ -232,13 +276,6 @@ function onTaskChange() {
 .ml-task-dropdown {
   width: 90%;
   margin: 0 16px;
-}
-
-.model-label {
-  width: 90%;
-  margin: 6px 16px 0;
-  font-size: 14px;
-  color: rgba(255, 255, 255, 0.7);
 }
 
 .run-btn {

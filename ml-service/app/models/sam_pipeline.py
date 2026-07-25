@@ -5,6 +5,11 @@ import numpy as np
 import torch
 from PIL import Image
 from lang_sam import LangSAM  # https://github.com/luca-medeiros/lang-segment-anything.git
+
+
+if torch.cuda.is_available():
+    torch.autocast(device_type="cuda", enabled=False).__enter__()
+
 import rasterio
 from rasterio.windows import Window
 from tqdm import tqdm

@@ -6,17 +6,22 @@ import requests
 from app.core.config import settings
 
 
-ModelType = Literal["tree", "zeroshot"]
+ModelType = Literal["tree", "tree_satlas", "tree_unet", "tree_deepforest", "zeroshot"]
+
+ML_ENDPOINTS = {
+    "tree": "/api/v1/predict/tree",                      # TCD-Segformer, 10cm ortho
+    "tree_satlas": "/api/v1/predict/tree/satlas",        # Satlas, 5m satellite
+    "tree_unet": "/api/v1/predict/tree/unet",            # UNet, 5m satellite
+    "tree_deepforest": "/api/v1/predict/tree/deepforest",  # DeepForest boxes, 10cm ortho
+    "zeroshot": "/api/v1/predict/zeroshot",
+}
 
 
 def get_ml_endpoint(model_type: ModelType) -> str:
-    if model_type == "tree":
-        return "/api/v1/predict/tree"
-
-    if model_type == "zeroshot":
-        return "/api/v1/predict/zeroshot"
-
-    raise ValueError(f"Unsupported model_type: {model_type}")
+    try:
+        return ML_ENDPOINTS[model_type]
+    except KeyError:
+        raise ValueError(f"Unsupported model_type: {model_type}")
 
 def get_shared_storage_relative_path(path: str | Path) -> str:
     """

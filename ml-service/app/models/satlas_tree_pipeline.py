@@ -5,7 +5,6 @@ import numpy as np
 import torch
 import rasterio
 from rasterio.windows import Window
-import satlaspretrain_models as spm
 
 from app.utils.logger import get_logger
 logger = get_logger(__name__)
@@ -18,6 +17,7 @@ class SatlasTreePipeline:
     fine-tuned on tcd@~5m (see satlas_tree_5m.ipynb) """
 
     def __init__(self, weights_path: str | None = None, patch_size: int = 512, overlap: int = 64):
+        import satlaspretrain_models as spm  # lazy
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.patch_size = patch_size
         self.overlap = overlap
@@ -52,6 +52,9 @@ class SatlasTreePipeline:
                         patch = (patch / 256).astype(np.uint8)
                     t = torch.from_numpy(patch).permute(2, 0, 1).float().unsqueeze(0).to(self.device) / 255.0
                     pred = self.model(t)[0]
+                    if pred.shape[-2:] != (th, tw):
+                        # edge tiles aren't always a multiple of the backbone's stride --> we adapt it
+                        pred = torch.nn.functional.interpolate(pred, size=(th, tw), mode="bilinear")
                     full_mask[y:y + th, x:x + tw] = (pred.argmax(1)[0].cpu().numpy() == 1).astype(np.uint8)
             logger.info(f"Satlas inference complete | {time.time() - start:.2f}s")
             return full_mask
