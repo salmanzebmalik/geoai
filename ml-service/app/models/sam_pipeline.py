@@ -33,7 +33,6 @@ logger = get_logger(__name__)
 
 class LangSAMPipeline:
     def __init__(self,patch_size: int = 1024,overlap: int = 128,device: Optional[str] = None,offline: bool = True,text_threshold: float = 0.15,box_threshold: float = 0.3):
-
         self.patch_size = patch_size
         self.overlap = overlap
         self.text_threshold = text_threshold
@@ -48,13 +47,15 @@ class LangSAMPipeline:
             sam_ckpt_path = f"{model_dir}/sam2.1_hiera_large.pt"
             gdino_model_path = f"{model_dir}/groundingdino_hf_model"
 
-            self.model = LangSAM(sam_type="sam2.1_hiera_large",sam_ckpt_path=sam_ckpt_path,gdino_model_ckpt_path=gdino_model_path,gdino_processor_ckpt_path=gdino_model_path,)
+            self.model = LangSAM(sam_type="sam2.1_hiera_large",sam_ckpt_path=sam_ckpt_path,gdino_model_ckpt_path=gdino_model_path,gdino_processor_ckpt_path=gdino_model_path,device=self.device)
         else:  # online
             self.model = LangSAM()
 
     def _predict(self, patch: np.ndarray, keyword: str):
-        with contextlib.redirect_stdout(io.StringIO()):   # LangSAM prints on every tile
-            res = self.model.predict([Image.fromarray(patch)], [keyword],text_threshold=self.text_threshold, box_threshold=self.box_threshold)
+        # autocast for bfloat16 on CUDA
+        with contextlib.redirect_stdout(io.StringIO()), torch.autocast(device_type=self.device,dtype=torch.bfloat16,enabled=(self.device == "cuda")):
+            # run the model on the patch with the given keyword
+            res = self.model.predict([Image.fromarray(patch)], [keyword],text_threshold=self.text_threshold,box_threshold=self.box_threshold)
         masks = res[0].get("masks") if res else None
         if masks is None or len(masks) == 0:
             return None
@@ -67,5 +68,7 @@ class LangSAMPipeline:
         return m
 
     def get_full_mask_from_bytes(self, image_bytes: bytes, keyword: str = "tree") -> np.ndarray:
-        return tiled_mask(image_bytes, self.patch_size, self.overlap,
-                          lambda p: self._predict(p, keyword), label="langsam")
+            return tiled_mask(image_bytes, self.patch_size, self.overlap,
+                              lambda p: self._predict(p, keyword), label="langsam")
+ 
+
