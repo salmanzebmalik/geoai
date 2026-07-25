@@ -7,6 +7,7 @@ import rasterio
 from PIL import Image
 
 from app.utils.logger import get_logger
+from app.utils.tiling import read_rgb
 logger = get_logger(__name__)
 
 
@@ -34,19 +35,19 @@ class UNetTreePipeline:
 
     @torch.inference_mode()
     def get_full_mask_from_bytes(self, image_bytes: bytes) -> np.ndarray:
-        start = time.time()
-        with rasterio.MemoryFile(image_bytes) as memfile, memfile.open() as src:
-            img = np.moveaxis(src.read([1, 2, 3]), 0, -1)  # (H, W, 3)
-        orig_h, orig_w = img.shape[:2]
-        if img.dtype == np.uint16:
-            img = (img / 256).astype(np.uint8)
+        t0 = time.time()
+        with rasterio.MemoryFile(image_bytes) as mem, mem.open() as src:
+            img = read_rgb(src)
+        h, w = img.shape[:2]
 
-        img_pil = Image.fromarray(img).resize(self.input_size, Image.BICUBIC)
-        x = np.array(img_pil).transpose(2, 0, 1).astype(np.float32) / 255.0
-        x = torch.from_numpy(x).unsqueeze(0).to(self.device)
+        small = np.asarray(Image.fromarray(img).resize(self.input_size, Image.BICUBIC))
+        x = torch.from_numpy(small.transpose(2, 0, 1).astype(np.float32) / 255.0)
+        prob = torch.sigmoid(self.model(x.unsqueeze(0).to(self.device)))
+        prob = prob.float().cpu().numpy().squeeze()
 
-        prob = torch.sigmoid(self.model(x)).float().cpu().numpy().squeeze()  # (input_h, input_w)
-        prob_pil = Image.fromarray((prob * 255).astype(np.uint8)).resize((orig_w, orig_h), Image.NEAREST)
-        mask = ((np.array(prob_pil) / 255.0) > self.threshold).astype(np.uint8)
-        logger.info(f"UNet inference complete | {time.time() - start:.2f}s")
+        prob = np.asarray(
+            Image.fromarray((prob * 255).astype(np.uint8)).resize((w, h), Image.NEAREST)
+        ) / 255.0
+        mask = (prob > self.threshold).astype(np.uint8)
+        logger.info(f"unet | {h}x{w} | {time.time() - t0:.1f}s")
         return mask

@@ -8,7 +8,6 @@ from rasterio.features import shapes as rio_shapes
 from rasterio.transform import from_bounds
 from shapely.geometry import shape
 
-
 def mask_to_instances(mask, min_distance=7, min_area=20, split_touching=True):
     """Binary/semantic mask (H, W) -> int32 label map (0 background, 1..N instances)."""
     mask = np.asarray(mask) > 0
