@@ -4,7 +4,6 @@ from typing import Literal, Optional
 import requests
 
 from app.core.config import settings
-from app.schemas.segmentation import BoundingBox
 
 
 ModelType = Literal["tree", "zeroshot"]
@@ -43,7 +42,6 @@ def get_shared_storage_relative_path(path: str | Path) -> str:
 
 def call_ml_service(
     query_id: str,
-    bbox: BoundingBox,
     input_image_path: str,
     model_type: ModelType = "tree",
     keyword: Optional[str] = None,
@@ -51,11 +49,13 @@ def call_ml_service(
     """
     Call the ML service using the shared-storage image path.
 
+    The ML service georeferences the prediction from the input GeoTIFF's own
+    CRS/bounds, so no bounding box is sent.
+
     Backend sends:
         query_id
         input_image_path
         output_dir
-        bbox coordinates
         optional keyword for zero-shot
     """
 
@@ -72,10 +72,6 @@ def call_ml_service(
         "query_id": query_id,
         "input_image_path": relative_input_image_path,
         "output_dir": output_dir,
-        "min_lon": bbox.min_lon,
-        "min_lat": bbox.min_lat,
-        "max_lon": bbox.max_lon,
-        "max_lat": bbox.max_lat,
     }
 
     if model_type == "zeroshot":

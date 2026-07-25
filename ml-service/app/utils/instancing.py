@@ -39,11 +39,26 @@ def mask_to_instances(mask, min_distance=7, min_area=20, split_touching=True):
     return remap[labels].astype(np.int32)
 
 
-def instances_to_geojson(labels, bbox_coords, class_name="tree", scores=None):
-    """Instance label map -> GeoDataFrame with one feature per instance (id, area_m2)."""
-    min_lon, min_lat, max_lon, max_lat = bbox_coords
+def _area_m2(gdf):
+    """True ground area, measured in a metric CRS.
+
+    Measuring in EPSG:3857 overstates area by sec^2(latitude) -- 2.6x at 52 deg N --
+    because Web Mercator is conformal, not equal-area. The crop's own UTM CRS is
+    already metric, so areas are read straight off it.
+    """
+    metric = gdf if gdf.crs.is_projected else gdf.to_crs(gdf.estimate_utm_crs())
+    return metric.geometry.area
+
+
+def instances_to_geojson(labels, bounds, crs, class_name="tree", scores=None):
+    """Instance label map -> GeoDataFrame with one feature per instance (id, area_m2).
+
+    `bounds`/`crs` come from the input GeoTIFF, so the label grid is georeferenced in
+    the raster's own (projected) CRS. Output is reprojected to WGS84, which GeoJSON
+    requires and the frontend expects.
+    """
     h, w = labels.shape
-    transform = from_bounds(min_lon, min_lat, max_lon, max_lat, w, h)
+    transform = from_bounds(*bounds, w, h)
 
     records = []
     for geom, value in rio_shapes(labels.astype(np.int32), mask=(labels > 0), transform=transform):
@@ -59,7 +74,7 @@ def instances_to_geojson(labels, bbox_coords, class_name="tree", scores=None):
     if not records:
         return gpd.GeoDataFrame({"geometry": []}, crs="EPSG:4326")
 
-    gdf = gpd.GeoDataFrame.from_features(records, crs="EPSG:4326")
+    gdf = gpd.GeoDataFrame.from_features(records, crs=crs)
     gdf = gdf.dissolve(by="instance_id", as_index=False, aggfunc="first")
-    gdf["area_m2"] = gdf.to_crs("EPSG:3857").geometry.area
-    return gdf
+    gdf["area_m2"] = _area_m2(gdf)
+    return gdf.to_crs("EPSG:4326")

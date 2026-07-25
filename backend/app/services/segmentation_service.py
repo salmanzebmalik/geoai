@@ -100,7 +100,6 @@ def run_prediction_models(
     for keyword in keywords:
         result = call_ml_service(
             query_id=query_id,
-            bbox=request.bbox,
             input_image_path=image_path,
             model_type=request.model_type,
             keyword=keyword,

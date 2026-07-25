@@ -20,7 +20,7 @@ router = APIRouter()
 
 
 def _predict(request: TreePredictionRequest, model_name: str, infer) -> PredictionResponse:
-    """`infer(image_bytes, bbox) -> geojson dict`. Mask models go through
+    """`infer(image_bytes) -> geojson dict`. Mask models go through
     run_tree_detection; DeepForest returns its box geojson directly."""
     query_id = request.query_id or str(uuid4())
     print("ML Service: Running Tree Detection Query:", query_id)
@@ -29,9 +29,8 @@ def _predict(request: TreePredictionRequest, model_name: str, infer) -> Predicti
             input_image_path=request.input_image_path,
             output_dir=request.output_dir,
         )
-        bbox = (request.min_lon, request.min_lat, request.max_lon, request.max_lat)
 
-        geojson_dict = infer(image_bytes, bbox)
+        geojson_dict = infer(image_bytes)
         feature_count = len(geojson_dict.get("features", []))
 
         result_path = save_geojson_to_shared_storage(
@@ -55,22 +54,22 @@ def _predict(request: TreePredictionRequest, model_name: str, infer) -> Predicti
 @router.post("/tree", response_model=PredictionResponse)
 async def predict_tree(request: TreePredictionRequest, segformer=Depends(get_segformer_model)):
     return _predict(request, "tcd-segformer-mit-b2",
-                    lambda ib, bb: run_tree_detection(segformer, ib, bb))
+                    lambda ib: run_tree_detection(segformer, ib))
 
 
 @router.post("/tree/satlas", response_model=PredictionResponse)
 async def predict_tree_satlas(request: TreePredictionRequest, satlas=Depends(get_satlas_tree_model)):
     return _predict(request, "satlas-tree-5m",
-                    lambda ib, bb: run_tree_detection(satlas, ib, bb))
+                    lambda ib: run_tree_detection(satlas, ib))
 
 
 @router.post("/tree/unet", response_model=PredictionResponse)
 async def predict_tree_unet(request: TreePredictionRequest, unet=Depends(get_unet_tree_model)):
     return _predict(request, "unet-resnet50-tree-5m",
-                    lambda ib, bb: run_tree_detection(unet, ib, bb))
+                    lambda ib: run_tree_detection(unet, ib))
 
 
 @router.post("/tree/deepforest", response_model=PredictionResponse)
 async def predict_tree_deepforest(request: TreePredictionRequest, deepforest=Depends(get_deepforest_model)):
     return _predict(request, "deepforest-tree",
-                    lambda ib, bb: deepforest.predict_boxes_geojson(ib, bb))
+                    lambda ib: deepforest.predict_boxes_geojson(ib))

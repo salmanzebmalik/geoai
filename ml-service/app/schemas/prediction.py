@@ -7,10 +7,6 @@ class BasePredictionRequest(BaseModel):
     query_id: str | None = None
     input_image_path: str
     output_dir: str | None = None
-    min_lon: float
-    min_lat: float
-    max_lon: float
-    max_lat: float
 
 
 class TreePredictionRequest(BasePredictionRequest):
