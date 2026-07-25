@@ -8,6 +8,7 @@ from rasterio.transform import from_bounds, xy
 import geopandas as gpd
 from shapely.geometry import box as shp_box
 
+from app.utils.instancing import _area_m2
 from app.utils.logger import get_logger
 logger = get_logger(__name__)
 
@@ -44,13 +45,16 @@ class DeepForestPipeline:
             pass
 
     @torch.inference_mode()
-    def predict_boxes_geojson(self, image_bytes: bytes, bbox_coords: tuple) -> dict:
+    def predict_boxes_geojson(self, image_bytes: bytes) -> dict:
         start = time.time()
         with rasterio.MemoryFile(image_bytes) as memfile, memfile.open() as src:
             img = np.moveaxis(src.read([1, 2, 3]), 0, -1)
             if img.dtype == np.uint16:
                 img = (img / 256).astype(np.uint8)
             h, w = img.shape[:2]
+            if src.crs is None:
+                raise ValueError("Input image has no CRS; cannot georeference the prediction.")
+            bounds, crs = src.bounds, src.crs
 
         boxes = self.model.predict_tile(
             image=np.ascontiguousarray(img),
@@ -61,17 +65,17 @@ class DeepForestPipeline:
             return {"type": "FeatureCollection", "features": []}
         boxes = boxes[boxes.score >= self.score_min]
 
-        # pixel coords -> lon/lat via the request bbox (same georef the service uses)
-        min_lon, min_lat, max_lon, max_lat = bbox_coords
-        transform = from_bounds(min_lon, min_lat, max_lon, max_lat, w, h)
+        # pixel coords -> the raster's own CRS (same georef the service uses)
+        transform = from_bounds(*bounds, w, h)
         geoms = []
         for r in boxes.itertuples():
             x0, y0 = xy(transform, r.ymin, r.xmin, offset="ul")
             x1, y1 = xy(transform, r.ymax, r.xmax, offset="ul")
             geoms.append(shp_box(min(x0, x1), min(y0, y1), max(x0, x1), max(y0, y1)))
 
-        gdf = gpd.GeoDataFrame({"score": boxes.score.values}, geometry=geoms, crs="EPSG:4326")
+        gdf = gpd.GeoDataFrame({"score": boxes.score.values}, geometry=geoms, crs=crs)
         gdf["class"] = "tree"
-        gdf["area_m2"] = gdf.to_crs("EPSG:3857").geometry.area
+        gdf["area_m2"] = _area_m2(gdf)
+        gdf = gdf.to_crs("EPSG:4326")
         logger.info(f"DeepForest inference complete | {len(gdf)} trees | {time.time() - start:.2f}s")
         return gdf.__geo_interface__

@@ -1,15 +1,15 @@
 from pathlib import Path
 from urllib.parse import urlencode
 
+import rasterio
 import requests
-from PIL import Image
+from rasterio.features import geometry_mask
+from rasterio.warp import transform_geom
+from shapely.geometry import box as shp_box, mapping
 
 from app.core.config import settings
 from app.schemas.segmentation import BoundingBox, ImageInfo, SourceType
-
-# Disable Pillow decompression bomb pixel limit
-# Use carefully: large TIFFs may consume a lot of RAM when opened.
-Image.MAX_IMAGE_PIXELS = None
+from app.utils.crs import best_crs_for_bbox
 
 def get_shared_storage_dir() -> Path:
     """
@@ -43,6 +43,18 @@ def build_titiler_request(
     source_type: SourceType = "satellite",
 ) -> tuple[str, dict]:
     bbox_string = bbox_to_titiler_string(bbox)
+    
+    dst_crs = best_crs_for_bbox(
+        min_lon=bbox.min_lon,
+        min_lat=bbox.min_lat,
+        max_lon=bbox.max_lon,
+        max_lat=bbox.max_lat,
+    )
+
+    # Both default to nearest, which aliases the imagery. "resampling" covers the read,
+    # "reproject" the warp into dst_crs; the crop feeds a segmentation model, so smooth
+    # edges matter more than the slightly cheaper interpolation.
+    resampling = {"resampling": "cubic", "reproject": "cubic"}
 
     if source_type == "satellite":
         endpoint = f"{settings.titiler_base_url}/cog/bbox/{bbox_string}.tif"
@@ -50,6 +62,8 @@ def build_titiler_request(
             "url": settings.satellite_vrt_path,
             "bidx": [3, 2, 1],
             "rescale": "0,3000",
+            "dst_crs": dst_crs,
+            **resampling,
         }
         return endpoint, params
 
@@ -57,10 +71,53 @@ def build_titiler_request(
         endpoint = f"{settings.titiler_base_url}/mosaicjson/bbox/{bbox_string}.tif"
         params = {
             "url": settings.ortho_mosaic_path,
+            "dst_crs": dst_crs,
+            **resampling,
         }
         return endpoint, params
 
     raise ValueError("Invalid source_type. Use 'satellite' or 'ortho'.")
+
+
+def _write_bbox_masked_crop(
+    image_bytes: bytes,
+    bbox: BoundingBox,
+    out_path: Path,
+) -> tuple[int, int]:
+    """Store the crop with everything outside the drawn bbox blacked out.
+
+    tiTiler returns the crop as the axis-aligned UTM bounding box of the reprojected
+    lon/lat box, so its corners cover ground *outside* the box the user drew. We
+    rasterise the bbox polygon (reprojected into the crop's own CRS) and set every
+    pixel outside it to 0, so the model doesn't detect features beyond the box. The
+    CRS/transform are preserved, so georeferencing downstream is unaffected.
+
+    Returns the (width, height) of the stored image.
+    """
+    with rasterio.MemoryFile(image_bytes) as memfile, memfile.open() as src:
+        profile = src.profile
+        data = src.read()
+        width, height = src.width, src.height
+
+        if src.crs is not None:
+            aoi = transform_geom(
+                "EPSG:4326",
+                src.crs,
+                mapping(shp_box(bbox.min_lon, bbox.min_lat, bbox.max_lon, bbox.max_lat)),
+            )
+            # invert=False -> True for pixels NOT covered by the AOI polygon
+            outside = geometry_mask(
+                [aoi],
+                out_shape=(height, width),
+                transform=src.transform,
+                invert=False,
+            )
+            data[:, outside] = 0
+
+    with rasterio.open(out_path, "w", **profile) as dst:
+        dst.write(data)
+
+    return width, height
 
 
 def fetch_satellite_image_from_titiler(
@@ -130,15 +187,11 @@ def fetch_satellite_image_from_titiler(
         raise RuntimeError("tiTiler returned an empty image.")
 
     image_path.parent.mkdir(parents=True, exist_ok=True)
-    image_path.write_bytes(response.content)
-
     try:
-        with Image.open(image_path) as img:
-            width, height = img.width, img.height
-
+        width, height = _write_bbox_masked_crop(response.content, bbox, image_path)
     except Exception as e:
         raise RuntimeError(
-            f"Image was saved but could not be opened: {image_path}. Error: {e}"
+            f"Failed to mask and save the crop from tiTiler: {image_path}. Error: {e}"
         ) from e
 
     image_info = ImageInfo(

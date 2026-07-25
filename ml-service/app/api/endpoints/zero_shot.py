@@ -29,17 +29,9 @@ async def predict_zero_shot(
             output_dir=request.output_dir,
         )
 
-        bbox = (
-            request.min_lon,
-            request.min_lat,
-            request.max_lon,
-            request.max_lat,
-        )
-
         geojson_dict = run_zero_shot_detection(
             pipeline=lang_sam,
             image_bytes=image_bytes,
-            bbox_coords=bbox,
             keyword=request.keyword,
         )
 
