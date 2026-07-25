@@ -27,7 +27,7 @@ class SatlasTreePipeline:
         if not weights_path.exists():
             raise FileNotFoundError(f"Satlas tree weights not found at {weights_path}. Train with satlas_tree_5m.ipynb.")
 
-        self.model.load_state_dict(torch.load(weights_path, map_location=self.device))
+        self.model.load_state_dict(torch.load(weights_path, map_location=self.device, mmap=True, weights_only=True))
         self.model.to(self.device).eval()
         logger.info(f"Satlas tree weights loaded from {weights_path}")
 

@@ -2,11 +2,17 @@ from fastapi import HTTPException, Request
 
 
 def get_segformer_model(request: Request):
-    return request.app.state.models["segformer"]
+    model = request.app.state.models.get("segformer")
+    if model is None:
+        raise HTTPException(503, "Segformer still loading")
+    return model
 
 
 def get_lang_sam_model(request: Request):
-    return request.app.state.models["lang_sam"]
+    model = request.app.state.models.get("lang_sam")
+    if model is None:
+        raise HTTPException(503, "LangSAM still loading")
+    return model
 
 
 def get_satlas_tree_model(request: Request):
