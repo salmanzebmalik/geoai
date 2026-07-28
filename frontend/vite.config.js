@@ -4,8 +4,8 @@ import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import vueDevTools from 'vite-plugin-vue-devtools'
 
-const BACKEND_PORT = process.env.BACKEND_PORT || 8013 // fallback to 8013
-const TITILER_PORT = process.env.TITILER_PORT || 8041
+const BACKEND_PORT = process.env.BACKEND_PORT || 8053 // fallback to 8013
+const TITILER_PORT = process.env.TITILER_PORT || 8051
 
 // https://vite.dev/config/
 export default defineConfig({

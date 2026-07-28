@@ -45,7 +45,7 @@
               aria-label="Enter coordinates manually"
               variant="tonal"
             >
-              <v-icon icon="mdi-form-textbox" />
+              <v-icon icon="mdi-pencil" />
             </v-btn>
           </div>
 
@@ -101,9 +101,10 @@
           ></v-list-item>
           
           <v-select
-            :items="modelLabels"
-            v-model="selectedModel"
-            :disabled="mapStore.selectedTask === 'Zero-Shot'"
+            :items="modelOptions"
+            :disabled="!modelOptions.length"
+            :placeholder= "modelOptions.length ? 'Select Model' : 'No models available'"
+            v-model="mapStore.modelType"
             variant="solo"
             density="compact"
             class="ml-task-dropdown"
@@ -162,12 +163,12 @@ const availableTasks = computed(() => TASK_OPTIONS_BY_MAP_TYPE[mapStore.mapType]
 // only the models that match the current dataset's resolution are displayed 
 const TREE_MODELS_BY_MAP_TYPE = {
   orthophoto: [
-    { title: 'TCD-Segformer (10cm ortho)', value: 'tree' },
-    { title: 'DeepForest boxes (10cm ortho)', value: 'tree_deepforest' },
+    { title: 'TCD-Segformer', value: 'tree' },
+    { title: 'DeepForest Boxes', value: 'tree_deepforest' },
   ],
   germany: [
-    { title: 'Satlas (5m satellite)', value: 'tree_satlas' },
-    { title: 'UNet (5m satellite)', value: 'tree_unet' },
+    { title: 'Satlas', value: 'tree_satlas' },
+    { title: 'UNet', value: 'tree_unet' },
   ],
   osm: [],
 }
@@ -181,21 +182,9 @@ const modelOptions = computed(() =>
 
 watch(() => mapStore.mapType, () => {
   if (!availableTasks.value.some((t) => t.value === mapStore.selectedTask)) {
-    mapStore.selectedTask = null
+    mapStore.selectedTask = availableTasks.value[0]?.value ?? null
   }
   onTaskChange()
-})
-
-const modelLabels = computed(() => modelOptions.value.map(m => m.title))
-
-const selectedModel = computed({
-  get: () => modelOptions.value.find(m => m.value === mapStore.modelType)?.title
-             ?? modelOptions.value[0]?.title
-             ?? null,
-  set: (title) => {
-    const match = modelOptions.value.find(m => m.title === title)
-    if (match) mapStore.modelType = match.value
-  },
 })
 
 function formatArea(sqm) {

@@ -23,6 +23,7 @@ export const useMapStore = defineStore('map', () => {
   // Prediction and export state
   const hasPrediction = ref(false)
   const viewedPrediction = ref(null)
+  const viewedPredictionMeta = ref(null)
   const currentQueryId = ref(null)
   const currentExport = ref(null)
   const isPredicting = ref(false)
@@ -63,14 +64,16 @@ export const useMapStore = defineStore('map', () => {
     exportDialogTrigger.value++
   }
 
-  function setViewedPrediction(geojson, queryId = null) {
+  function setViewedPrediction(geojson, queryId = null, meta = null) {
     viewedPrediction.value = geojson
+    viewedPredictionMeta.value = meta
     if (queryId) currentQueryId.value = queryId
   }
 
-  function setCurrentPrediction(queryId, geojson = null) {
+  function setCurrentPrediction(queryId, geojson = null, meta = null) {
     currentQueryId.value = queryId
     if (geojson) viewedPrediction.value = geojson
+    if (meta) viewedPredictionMeta.value = meta
   }
 
   function setCurrentExport(value) {
@@ -88,7 +91,7 @@ export const useMapStore = defineStore('map', () => {
   return {
     mapType, setMapType, mapCenter, mapZoom,
     bbox, areaSqm, selectedTask, modelType, keyword, setModelType, setKeyword,
-    hasPrediction, viewedPrediction, currentQueryId, currentExport, isPredicting, isExporting,
+    hasPrediction, viewedPrediction, viewedPredictionMeta, currentQueryId, currentExport, isPredicting, isExporting,
     historyDrawerOpen, coordinateInputOpen,
     startDrawingTrigger, triggerDrawing,
     runTrigger, triggerRun,
