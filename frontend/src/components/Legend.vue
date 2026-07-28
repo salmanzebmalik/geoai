@@ -4,15 +4,26 @@
     class="legend"
     :class="{ 'legend--shifted': mapStore.historyDrawerOpen }"
   >
-    <span class="swatch" />
-    <span class="label">Detected objects</span>
+    <div class="legend-row">
+      <span class="swatch" />
+      <span class="label">Detected objects</span>
+    </div>
+    <div v-if="treeCount !== null" class="legend-row">
+      <span class="label">Number of detected trees: <span class="count">{{ treeCount }}</span></span>
+    </div>
   </div>
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import { useMapStore } from '@/stores/map'
 
 const mapStore = useMapStore()
+
+const treeCount = computed(() => {
+  if (mapStore.viewedPredictionMeta?.model_name !== 'deepforest-tree') return null
+  return mapStore.viewedPredictionMeta?.feature_count ?? null
+})
 </script>
 
 <style scoped>
@@ -22,10 +33,9 @@ const mapStore = useMapStore()
   right: 76px;
   z-index: 1005;
   display: flex;
-  align-items: center;
-  gap: 8px;
-  height: 40px;
-  padding: 0 12px;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 12px;
   background-color: #1b2e1be1;
   border-radius: 8px;
   font-size: 13px;
@@ -36,6 +46,17 @@ const mapStore = useMapStore()
 
 .legend--shifted {
   right: 416px;
+}
+
+.legend-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 24px;
+}
+
+.count {
+  font-weight: 700;
 }
 
 .swatch {

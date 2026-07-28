@@ -2,25 +2,28 @@
   <v-navigation-drawer permanent width="300" color="#1b2e1b">
     <!--  Map picker -->
       <div class="map-picker">
-        <p class="picker-label">Map</p>
-        <v-btn-toggle
+        <div class="picker-title">
+          <v-icon size="18" class="mr-2">mdi-layers</v-icon>
+          <p class="picker-label">MAP</p>
+        </div>
+        <v-select
           v-model="mapStore.mapType"
-          rounded
-          divided
+          :items="mapTypeOptions"
           variant="outlined"
-          color="success"
-          class="map-type-toggle"
+          density="comfortable"
+          hide-details
+          class="map-type-select"
         >
-          <v-btn value="osm" prepend-icon="mdi-map">
-            OSM
-          </v-btn>
-          <v-btn value="germany" prepend-icon="mdi-earth">
-            Germany
-          </v-btn>
-          <v-btn value="orthophoto" prepend-icon="mdi-magnify">
-            NRW
-          </v-btn>
-        </v-btn-toggle>
+          <template #item="{ item, props: itemProps }">
+            <v-list-item v-bind="itemProps" title="" class="map-select-item">
+              <template #prepend>
+                <img :src="item.thumbnail" alt="" class="map-thumb" />
+              </template>
+              <v-list-item-title class="map-item-title">{{ item.title }}</v-list-item-title>
+              <v-list-item-subtitle class="map-item-subtitle">{{ item.description }}</v-list-item-subtitle>
+            </v-list-item>
+          </template>
+        </v-select>
       </div>
 
       <v-divider/>
@@ -45,7 +48,7 @@
               aria-label="Enter coordinates manually"
               variant="tonal"
             >
-              <v-icon icon="mdi-form-textbox" />
+              <v-icon icon="mdi-pencil" />
             </v-btn>
           </div>
 
@@ -101,9 +104,10 @@
           ></v-list-item>
           
           <v-select
-            :items="modelLabels"
-            v-model="selectedModel"
-            :disabled="mapStore.selectedTask === 'Zero-Shot'"
+            :items="modelOptions"
+            :disabled="!modelOptions.length"
+            :placeholder= "modelOptions.length ? 'Select Model' : 'No models available'"
+            v-model="mapStore.modelType"
             variant="solo"
             density="compact"
             class="ml-task-dropdown"
@@ -143,8 +147,32 @@
 <script setup>
 import { computed, watch } from 'vue'
 import { useMapStore } from '@/stores/map'
+import osmThumb from '@/assets/map-osm.jpg'
+import germanyThumb from '@/assets/map-germany.jpg'
+import orthophotoThumb from '@/assets/map-orthophoto.jpg'
 
 const mapStore = useMapStore()
+
+const mapTypeOptions = [
+  {
+    title: 'OSM',
+    value: 'osm',
+    description: 'Open street map (no prediction)',
+    thumbnail: osmThumb,
+  },
+  {
+    title: 'Germany',
+    value: 'germany',
+    description: 'Coarse aerial imagery (10m)',
+    thumbnail: germanyThumb,
+  },
+  {
+    title: 'NRW',
+    value: 'orthophoto',
+    description: 'High-resolution aerial imagery (5m)',
+    thumbnail: orthophotoThumb,
+  },
+]
 
 const TASK_OPTIONS_BY_MAP_TYPE = {
   orthophoto: [
@@ -162,12 +190,12 @@ const availableTasks = computed(() => TASK_OPTIONS_BY_MAP_TYPE[mapStore.mapType]
 // only the models that match the current dataset's resolution are displayed 
 const TREE_MODELS_BY_MAP_TYPE = {
   orthophoto: [
-    { title: 'TCD-Segformer (10cm ortho)', value: 'tree' },
-    { title: 'DeepForest boxes (10cm ortho)', value: 'tree_deepforest' },
+    { title: 'TCD-Segformer', value: 'tree' },
+    { title: 'DeepForest Boxes', value: 'tree_deepforest' },
   ],
   germany: [
-    { title: 'Satlas (5m satellite)', value: 'tree_satlas' },
-    { title: 'UNet (5m satellite)', value: 'tree_unet' },
+    { title: 'Satlas', value: 'tree_satlas' },
+    { title: 'UNet', value: 'tree_unet' },
   ],
   osm: [],
 }
@@ -181,21 +209,9 @@ const modelOptions = computed(() =>
 
 watch(() => mapStore.mapType, () => {
   if (!availableTasks.value.some((t) => t.value === mapStore.selectedTask)) {
-    mapStore.selectedTask = null
+    mapStore.selectedTask = availableTasks.value[0]?.value ?? null
   }
   onTaskChange()
-})
-
-const modelLabels = computed(() => modelOptions.value.map(m => m.title))
-
-const selectedModel = computed({
-  get: () => modelOptions.value.find(m => m.value === mapStore.modelType)?.title
-             ?? modelOptions.value[0]?.title
-             ?? null,
-  set: (title) => {
-    const match = modelOptions.value.find(m => m.title === title)
-    if (match) mapStore.modelType = match.value
-  },
 })
 
 function formatArea(sqm) {
@@ -236,22 +252,52 @@ function onTaskChange() {
   }
 }
 
-.picker-label {
-  font-size: 11px;
-  text-transform: uppercase;
+.picker-title {
+  display: flex;
+  align-items: center;
   margin-bottom: 10px;
 }
 
-.map-type-toggle {
+.picker-label {
+  font-size: 11px;
+  margin: 0;
+}
+
+.map-type-select {
   width: 100%;
 }
 
-.map-type-toggle :deep(.v-btn:not(.v-btn--active)) {
+.map-type-select :deep(.v-field) {
   color: white;
 }
 
-.map-type-toggle :deep(.v-btn) {
-  border-color: rgba(255, 255, 255, 0.2);
+.map-type-select :deep(.v-field__outline) {
+  --v-field-border-opacity: 0.3;
+}
+
+.map-select-item {
+  padding-inline-start: 8px;
+}
+
+.map-thumb {
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.map-item-title {
+  font-size: 13px;
+  font-weight: 500;
+  margin-left: 8px;
+}
+
+.map-item-subtitle {
+  font-size: 11px;
+  opacity: 0.7;
+  white-space: normal;
+  margin-left: 8px;
 }
 
 .area-buttons {

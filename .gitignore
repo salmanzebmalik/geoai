@@ -129,6 +129,9 @@ Grounded-SAM-2/
 *.jpeg
 *.webp
 
+# ...except UI assets bundled with the frontend
+!frontend/src/assets/**
+
 
 # ============================================================
 # OS / editor files

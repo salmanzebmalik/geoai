@@ -335,7 +335,7 @@ watch(() => mapStore.runTrigger, async () => {
     }
 
     displayPrediction(geojson)
-    mapStore.setCurrentPrediction(result.query_id, geojson)
+    mapStore.setCurrentPrediction(result.query_id, geojson, result.prediction)
   } finally {
     mapStore.isPredicting = false
   }
