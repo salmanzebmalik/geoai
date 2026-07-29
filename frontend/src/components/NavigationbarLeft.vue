@@ -578,7 +578,7 @@ function onTaskChange() {
 }
 
 .area-fields {
-  font-size: 10px;
+  font-size: 11px;
   color: rgba(255, 255, 255, 0.5);
   white-space: nowrap;
 }

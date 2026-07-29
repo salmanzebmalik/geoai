@@ -242,11 +242,6 @@ onMounted(() => {
     }),
   })
 
-  const tileErrorHandler = () => mapStore.setError('Tile server could not be reached.')
-  for (const source of [orthophotoSource, germanySource, sentinelSource]) {
-    source.on('tileloaderror', tileErrorHandler)
-  }
-
   // Apply selected map type
   showMapLayer(mapStore.mapType)
   if (mapStore.mapType === 'sentinel') refreshSentinelLayer()
