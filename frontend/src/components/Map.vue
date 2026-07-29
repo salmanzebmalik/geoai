@@ -28,6 +28,17 @@ let map = null
 // titiler URL, server must be running for the XYZ layers to work
 const TITILER_URL = import.meta.env.VITE_TITILER_URL || '/image-api'
 
+// one titiler-pgstac collection per year (data: 2018-2024)
+const SENTINEL_COLLECTIONS = [
+  'sentinel-2-l2a-worldwide-2018',
+  'sentinel-2-l2a-worldwide-2019',
+  'sentinel-2-l2a-worldwide-2020',
+  'sentinel-2-l2a-worldwide-2021',
+  'sentinel-2-l2a-worldwide-2022',
+  'sentinel-2-l2a-worldwide-2023',
+  'sentinel-2-l2a-worldwide-2024',
+]
+
 // source for NRW orthophoto imagery
 const orthophotoSource = new XYZ({
   url:
@@ -49,11 +60,58 @@ const germanySource = new XYZ({
   maxZoom: 22,
 })
 
+// source for Sentinel-2 imagery, filled in by refreshSentinelLayer() once a STAC search has been registered (no fixed file path like the sources above)
+const sentinelSource = new XYZ({
+  minZoom: 9,
+  maxNativeZoom: 14,
+  maxZoom: 19,
+})
+
 // TileLayer per map type
 const mapLayers = {
   osm: new TileLayer({ source: new OSM() }),
   germany: new TileLayer({ source: germanySource }),
   orthophoto: new TileLayer({ source: orthophotoSource }),
+  sentinel: new TileLayer({ source: sentinelSource }),
+}
+
+// Register a titiler-pgstac STAC search for the current date range / cloud cover filter, then point sentinelSource at the resulting tiles
+// See image_pipeline/stac_viewer/stac_map.html for the two-step pattern this mirrors
+async function refreshSentinelLayer() {
+  const from = mapStore.sentinelDateFrom
+  const to = mapStore.sentinelDateTo
+  const maxCloudCover = mapStore.sentinelMaxCloudCover
+
+  let response
+  try {
+    response = await fetch(`${TITILER_URL}/searches/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        collections: SENTINEL_COLLECTIONS,
+        datetime: `${from}T00:00:00Z/${to}T23:59:59Z`,
+        query: {
+          'eo:cloud_cover': { lte: maxCloudCover },
+        },
+      }),
+    })
+  } catch {
+    mapStore.setError('Tile server could not be reached.')
+    return
+  }
+
+  if (!response.ok) {
+    mapStore.setError('Sentinel search failed: HTTP ' + response.status)
+    return
+  }
+
+  const search = await response.json()
+  sentinelSource.setUrl(
+    `${TITILER_URL}/searches/${search.id}/tiles/WebMercatorQuad/{z}/{x}/{y}` +
+    '?assets=B04&assets=B03&assets=B02' +
+    '&rescale=0,3000' +
+    '&nodata=0'
+  )
 }
 
 // Switch which map layer is visible
@@ -185,12 +243,13 @@ onMounted(() => {
   })
 
   const tileErrorHandler = () => mapStore.setError('Tile server could not be reached.')
-  for (const source of [orthophotoSource, germanySource]) {
+  for (const source of [orthophotoSource, germanySource, sentinelSource]) {
     source.on('tileloaderror', tileErrorHandler)
   }
 
   // Apply selected map type
   showMapLayer(mapStore.mapType)
+  if (mapStore.mapType === 'sentinel') refreshSentinelLayer()
 
   // Update store with new center/zoom when map is moved
   map.on('moveend', () => {
@@ -209,7 +268,15 @@ onUnmounted(() => {
 })
 
 // Nav bar changes mapType -> swap visible map layer
-watch(() => mapStore.mapType, (type) => showMapLayer(type))
+watch(() => mapStore.mapType, (type) => {
+  showMapLayer(type)
+  if (type === 'sentinel') refreshSentinelLayer() // (re-)register the STAC search for the current filters
+})
+
+// Nav bar date range / cloud cover filter changed -> re-register the STAC search
+watch(() => mapStore.sentinelRefreshTrigger, () => {
+  if (mapStore.mapType === 'sentinel') refreshSentinelLayer()
+})
 
 // Nav bar "Select Area" -> start drawing
 watch(() => mapStore.startDrawingTrigger, () => startDrawing())

@@ -24,6 +24,47 @@
             </v-list-item>
           </template>
         </v-select>
+
+        <div class="sentinel-controls" v-if="mapStore.mapType === 'sentinel'">
+          <div class="sentinel-label">
+            <v-icon size="16" class="mr-2">mdi-cloud</v-icon>
+            <p>Max. cloud coverage</p>
+          </div>
+          <div class="cloud-slider-row">
+            <v-slider
+              v-model="mapStore.sentinelMaxCloudCover"
+              :min="0"
+              :max="100"
+              :step="1"
+              hide-details
+              color="#a5d6a7"
+              track-color="rgba(255, 255, 255, 0.25)"
+              thumb-size="15"
+              class="cloud-slider"
+              @end="mapStore.triggerSentinelRefresh()"
+            ></v-slider>
+            <span class="cloud-value">{{ mapStore.sentinelMaxCloudCover }}%</span>
+          </div>
+
+          <div class="sentinel-label">
+            <v-icon size="16" class="mr-2">mdi-calendar-range</v-icon>
+            <span>Date range</span>
+          </div>
+          <v-date-picker
+            v-model="sentinelDateRange"
+            multiple="range"
+            show-adjacent-months
+            hide-header
+            theme="dark"
+            color="#8bc34a"
+            bg-color="transparent"
+            elevation="0"
+            width="100%"
+            :min="sentinelMinDate"
+            :max="sentinelMaxDate"
+            class="sentinel-date-picker"
+          ></v-date-picker>
+        </div>
       </div>
 
       <v-divider/>
@@ -125,7 +166,7 @@
             prepend-icon="mdi-rocket-launch"
             class="run-btn"
             color="success"
-            :disabled="mapStore.mapType === 'osm' || !mapStore.bbox || !mapStore.selectedTask || (mapStore.selectedTask === 'Zero-Shot' && !mapStore.keyword.trim())"
+            :disabled="mapStore.mapType === 'osm' || mapStore.mapType === 'sentinel' || !mapStore.bbox || !mapStore.selectedTask || (mapStore.selectedTask === 'Zero-Shot' && !mapStore.keyword.trim())"
           >Run</v-btn>
 
           <v-list-item
@@ -145,32 +186,59 @@
 </template>
 
 <script setup>
-import { computed, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useMapStore } from '@/stores/map'
 import osmThumb from '@/assets/map-osm.jpg'
 import germanyThumb from '@/assets/map-germany.jpg'
 import orthophotoThumb from '@/assets/map-orthophoto.jpg'
+import sentinelThumb from '@/assets/map-sentinel.jpg'
 
 const mapStore = useMapStore()
 
+// Some element in this densely interactive sidebar (menus/overlays call
+// stopPropagation() on their own click handling) can swallow a mouseup before
+// it bubbles up to window, which is where v-slider listens to end a drag -
+// leaving the cloud-cover slider's thumb stuck following the cursor. A
+// capture-phase listener always fires before that interference, so redispatch
+// the release straight at window to make sure the slider actually sees it.
+function releaseStuckDrag(e) {
+  if (!e.isTrusted) return // ignore the synthetic event this handler itself dispatches
+  window.dispatchEvent(new MouseEvent('mouseup', {
+    bubbles: false,
+    cancelable: true,
+    clientX: e.clientX,
+    clientY: e.clientY,
+    button: e.button,
+  }))
+}
+
+onMounted(() => window.addEventListener('mouseup', releaseStuckDrag, { capture: true }))
+onUnmounted(() => window.removeEventListener('mouseup', releaseStuckDrag, { capture: true }))
+
 const mapTypeOptions = [
+  {
+    title: 'NRW',
+    value: 'orthophoto',
+    description: 'High-resolution aerial imagery (10cm/px; 2021/2022)',
+    thumbnail: orthophotoThumb,
+  },
+  {
+    title: 'Germany',
+    value: 'germany',
+    description: 'Coarse aerial imagery (20cm/px; 2020)',
+    thumbnail: germanyThumb,
+  },
+  {
+    title: 'Sentinel',
+    value: 'sentinel',
+    description: 'Satellite imagery (10m/px; 2018-2024 available)',
+    thumbnail: sentinelThumb,
+  },
   {
     title: 'OSM',
     value: 'osm',
     description: 'Open street map (no prediction)',
     thumbnail: osmThumb,
-  },
-  {
-    title: 'Germany',
-    value: 'germany',
-    description: 'Coarse aerial imagery (10m)',
-    thumbnail: germanyThumb,
-  },
-  {
-    title: 'NRW',
-    value: 'orthophoto',
-    description: 'High-resolution aerial imagery (5m)',
-    thumbnail: orthophotoThumb,
   },
 ]
 
@@ -183,6 +251,7 @@ const TASK_OPTIONS_BY_MAP_TYPE = {
     { title: 'Tree Detection', value: 'Tree Detection' },
   ],
   osm: [],
+  sentinel: [],
 }
 
 const availableTasks = computed(() => TASK_OPTIONS_BY_MAP_TYPE[mapStore.mapType] ?? [])
@@ -198,6 +267,7 @@ const TREE_MODELS_BY_MAP_TYPE = {
     { title: 'UNet', value: 'tree_unet' },
   ],
   osm: [],
+  sentinel: [],
 }
 
 const modelOptions = computed(() =>
@@ -206,6 +276,37 @@ const modelOptions = computed(() =>
     : TREE_MODELS_BY_MAP_TYPE[mapStore.mapType] ?? []
 )
 
+// === Sentinel date range picker ===
+// v-date-picker (multiple="range") works with Date objects; the store keeps
+// plain 'YYYY-MM-DD' strings (used directly to build the STAC datetime range).
+const sentinelMinDate = new Date(2018, 0, 1)
+const sentinelMaxDate = new Date(2024, 11, 31)
+
+function fromISODate(iso) {
+  const [y, m, d] = iso.split('-').map(Number)
+  return new Date(y, m - 1, d)
+}
+
+function toISODate(date) {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+const sentinelDateRange = ref([
+  fromISODate(mapStore.sentinelDateFrom),
+  fromISODate(mapStore.sentinelDateTo),
+])
+
+// Only commit + trigger a refresh once a full [start, end] range is picked
+// (a fresh selection briefly holds a single date while the user picks the second)
+watch(sentinelDateRange, (range) => {
+  if (range.length !== 2) return
+  mapStore.sentinelDateFrom = toISODate(range[0])
+  mapStore.sentinelDateTo = toISODate(range[1])
+  mapStore.triggerSentinelRefresh()
+})
 
 watch(() => mapStore.mapType, () => {
   if (!availableTasks.value.some((t) => t.value === mapStore.selectedTask)) {
@@ -273,6 +374,62 @@ function onTaskChange() {
 
 .map-type-select :deep(.v-field__outline) {
   --v-field-border-opacity: 0.3;
+}
+
+.sentinel-controls {
+  margin-top: 14px;
+  padding-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sentinel-label {
+  display: flex;
+  align-items: center;
+  font-size: 11px;
+  text-transform: uppercase;
+  margin-top: 8px;
+}
+
+.sentinel-label:first-child {
+  margin-top: 0;
+}
+
+.sentinel-label p {
+  margin: 0;
+}
+
+.cloud-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cloud-slider {
+  flex: 1;
+}
+
+.cloud-value {
+  font-size: 13px;
+  font-weight: 600;
+  color: #a5d6a7;
+  min-width: 32px;
+  text-align: right;
+}
+
+.sentinel-date-picker {
+  align-self: center;
+  overflow: hidden;
+}
+
+.sentinel-date-picker :deep(.v-picker__body) {
+  background: transparent;
+}
+
+.sentinel-date-picker :deep(.v-date-picker-month__day-btn) {
+  --v-btn-size: 12px;
+  --v-btn-height: 28px;
 }
 
 .map-select-item {
