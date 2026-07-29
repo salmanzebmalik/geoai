@@ -236,7 +236,7 @@ const mapTypeOptions = [
   {
     title: 'Germany',
     value: 'germany',
-    description: 'Coarse aerial imagery (20cm/px; 2020)',
+    description: 'Coarse aerial imagery (3-5m/px; 2020)',
     thumbnail: germanyThumb,
   },
   {
