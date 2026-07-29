@@ -55,6 +55,7 @@
             multiple="range"
             show-adjacent-months
             hide-header
+            first-day-of-week="1"
             theme="dark"
             color="#8bc34a"
             bg-color="transparent"
@@ -63,7 +64,17 @@
             :min="sentinelMinDate"
             :max="sentinelMaxDate"
             class="sentinel-date-picker"
-          ></v-date-picker>
+          >
+            <template #controls="{ monthText, yearText, openMonths, openYears }">
+              <v-sheet
+                class="w-100 d-flex align-center rounded-lg pa-1 ga-1"
+                color="rgba(255, 255, 255, 0.08)"
+              >
+                <v-btn :text="monthText" append-icon="$dropdown" size="small" variant="tonal" class="px-2" @click="openMonths"></v-btn>
+                <v-btn :text="yearText" append-icon="$dropdown" size="small" variant="tonal" class="px-2" @click="openYears"></v-btn>
+              </v-sheet>
+            </template>
+          </v-date-picker>
         </div>
       </div>
 
@@ -276,9 +287,8 @@ const modelOptions = computed(() =>
     : TREE_MODELS_BY_MAP_TYPE[mapStore.mapType] ?? []
 )
 
-// === Sentinel date range picker ===
-// v-date-picker (multiple="range") works with Date objects; the store keeps
-// plain 'YYYY-MM-DD' strings (used directly to build the STAC datetime range).
+//Sentinel date range picker
+// v-date-picker (multiple="range") works with Date objects
 const sentinelMinDate = new Date(2018, 0, 1)
 const sentinelMaxDate = new Date(2024, 11, 31)
 
@@ -300,7 +310,6 @@ const sentinelDateRange = ref([
 ])
 
 // Only commit + trigger a refresh once a full [start, end] range is picked
-// (a fresh selection briefly holds a single date while the user picks the second)
 watch(sentinelDateRange, (range) => {
   if (range.length !== 2) return
   mapStore.sentinelDateFrom = toISODate(range[0])
@@ -429,7 +438,43 @@ function onTaskChange() {
 
 .sentinel-date-picker :deep(.v-date-picker-month__day-btn) {
   --v-btn-size: 12px;
-  --v-btn-height: 28px;
+  --v-btn-height: 26px;
+  /* Override circle size to force that the button stays a circle instead of the oval due to other resizing. */
+  width: 26px !important;
+  height: 26px !important;
+}
+
+/* Override between-dates days circle color  */
+.sentinel-date-picker :deep(.v-date-picker-month__day--selected .v-btn) {
+  background-color: #a5d6a78c;
+}
+
+/* Shrink the day-cell grid itself */
+.sentinel-date-picker :deep(.v-date-picker-month) {
+  padding: 0 4px 8px;
+}
+
+.sentinel-date-picker :deep(.v-date-picker-month__days) {
+  column-gap: 2px;
+}
+
+.sentinel-date-picker :deep(.v-date-picker-month__day) {
+  width: 28px;
+  height: 28px;
+}
+
+/* Override the year dropdown to 2 and not 3 columns */
+.sentinel-date-picker :deep(.v-date-picker-years__content) {
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px 12px;
+  padding-inline: 8px;
+}
+
+/* Override year selection hight because we only ever need 4 rows. */
+.sentinel-date-picker :deep(.v-date-picker-years) {
+  height: auto;
+  max-height: 220px;
+  overflow-y: auto;
 }
 
 .map-select-item {
