@@ -3,7 +3,7 @@
     <v-card class="overlay-card" color="white" elevation="8" rounded="lg">
       <v-card-text class="card-body">
         <div class="title-row">
-          <v-icon size="20" class="mr-2">mdi-form-textbox</v-icon>
+          <v-icon size="20" class="mr-2">mdi-pencil</v-icon>
           Enter Bounding Box Coordinates 
         </div>
 

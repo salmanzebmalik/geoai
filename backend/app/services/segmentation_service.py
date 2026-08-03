@@ -18,6 +18,13 @@ from app.schemas.segmentation import (
 from app.services.ml_service_client import call_ml_service
 from app.services.satellite_image_service import fetch_satellite_image_from_titiler
 
+from pyproj import Geod
+from shapely.geometry import box as shp_box, mapping, shape
+from shapely.ops import unary_union
+
+# Geodesic area on the WGS84 ellipsoid, used to re-measure trimmed polygons.
+_GEOD = Geod(ellps="WGS84")
+
 
 def validate_bbox(bbox: BoundingBox) -> None:
     if bbox.max_lat <= bbox.min_lat:
@@ -100,7 +107,6 @@ def run_prediction_models(
     for keyword in keywords:
         result = call_ml_service(
             query_id=query_id,
-            bbox=request.bbox,
             input_image_path=image_path,
             model_type=request.model_type,
             keyword=keyword,
@@ -116,30 +122,89 @@ def run_prediction_models(
         results.append(result)
 
     if len(results) == 1:
-        return results[0]
+        final = results[0]
+    else:
+        final_path = resolve_prediction_result_path(results[-1]["result_path"])
+        temporary = final_path.with_suffix(final_path.suffix + ".tmp")
+        temporary.write_text(
+            json.dumps(
+                {
+                    "type": "FeatureCollection",
+                    "name": "zero_shot_predictions",
+                    "features": merged_features,
+                },
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
+        os.replace(temporary, final_path)
+        final = {
+            **results[-1],
+            "feature_count": len(merged_features),
+            "summary": (
+                f"Found {len(merged_features)} polygons/clusters for "
+                + ", ".join(keywords)
+            ),
+        }
 
-    final_path = resolve_prediction_result_path(results[-1]["result_path"])
-    temporary = final_path.with_suffix(final_path.suffix + ".tmp")
-    temporary.write_text(
-        json.dumps(
-            {
-                "type": "FeatureCollection",
-                "name": "zero_shot_predictions",
-                "features": merged_features,
-            },
-            ensure_ascii=False,
-        ),
-        encoding="utf-8",
-    )
-    os.replace(temporary, final_path)
-    return {
-        **results[-1],
-        "feature_count": len(merged_features),
-        "summary": (
-            f"Found {len(merged_features)} polygons/clusters for "
-            + ", ".join(keywords)
-        ),
-    }
+    # Trim predictions to the drawn AOI. tiTiler reprojects the crop to UTM, so it
+    # comes back a few metres larger than the lon/lat box and the model can detect
+    # features just past it; clip every polygon so nothing renders outside the box.
+    final["feature_count"] = clip_geojson_to_bbox(final["result_path"], request.bbox)
+    return final
+
+
+def _polygonal(geom):
+    """Keep only the polygonal part of a clip result (drop line/point tangencies)."""
+    if geom.is_empty:
+        return None
+    if geom.geom_type in ("Polygon", "MultiPolygon"):
+        return geom
+    if geom.geom_type == "GeometryCollection":
+        polys = [g for g in geom.geoms if g.geom_type in ("Polygon", "MultiPolygon")]
+        return unary_union(polys) if polys else None
+    return None
+
+
+def clip_geojson_to_bbox(stored_path: str, bbox: BoundingBox) -> int:
+    """Clip stored prediction polygons to the requested AOI and rewrite the file.
+
+    Each feature is intersected with the lon/lat box the user drew: features entirely
+    outside are dropped and a straddling feature is trimmed at the box edge (its
+    area_m2 is refreshed geodesically). Returns the number of features kept.
+    """
+    path = resolve_prediction_result_path(stored_path)
+    data = json.loads(path.read_text(encoding="utf-8"))
+    clip = shp_box(bbox.min_lon, bbox.min_lat, bbox.max_lon, bbox.max_lat)
+
+    kept: list[dict] = []
+    for feature in data.get("features", []):
+        raw = feature.get("geometry")
+        if not raw:
+            continue
+        try:
+            geom = shape(raw)
+        except Exception:
+            continue
+        if not geom.is_valid:
+            geom = geom.buffer(0)
+        clipped = _polygonal(geom.intersection(clip))
+        if clipped is None or clipped.is_empty:
+            continue
+        new_feature = {**feature, "geometry": mapping(clipped)}
+        props = feature.get("properties") or {}
+        if "area_m2" in props and clipped.area < geom.area * (1 - 1e-9):
+            new_props = dict(props)
+            area, _ = _GEOD.geometry_area_perimeter(clipped)
+            new_props["area_m2"] = round(abs(area), 2)
+            new_feature["properties"] = new_props
+        kept.append(new_feature)
+
+    data["features"] = kept
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+    os.replace(temporary, path)
+    return len(kept)
 
 
 def resolve_prediction_result_path(

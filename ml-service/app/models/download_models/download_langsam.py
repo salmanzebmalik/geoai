@@ -1,8 +1,6 @@
 import os
 import requests
 from huggingface_hub import snapshot_download
-from transformers import AutoModelForZeroShotObjectDetection, AutoProcessor
-from transformers import AutoProcessor
 
 
 def download_langsam(local_path="ml-service/app/models/local_langsam"):

@@ -259,7 +259,7 @@ async function viewPrediction(item) {
 
     const geojson = await geojsonResponse.json()
 
-    mapStore.setViewedPrediction(geojson, item.query_id)
+    mapStore.setViewedPrediction(geojson, item.query_id, result.prediction)
     mapStore.historyDrawerOpen = false
   } catch (err) {
     error.value = err.message
