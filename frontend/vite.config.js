@@ -26,11 +26,7 @@ export default defineConfig({
     },
     proxy: {
       '/api': {
-<<<<<<< Updated upstream
         target: `http://127.0.0.1:${BACKEND_PORT}`,
-=======
-        target: 'http://127.0.0.1:8003',
->>>>>>> Stashed changes
         changeOrigin: true,
       },
       '/image-api': {
