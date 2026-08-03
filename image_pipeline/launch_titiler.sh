@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/../ports.sh"
+
+# source "$SCRIPT_DIR/../ports.sh"
+TITILER_PORT="${TITILER_PORT:-8001}" # Used for deployment
 
 # pgstac database (conda postgres, TCP only); "titiler" is a read-only role
 export DATABASE_URL="postgresql://titiler@127.0.0.1:5432/stac"

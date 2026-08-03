@@ -110,7 +110,10 @@ dependencies = [
     "truststore==0.10.4",
     "deepforest>=2.1.0",
     "satlaspretrain-models==0.3.1",
+<<<<<<< Updated upstream
     "segmentation-models-pytorch>=0.5.0",
+=======
+>>>>>>> Stashed changes
 ]
 
 [project.scripts]
