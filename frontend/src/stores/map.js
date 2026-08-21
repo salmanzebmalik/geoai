@@ -16,9 +16,9 @@ export const useMapStore = defineStore('map', () => {
   const keyword = ref('house')    // For zeroshot model
 
   // === Sentinel STAC search filters ===
-  const sentinelDateFrom = ref('2024-08-01')
-  const sentinelDateTo = ref('2024-08-31')
-  const sentinelMaxCloudCover = ref(30) // percent, 0-100
+  const sentinelDateFrom = ref('2024-04-01') // growing season: avoids snow, and wide enough that every tile has a scene
+  const sentinelDateTo = ref('2024-09-30')
+  const sentinelMaxCloudCover = ref(25) // percent, 0-100
 
   const coordinateInputOpen = ref(false) // whether the manual coordinate input overlay is open
 

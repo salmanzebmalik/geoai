@@ -28,16 +28,12 @@ let map = null
 // titiler URL, server must be running for the XYZ layers to work
 const TITILER_URL = import.meta.env.VITE_TITILER_URL || '/image-api'
 
-// one titiler-pgstac collection per year (data: 2018-2024)
-const SENTINEL_COLLECTIONS = [
-  'sentinel-2-l2a-worldwide-2018',
-  'sentinel-2-l2a-worldwide-2019',
-  'sentinel-2-l2a-worldwide-2020',
-  'sentinel-2-l2a-worldwide-2021',
-  'sentinel-2-l2a-worldwide-2022',
-  'sentinel-2-l2a-worldwide-2023',
-  'sentinel-2-l2a-worldwide-2024',
-]
+// 8-bit RGB COG collection: one 3-band 'visual' asset per scene, already
+// contrast-stretched and in EPSG:3857 with internal overviews, so tiles need no
+// rescale and far less IO than the raw 16-bit .jp2 collections.
+// The .jp2 collections (sentinel-2-l2a-worldwide-2018..2024) are still in the
+// database but need different render params -- see refreshSentinelLayer below.
+const SENTINEL_COLLECTIONS = ['sentinel-2-l2a-rgb-cog-v2-2024']
 
 // source for NRW orthophoto imagery
 const orthophotoSource = new XYZ({
@@ -62,9 +58,12 @@ const germanySource = new XYZ({
 
 // source for Sentinel-2 imagery, filled in by refreshSentinelLayer() once a STAC search has been registered (no fixed file path like the sources above)
 const sentinelSource = new XYZ({
-  minZoom: 9,
-  maxNativeZoom: 14,
-  maxZoom: 19,
+  // tileSize left at the 256px default. 512 moves more pixels per request but
+  // each tile spans 4x the ground, so it mosaics more scenes and takes longer
+  // to come back -- the map fills in in coarser, slower steps.
+  minZoom: 7,        // internal overviews make low zoom cheap, unlike the .jp2s
+  maxNativeZoom: 14, // 10 m imagery stops gaining detail here
+  maxZoom: 14,       // above native zoom the client only magnifies edge pixels
 })
 
 // TileLayer per map type
@@ -90,6 +89,17 @@ async function refreshSentinelLayer() {
       body: JSON.stringify({
         collections: SENTINEL_COLLECTIONS,
         datetime: `${from}T00:00:00Z/${to}T23:59:59Z`,
+        // Least cloudy scene wins per pixel, within the selected window.
+        // Without an ordering that prefers clear scenes the mosaic serves
+        // whichever scene pgstac returns first, often cloud- or snow-saturated,
+        // which renders near-white.
+        // Sorting by datetime desc was tried instead (temporally coherent, less
+        // patchy) but with a wide window "most recent" lands in December: low
+        // winter sun and snow, ~20% of a tile near-white. Snow is not cloud, so
+        // the cloud filter cannot exclude it. Constraining the default range to
+        // the growing season (April-September, see stores/map.js) is what keeps
+        // cloud sorting from reaching into winter.
+        sortby: [{ field: 'eo:cloud_cover', direction: 'asc' }],
         query: {
           'eo:cloud_cover': { lte: maxCloudCover },
         },
@@ -108,10 +118,25 @@ async function refreshSentinelLayer() {
   const search = await response.json()
   sentinelSource.setUrl(
     `${TITILER_URL}/searches/${search.id}/tiles/WebMercatorQuad/{z}/{x}/{y}` +
-    '?assets=B04&assets=B03&assets=B02' +
-    '&rescale=0,3000' +
-    '&nodata=0'
+    // one 3-band RGB asset, bands already in R,G,B order
+    '?assets=visual' +
+    // NO rescale: the 0..3000 -> 0..255 stretch is baked into these COGs, so
+    // passing it again renders near-black.
+    // NO nodata: they declare nodata=0 internally, so titiler masks the
+    // reprojection fill on its own.
+    // first valid pixel down the cloud-sorted stack wins; the mask lets fill
+    // fall through to a covering neighbour scene.
+    '&pixel_selection=first'
   )
+
+  // Drop every cached tile. setUrl() alone already invalidates them (the search
+  // id is part of the URL, so the source key changes), but OpenLayers keeps the
+  // old tile on screen as an 'interim' placeholder while the new one loads.
+  // That would show imagery from the PREVIOUS date range / cloud threshold as
+  // if it were current -- misleading in a tool where the imagery is the result
+  // and where a bounding box may be drawn on it. Blank-then-load is the safer
+  // trade here.
+  sentinelSource.refresh()
 }
 
 // Switch which map layer is visible
