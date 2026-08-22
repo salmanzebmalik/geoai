@@ -33,7 +33,11 @@ const TITILER_URL = import.meta.env.VITE_TITILER_URL || '/image-api'
 // rescale and far less IO than the raw 16-bit .jp2 collections.
 // The .jp2 collections (sentinel-2-l2a-worldwide-2018..2024) are still in the
 // database but need different render params -- see refreshSentinelLayer below.
-const SENTINEL_COLLECTIONS = ['sentinel-2-l2a-rgb-cog-v2-2024']
+const SENTINEL_COLLECTIONS = [
+  'sentinel-2-l2a-rgb-cog-v2-2022',
+  'sentinel-2-l2a-rgb-cog-v2-2023',
+  'sentinel-2-l2a-rgb-cog-v2-2024',
+]
 
 // source for NRW orthophoto imagery
 const orthophotoSource = new XYZ({
