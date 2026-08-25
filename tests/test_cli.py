@@ -64,7 +64,7 @@ class CLICommandTests(unittest.TestCase):
                 "7.62",
                 "51.96",
                 "--source-type",
-                "ortho",
+                "satellite",
                 "--model-type",
                 "tree_satlas",
             ]
@@ -73,7 +73,7 @@ class CLICommandTests(unittest.TestCase):
         method, path, payload = self.client.calls[0]
         self.assertEqual((method, path), ("POST", "predict"))
         self.assertEqual(payload["model_type"], "tree_satlas")
-        self.assertEqual(payload["source_type"], "ortho")
+        self.assertEqual(payload["source_type"], "satellite")
         self.assertEqual(payload["keywords"], [])
         self.assertEqual(payload["bbox"]["min_lon"], 7.61)
 
@@ -159,6 +159,44 @@ class CLICommandTests(unittest.TestCase):
             ("GET", "exports", {"query_id": "query-1"}),
         )
 
+    def test_prediction_defaults_are_compatible(self):
+        self.invoke(
+            [
+                "predict",
+                "--bbox",
+                "7.61",
+                "51.95",
+                "7.62",
+                "51.96",
+            ]
+        )
+
+        payload = self.client.calls[0][2]
+
+        self.assertEqual(payload["model_type"], "tree")
+        self.assertEqual(payload["source_type"], "ortho")
+
+    def test_rejects_incompatible_model_and_source(self):
+        args = self.parser.parse_args(
+            [
+                "predict",
+                "--bbox",
+                "7.61",
+                "51.95",
+                "7.62",
+                "51.96",
+                "--source-type",
+                "ortho",
+                "--model-type",
+                "tree_satlas",
+            ]
+        )
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "not compatible",
+        ):
+            args.handler(self.client, args)
 
 class APIClientTests(unittest.TestCase):
     def test_builds_relative_and_absolute_urls(self):

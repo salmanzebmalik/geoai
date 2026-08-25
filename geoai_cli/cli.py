@@ -24,6 +24,17 @@ ARTIFACT_SUFFIXES = {
 
 MODEL_TYPES = ("tree", "tree_satlas", "tree_unet", "tree_deepforest", "zeroshot")
 SOURCE_TYPES = ("satellite", "ortho")
+MODELS_BY_SOURCE = {
+    "ortho": (
+        "tree",
+        "tree_deepforest",
+        "zeroshot",
+    ),
+    "satellite": (
+        "tree_satlas",
+        "tree_unet",
+    ),
+}
 VECTOR_FORMATS = ("geojson", "gpkg", "flatgeobuf", "shapefile")
 GEOMETRY_TYPES = ("Polygon", "MultiPolygon")
 
@@ -62,7 +73,10 @@ def _add_fetch_image_command(commands: argparse._SubParsersAction) -> None:
         help="fetch the source image without running inference",
     )
     _add_bbox_arguments(parser)
-    _add_source_argument(parser)
+    _add_source_argument(
+        parser,
+        default="satellite",
+    )
     parser.set_defaults(handler=_fetch_image)
 
 
@@ -134,18 +148,25 @@ def _add_bbox_arguments(parser: argparse.ArgumentParser) -> None:
     )
 
 
-def _add_source_argument(parser: argparse.ArgumentParser) -> None:
+def _add_source_argument(
+    parser: argparse.ArgumentParser,
+    *,
+    default: str,
+) -> None:
     parser.add_argument(
         "--source-type",
         choices=SOURCE_TYPES,
-        default="satellite",
-        help="source imagery (default: satellite)",
+        default=default,
+        help=f"source imagery (default: {default})",
     )
 
 
 def _add_prediction_arguments(parser: argparse.ArgumentParser) -> None:
     _add_bbox_arguments(parser)
-    _add_source_argument(parser)
+    _add_source_argument(
+        parser,
+        default="ortho",
+    )
     parser.add_argument(
         "--model-type",
         choices=MODEL_TYPES,
@@ -299,11 +320,25 @@ def _bbox_payload(values: list[float]) -> dict[str, float]:
 
 
 def _prediction_payload(args: argparse.Namespace) -> dict[str, Any]:
+    allowed_models = MODELS_BY_SOURCE[args.source_type]
+
+    if args.model_type not in allowed_models:
+        allowed_text = ", ".join(allowed_models)
+
+        raise ValueError(
+            f"model type '{args.model_type}' is not compatible with "
+            f"source type '{args.source_type}'. Allowed models: "
+            f"{allowed_text}"
+        )
+        
     keywords = list(dict.fromkeys(term.strip() for term in args.keyword if term.strip()))
+    
     if args.model_type == "zeroshot" and not keywords:
         raise ValueError("--keyword is required for model type zeroshot")
+    
     if args.model_type != "zeroshot" and keywords:
         raise ValueError("--keyword can only be used with model type zeroshot")
+    
     return {
         "bbox": _bbox_payload(args.bbox),
         "model_type": args.model_type,

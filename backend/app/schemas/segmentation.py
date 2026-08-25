@@ -7,6 +7,17 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 SourceType = Literal["satellite", "ortho"]
 ModelType = Literal["tree", "tree_satlas", "tree_unet", "tree_deepforest", "zeroshot"]
+MODELS_BY_SOURCE: dict[SourceType, tuple[ModelType, ...]] = {
+    "ortho": (
+        "tree",
+        "tree_deepforest",
+        "zeroshot",
+    ),
+    "satellite": (
+        "tree_satlas",
+        "tree_unet",
+    ),
+}
 VectorFormat = Literal["geojson", "gpkg", "flatgeobuf", "shapefile"]
 GeometryType = Literal["Polygon", "MultiPolygon"]
 
@@ -32,22 +43,39 @@ class PredictionRequest(BaseModel):
     # Multiple zero-shot terms are evaluated one after another and merged.
     keywords: List[str] = Field(default_factory=list, max_length=20)
 
-    # Optional source selection for tiTiler.
-    source_type: SourceType = "satellite"
+    # The default tree model expects 10 cm orthophoto imagery.
+    source_type: SourceType = "ortho"
 
     @model_validator(mode="after")
     def validate_model_parameters(self) -> "PredictionRequest":
         self.keyword = self.keyword.strip() if self.keyword else None
         self.keywords = list(
-            dict.fromkeys(term.strip() for term in self.keywords if term.strip())
+            dict.fromkeys(
+                term.strip()
+                for term in self.keywords
+                if term.strip()
+            )
         )
 
-        if self.model_type == "zeroshot" and not (self.keyword or self.keywords):
+        allowed_models = MODELS_BY_SOURCE[self.source_type]
+
+        if self.model_type not in allowed_models:
+            allowed_text = ", ".join(allowed_models)
+
             raise ValueError(
-                "keyword or keywords is required when model_type is 'zeroshot'"
+                f"Model '{self.model_type}' is not compatible with "
+                f"source '{self.source_type}'. Allowed models for "
+                f"'{self.source_type}': {allowed_text}"
             )
 
-        if self.model_type == "tree":
+        if self.model_type == "zeroshot":
+            if not (self.keyword or self.keywords):
+                raise ValueError(
+                    "keyword or keywords is required when "
+                    "model_type is 'zeroshot'"
+                )
+        else:
+            # Keywords have no meaning for the fixed tree models.
             self.keyword = None
             self.keywords = []
 
