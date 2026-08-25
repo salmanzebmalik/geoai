@@ -10,6 +10,7 @@ from shapely.geometry import box as shp_box, mapping
 from app.core.config import settings
 from app.schemas.segmentation import BoundingBox, ImageInfo, SourceType
 from app.utils.crs import best_crs_for_bbox
+from app.utils.http import get_http_session
 
 def get_shared_storage_dir() -> Path:
     """
@@ -148,11 +149,18 @@ def fetch_satellite_image_from_titiler(
     print("Output image path:", image_path)
     print("==========================================\n")
 
-    session = requests.Session()
+    session = get_http_session()
     session.trust_env = False
 
     try:
-        response = session.get(request_url)
+        
+        response = session.get(
+            request_url,
+            timeout=(
+                settings.titiler_connect_timeout_seconds,
+                settings.titiler_read_timeout_seconds,
+            ),
+        )
 
         print("\n========== tiTiler Response Debug ==========")
         print("Status code:", response.status_code)
@@ -170,7 +178,10 @@ def fetch_satellite_image_from_titiler(
 
     except requests.exceptions.Timeout as e:
         raise RuntimeError(
-            f"tiTiler request timed out: {request_url}"
+            "tiTiler request timed out "
+            f"(connect={settings.titiler_connect_timeout_seconds}s, "
+            f"read={settings.titiler_read_timeout_seconds}s): "
+            f"{request_url}"
         ) from e
 
     except requests.exceptions.HTTPError as e:

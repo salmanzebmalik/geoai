@@ -4,7 +4,7 @@ from typing import Literal, Optional
 import requests
 
 from app.core.config import settings
-
+from app.utils.http import get_http_session
 
 ModelType = Literal["tree", "tree_satlas", "tree_unet", "tree_deepforest", "zeroshot"]
 
@@ -82,8 +82,7 @@ def call_ml_service(
     if model_type == "zeroshot":
         payload["keyword"] = keyword or "tree"
 
-    session = requests.Session()
-    session.trust_env = False  # avoids proxy problems on some systems
+    session = get_http_session()
 
     print("\n========== ML Service Request Debug ==========")
     print("URL:", url)
@@ -92,10 +91,15 @@ def call_ml_service(
     print("=============================================\n")
 
     try:
+        
         response = session.post(
             url,
             json=payload,
             headers={"Accept": "application/json"},
+            timeout=(
+                settings.ml_connect_timeout_seconds,
+                settings.ml_read_timeout_seconds,
+            ),
         )
 
         print("\n========== ML Service Response Debug ==========")

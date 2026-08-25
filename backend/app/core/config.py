@@ -55,6 +55,24 @@ class Settings:
     ).rstrip("/")
 
     # -----------------------------
+    # Internal HTTP communication
+    # -----------------------------
+    titiler_connect_timeout_seconds: float = float(
+        os.getenv("TITILER_CONNECT_TIMEOUT_SECONDS", "5")
+    )
+
+    titiler_read_timeout_seconds: float = float(
+        os.getenv("TITILER_READ_TIMEOUT_SECONDS", "300")
+    )
+
+    ml_connect_timeout_seconds: float = float(
+        os.getenv("ML_CONNECT_TIMEOUT_SECONDS", "5")
+    )
+
+    ml_read_timeout_seconds: float = float(
+        os.getenv("ML_READ_TIMEOUT_SECONDS", "1800")
+    )
+    # -----------------------------
     # Shared storage
     # -----------------------------
     shared_storage_dir: str = os.getenv(
