@@ -11,6 +11,10 @@ export const useMapStore = defineStore('map', () => {
   const bbox = ref(null)
   const areaSqm = ref(null)
   
+  const rasterEstimate = ref(null)
+  const rasterEstimateError = ref(null)
+  const isEstimatingRaster = ref(false)
+
   const selectedTask = ref('Tree Detection')
   const modelType = ref('tree')  // 'tree' or 'zeroshot'
   const keyword = ref('house')    // For zeroshot model
@@ -97,12 +101,22 @@ export const useMapStore = defineStore('map', () => {
   function clearError() {
     errorMessage.value = null
   }
+  
+  function clearRasterEstimate() {
+    rasterEstimate.value = null
+    rasterEstimateError.value = null
+    isEstimatingRaster.value = false
+  }
 
   return {
     mapType, setMapType, mapCenter, mapZoom,
-    bbox, areaSqm, selectedTask, modelType, keyword, setModelType, setKeyword,
+    bbox, areaSqm,
+    rasterEstimate, rasterEstimateError, isEstimatingRaster,
+    clearRasterEstimate,
+    selectedTask, modelType, keyword, setModelType, setKeyword,
     sentinelDateFrom, sentinelDateTo, sentinelMaxCloudCover,
-    hasPrediction, viewedPrediction, viewedPredictionMeta, currentQueryId, currentExport, isPredicting, isExporting,
+    hasPrediction, viewedPrediction, viewedPredictionMeta,
+    currentQueryId, currentExport, isPredicting, isExporting,
     historyDrawerOpen, coordinateInputOpen,
     startDrawingTrigger, triggerDrawing,
     runTrigger, triggerRun,

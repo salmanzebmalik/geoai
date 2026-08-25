@@ -3,7 +3,13 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import {
+  onMounted,
+  onUnmounted,
+  onWatcherCleanup,
+  ref,
+  watch,
+} from 'vue'
 import Map from 'ol/Map'
 import View from 'ol/View'
 import TileLayer from 'ol/layer/Tile'
@@ -27,6 +33,37 @@ let map = null
 
 // titiler URL, server must be running for the XYZ layers to work
 const TITILER_URL = import.meta.env.VITE_TITILER_URL || '/image-api'
+
+function getPredictionSourceType(mapType) {
+  switch (mapType) {
+    case 'orthophoto':
+      return 'ortho'
+    case 'germany':
+      return 'satellite'
+    default:
+      return null
+  }
+}
+
+function getApiErrorMessage(payload, fallback) {
+  const detail = payload?.detail
+
+  if (typeof detail === 'string') {
+    return detail
+  }
+
+  if (Array.isArray(detail)) {
+    const messages = detail
+      .map((item) => item?.msg)
+      .filter(Boolean)
+
+    if (messages.length) {
+      return messages.join(' ')
+    }
+  }
+
+  return fallback
+}
 
 // 8-bit RGB COG collection: one 3-band 'visual' asset per scene, already
 // contrast-stretched and in EPSG:3857 with internal overviews, so tiles need no
@@ -314,27 +351,132 @@ watch(() => mapStore.viewedPrediction, (geojson) => {
   displayPrediction(geojson)
 })
 
+// Nav bar changes bbox or mapType -> estimate raster size for the selected area
+watch(
+  [
+    () => mapStore.bbox?.min_lon,
+    () => mapStore.bbox?.min_lat,
+    () => mapStore.bbox?.max_lon,
+    () => mapStore.bbox?.max_lat,
+    () => mapStore.mapType,
+  ],
+  async () => {
+    mapStore.clearRasterEstimate()
+
+    const bbox = mapStore.bbox
+    const sourceType = getPredictionSourceType(mapStore.mapType)
+
+    if (!bbox || !sourceType) {
+      return
+    }
+
+    const controller = new AbortController()
+
+    onWatcherCleanup(() => {
+      controller.abort()
+    })
+
+    mapStore.isEstimatingRaster = true
+
+    try {
+      const response = await fetch(
+        '/api/segmentation/estimate',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          signal: controller.signal,
+          body: JSON.stringify({
+            bbox,
+            source_type: sourceType,
+          }),
+        },
+      )
+
+      let result = null
+
+      try {
+        result = await response.json()
+      } catch {
+        // The error below will provide a user-facing fallback.
+      }
+
+      if (!response.ok) {
+        mapStore.rasterEstimateError = getApiErrorMessage(
+          result,
+          'The selected area could not be estimated.',
+        )
+        return
+      }
+
+      mapStore.rasterEstimate = result
+
+    } catch (error) {
+      if (error?.name === 'AbortError') {
+        return
+      }
+
+      mapStore.rasterEstimateError =
+        'The backend could not estimate the selected area.'
+
+    } finally {
+      if (!controller.signal.aborted) {
+        mapStore.isEstimatingRaster = false
+      }
+    }
+  },
+  {
+    immediate: true,
+  },
+)
+
 // Click on Run -> predict
 watch(() => mapStore.runTrigger, async () => {
-  if (!mapStore.bbox) return
+  if (!mapStore.bbox) {
+    return
+  }
+
+  if (mapStore.isEstimatingRaster) {
+    mapStore.setError(
+      'Please wait while the selected area is being estimated.',
+    )
+    return
+  }
+
+  if (mapStore.rasterEstimateError) {
+    mapStore.setError(mapStore.rasterEstimateError)
+    return
+  }
+
+  if (!mapStore.rasterEstimate) {
+    mapStore.setError(
+      'The raster estimate is not ready. Please try again.',
+    )
+    return
+  }
+
+  if (!mapStore.rasterEstimate.allowed) {
+    mapStore.setError(
+      'The selected area exceeds the current processing limit.',
+    )
+    return
+  }
 
   mapStore.isPredicting = true
 
   try {
-    // Derive satSoruceType from the selected map type
-    let satSourceType
-    switch (mapStore.mapType) {
-      case 'orthophoto':
-        satSourceType = 'ortho'
-        break
-      case 'germany':
-        satSourceType = 'satellite'
-        break
-      default:
-        console.warn('OSM is not a valid prediction source')
-        mapStore.isPredicting = false
-        return
-    }
+      // Derive satSoruceType from the selected map type
+      const satSourceType = getPredictionSourceType(
+    mapStore.mapType,
+  )
+
+  if (!satSourceType) {
+    mapStore.setError(
+      'The selected map does not support prediction.',
+    )
+    return
+  }
 
     // assembles POST request body for prediction
     const requestBody = {
@@ -376,7 +518,13 @@ watch(() => mapStore.runTrigger, async () => {
     console.log('Prediction result recieved:', result)
 
     if (!response.ok) {
-      mapStore.setError('Prediction failed.')
+      mapStore.setError(
+        getApiErrorMessage(
+          result,
+          'Prediction failed.',
+        ),
+      )
+
       console.error('Prediction failed:', result.detail)
       return
     }

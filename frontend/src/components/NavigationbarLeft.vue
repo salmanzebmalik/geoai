@@ -117,6 +117,89 @@
             </div>
           </div>
 
+          <div
+            v-if="mapStore.bbox && supportsPredictionMap"
+            class="raster-estimate"
+            :class="{
+              'raster-estimate--blocked':
+                mapStore.rasterEstimate &&
+                !mapStore.rasterEstimate.allowed,
+              'raster-estimate--error':
+                mapStore.rasterEstimateError,
+            }"
+          >
+            <div class="raster-estimate-title">
+              <v-icon size="15">mdi-image-size-select-large</v-icon>
+              <span>Estimated raster</span>
+            </div>
+
+            <div
+              v-if="mapStore.isEstimatingRaster"
+              class="raster-estimate-loading"
+            >
+              <v-progress-circular
+                indeterminate
+                size="14"
+                width="2"
+              />
+              <span>Calculating workload…</span>
+            </div>
+
+            <template v-else-if="mapStore.rasterEstimate">
+              <span class="raster-estimate-size">
+                {{
+                  formatPixelCount(
+                    mapStore.rasterEstimate.width_pixels,
+                  )
+                }}
+                ×
+                {{
+                  formatPixelCount(
+                    mapStore.rasterEstimate.height_pixels,
+                  )
+                }}
+                pixels
+                ({{ formatMegapixels(mapStore.rasterEstimate.megapixels) }} MP)
+              </span>
+
+              <span
+                class="raster-estimate-status"
+                :class="{
+                  'raster-estimate-status--blocked':
+                    !mapStore.rasterEstimate.allowed,
+                }"
+              >
+                {{
+                  mapStore.rasterEstimate.allowed
+                    ? 'Within current processing limit'
+                    : 'Area exceeds current processing limit'
+                }}
+              </span>
+
+              <span class="raster-estimate-limit">
+                Limit:
+                {{
+                  formatMegapixels(
+                    mapStore.rasterEstimate.max_total_pixels / 1_000_000,
+                  )
+                }}
+                MP total /
+                {{
+                  formatPixelCount(
+                    mapStore.rasterEstimate.max_side_pixels,
+                  )
+                }}
+                px per side
+              </span>
+            </template>
+
+            <span
+              v-else-if="mapStore.rasterEstimateError"
+              class="raster-estimate-status raster-estimate-status--blocked"
+            >
+              {{ mapStore.rasterEstimateError }}
+            </span>
+          </div>
           <!-- Task selection  -->
           <v-list-item
             prepend-icon="mdi-numeric-2-circle"
@@ -177,7 +260,7 @@
             prepend-icon="mdi-rocket-launch"
             class="run-btn"
             color="success"
-            :disabled="mapStore.mapType === 'osm' || mapStore.mapType === 'sentinel' || !mapStore.bbox || !mapStore.selectedTask || (mapStore.selectedTask === 'Zero-Shot' && !mapStore.keyword.trim())"
+            :disabled="runDisabled"
           >Run</v-btn>
 
           <v-list-item
@@ -205,6 +288,34 @@ import orthophotoThumb from '@/assets/map-orthophoto.jpg'
 import sentinelThumb from '@/assets/map-sentinel.jpg'
 
 const mapStore = useMapStore()
+const supportsPredictionMap = computed(() =>
+  ['orthophoto', 'germany'].includes(mapStore.mapType)
+)
+
+const runDisabled = computed(() => {
+  const zeroShotKeywordMissing =
+    mapStore.selectedTask === 'Zero-Shot'
+    && !mapStore.keyword.trim()
+
+  return (
+    !supportsPredictionMap.value
+    || !mapStore.bbox
+    || !mapStore.selectedTask
+    || zeroShotKeywordMissing
+    || mapStore.isEstimatingRaster
+    || Boolean(mapStore.rasterEstimateError)
+    || !mapStore.rasterEstimate
+    || !mapStore.rasterEstimate.allowed
+  )
+})
+
+function formatPixelCount(value) {
+  return Number(value).toLocaleString()
+}
+
+function formatMegapixels(value) {
+  return Number(value).toFixed(2)
+}
 
 // Some element in this densely interactive sidebar (menus/overlays call
 // stopPropagation() on their own click handling) can swallow a mouseup before
@@ -582,4 +693,56 @@ function onTaskChange() {
   color: rgba(255, 255, 255, 0.5);
   white-space: nowrap;
 }
+
+
+.raster-estimate {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 90%;
+  margin: 8px 16px;
+  padding: 9px 11px;
+  border: 1px solid rgba(139, 195, 74, 0.28);
+  border-radius: 8px;
+  background: rgba(139, 195, 74, 0.08);
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 11px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.raster-estimate--blocked,
+.raster-estimate--error {
+  border-color: rgba(239, 83, 80, 0.55);
+  background: rgba(239, 83, 80, 0.1);
+}
+
+.raster-estimate-title,
+.raster-estimate-loading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.raster-estimate-title {
+  color: rgba(255, 255, 255, 0.65);
+  font-weight: 600;
+}
+
+.raster-estimate-size {
+  color: white;
+}
+
+.raster-estimate-status {
+  color: #a5d6a7;
+}
+
+.raster-estimate-status--blocked {
+  color: #ef9a9a;
+}
+
+.raster-estimate-limit {
+  color: rgba(255, 255, 255, 0.5);
+}
+
 </style>
