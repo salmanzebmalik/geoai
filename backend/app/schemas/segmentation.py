@@ -93,6 +93,22 @@ class FetchImageRequest(BaseModel):
     bbox: BoundingBox
     source_type: SourceType = "satellite"
 
+class RasterEstimateRequest(BaseModel):
+    bbox: BoundingBox
+    source_type: SourceType = "satellite"
+
+
+class RasterEstimateResponse(BaseModel):
+    source_type: SourceType
+    width_pixels: int
+    height_pixels: int
+    total_pixels: int
+    megapixels: float
+    resolution_meters: float
+    projected_crs: str
+    allowed: bool
+    max_total_pixels: int
+    max_side_pixels: int
 
 class ImageInfo(BaseModel):
     image_url: Optional[str] = None

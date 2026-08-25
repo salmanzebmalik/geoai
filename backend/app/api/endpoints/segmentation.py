@@ -6,6 +6,7 @@ from sqlmodel import Session
 
 from app.db.database import get_session
 from app.db.models import SegmentationQuery
+
 from app.schemas.segmentation import (
     ExportArtifact,
     ExportRequest,
@@ -17,6 +18,8 @@ from app.schemas.segmentation import (
     PredictionExportResponse,
     PredictionRequest,
     PredictionResponse,
+    RasterEstimateRequest,
+    RasterEstimateResponse,
 )
 from app.services.annotation_export_service import (
     export_annotations,
@@ -33,6 +36,11 @@ from app.services.segmentation_service import (
     validate_bbox,
 )
 from app.utils.raster_budget import validate_raster_budget
+from app.core.config import settings
+from app.utils.raster_budget import (
+    estimate_raster_size,
+    raster_fits_budget,
+)
 
 router = APIRouter()
 
@@ -101,7 +109,42 @@ def create_export_for_query(
     )
     return build_export_response(manifest)
 
+@router.post(
+    "/estimate",
+    response_model=RasterEstimateResponse,
+)
+def estimate_prediction_raster(
+    request: RasterEstimateRequest,
+):
+    """Estimate the raster workload without starting processing."""
 
+    try:
+        validate_bbox(request.bbox)
+
+        estimate = estimate_raster_size(
+            bbox=request.bbox,
+            source_type=request.source_type,
+        )
+
+        return RasterEstimateResponse(
+            source_type=request.source_type,
+            width_pixels=estimate.width_pixels,
+            height_pixels=estimate.height_pixels,
+            total_pixels=estimate.total_pixels,
+            megapixels=round(estimate.megapixels, 2),
+            resolution_meters=estimate.resolution_meters,
+            projected_crs=estimate.projected_crs,
+            allowed=raster_fits_budget(estimate),
+            max_total_pixels=settings.max_input_raster_pixels,
+            max_side_pixels=settings.max_input_raster_side_pixels,
+        )
+
+    except ValueError as error:
+        raise HTTPException(
+            status_code=400,
+            detail=str(error),
+        ) from error
+        
 @router.post("/fetch-image", response_model=ImageInfo)
 def fetch_image(
     request: FetchImageRequest,

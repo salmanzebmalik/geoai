@@ -101,6 +101,31 @@ def estimate_raster_size(
         projected_crs=projected_crs,
     )
 
+def raster_fits_budget(
+    estimate: RasterSizeEstimate,
+) -> bool:
+    """Return whether an estimate fits all configured raster limits."""
+
+    within_total_limit = (
+        estimate.total_pixels
+        <= settings.max_input_raster_pixels
+    )
+
+    within_width_limit = (
+        estimate.width_pixels
+        <= settings.max_input_raster_side_pixels
+    )
+
+    within_height_limit = (
+        estimate.height_pixels
+        <= settings.max_input_raster_side_pixels
+    )
+
+    return (
+        within_total_limit
+        and within_width_limit
+        and within_height_limit
+    )
 
 def validate_raster_budget(
     bbox: BoundingBox,
@@ -123,15 +148,7 @@ def validate_raster_budget(
         source_type=source_type,
     )
 
-    exceeds_total = (
-        estimate.total_pixels > settings.max_input_raster_pixels
-    )
-    exceeds_side = (
-        estimate.width_pixels > settings.max_input_raster_side_pixels
-        or estimate.height_pixels > settings.max_input_raster_side_pixels
-    )
-
-    if exceeds_total or exceeds_side:
+    if not raster_fits_budget(estimate):
         raise ValueError(
             "Requested area is too large for the current synchronous "
             f"prediction pipeline. Estimated raster: "
