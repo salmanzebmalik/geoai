@@ -30,7 +30,9 @@ from app.services.segmentation_service import (
     get_prediction_by_id,
     get_prediction_geojson_source,
     get_prediction_history,
+    validate_bbox,
 )
+from app.utils.raster_budget import validate_raster_budget
 
 router = APIRouter()
 
@@ -110,6 +112,12 @@ def fetch_image(
     """
 
     try:
+        validate_bbox(request.bbox)
+
+        validate_raster_budget(
+            bbox=request.bbox,
+            source_type=request.source_type,
+        )
         query_id = str(uuid4())
 
         image_path, image_info = fetch_satellite_image_from_titiler(
@@ -119,7 +127,12 @@ def fetch_image(
         )
 
         return image_info
-
+    
+    except ValueError as e:
+        raise HTTPException(
+            status_code=400,
+            detail=str(e),
+        ) from e
     except Exception as e:
         raise HTTPException(
             status_code=500,

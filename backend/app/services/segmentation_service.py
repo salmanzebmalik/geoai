@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 from uuid import UUID
 from app.core.config import settings
-
+from app.utils.raster_budget import validate_raster_budget
 from sqlmodel import Session, select
 
 from app.db.models import SegmentationQuery
@@ -250,7 +250,22 @@ def create_prediction(
     """
 
     validate_bbox(request.bbox)
+    raster_estimate = validate_raster_budget(
+        bbox=request.bbox,
+        source_type=request.source_type,
+    )
 
+    print("\n========== Raster Budget ==========")
+    print("Source:", request.source_type)
+    print(
+        "Estimated size:",
+        raster_estimate.width_pixels,
+        "x",
+        raster_estimate.height_pixels,
+    )
+    print("Estimated megapixels:", round(raster_estimate.megapixels, 2))
+    print("Projected CRS:", raster_estimate.projected_crs)
+    print("===================================\n")
     db_query = SegmentationQuery(
         min_lat=request.bbox.min_lat,
         max_lat=request.bbox.max_lat,

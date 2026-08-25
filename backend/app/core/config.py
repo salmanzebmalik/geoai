@@ -72,6 +72,30 @@ class Settings:
     ml_read_timeout_seconds: float = float(
         os.getenv("ML_READ_TIMEOUT_SECONDS", "1800")
     )
+    
+    # -----------------------------
+    # Input raster safety limits
+    # -----------------------------
+    ortho_resolution_meters_per_pixel: float = float(
+        os.getenv("ORTHO_RESOLUTION_METERS_PER_PIXEL", "0.10")
+    )
+
+    satellite_resolution_meters_per_pixel: float = float(
+        os.getenv("SATELLITE_RESOLUTION_METERS_PER_PIXEL", "3.0")
+    )
+
+    raster_estimate_margin: float = float(
+        os.getenv("RASTER_ESTIMATE_MARGIN", "1.10")
+    )
+
+    max_input_raster_pixels: int = int(
+        os.getenv("MAX_INPUT_RASTER_PIXELS", "25000000")
+    )
+
+    max_input_raster_side_pixels: int = int(
+        os.getenv("MAX_INPUT_RASTER_SIDE_PIXELS", "8000")
+    )
+    
     # -----------------------------
     # Shared storage
     # -----------------------------
