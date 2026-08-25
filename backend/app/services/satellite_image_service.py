@@ -88,38 +88,54 @@ def _write_bbox_masked_crop(
     bbox: BoundingBox,
     out_path: Path,
 ) -> tuple[int, int]:
-    """Store the crop with everything outside the drawn bbox blacked out.
+    """Mask and store a raster crop one block at a time.
 
-    tiTiler returns the crop as the axis-aligned UTM bounding box of the reprojected
-    lon/lat box, so its corners cover ground *outside* the box the user drew. We
-    rasterise the bbox polygon (reprojected into the crop's own CRS) and set every
-    pixel outside it to 0, so the model doesn't detect features beyond the box. The
-    CRS/transform are preserved, so georeferencing downstream is unaffected.
+    Pixels outside the user-drawn bounding box are set to zero. Processing
+    block by block prevents the complete raster and mask from being loaded
+    into backend memory at once.
 
-    Returns the (width, height) of the stored image.
+    Returns the width and height of the stored image.
     """
+
     with rasterio.open(source_path) as src:
-        profile = src.profile
-        data = src.read()
-        width, height = src.width, src.height
+        profile = src.profile.copy()
+        width = src.width
+        height = src.height
+
+        aoi = None
 
         if src.crs is not None:
             aoi = transform_geom(
                 "EPSG:4326",
                 src.crs,
-                mapping(shp_box(bbox.min_lon, bbox.min_lat, bbox.max_lon, bbox.max_lat)),
+                mapping(
+                    shp_box(
+                        bbox.min_lon,
+                        bbox.min_lat,
+                        bbox.max_lon,
+                        bbox.max_lat,
+                    )
+                ),
             )
-            # invert=False -> True for pixels NOT covered by the AOI polygon
-            outside = geometry_mask(
-                [aoi],
-                out_shape=(height, width),
-                transform=src.transform,
-                invert=False,
-            )
-            data[:, outside] = 0
 
-    with rasterio.open(out_path, "w", **profile) as dst:
-        dst.write(data)
+        with rasterio.open(out_path, "w", **profile) as dst:
+            for _, window in src.block_windows(1):
+                data = src.read(window=window)
+
+                if aoi is not None:
+                    outside = geometry_mask(
+                        [aoi],
+                        out_shape=(
+                            int(window.height),
+                            int(window.width),
+                        ),
+                        transform=src.window_transform(window),
+                        invert=False,
+                    )
+
+                    data[:, outside] = 0
+
+                dst.write(data, window=window)
 
     return width, height
 
