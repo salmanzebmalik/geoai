@@ -3,11 +3,13 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.dependencies import (
+    acquire_inference_slot,
     get_segformer_model,
     get_satlas_tree_model,
     get_unet_tree_model,
     get_deepforest_model,
 )
+
 from app.schemas.prediction import TreePredictionRequest, PredictionResponse
 from app.services.storage_service import (
     read_image_from_shared_storage,
@@ -52,24 +54,52 @@ def _predict(request: TreePredictionRequest, model_name: str, infer) -> Predicti
 
 
 @router.post("/tree", response_model=PredictionResponse)
-async def predict_tree(request: TreePredictionRequest, segformer=Depends(get_segformer_model)):
-    return _predict(request, "tcd-segformer-mit-b2",
-                    lambda ib: run_tree_detection(segformer, ib))
+def predict_tree(
+    request: TreePredictionRequest,
+    segformer=Depends(get_segformer_model),
+    _inference_slot=Depends(acquire_inference_slot),
+):
+    return _predict(
+        request,
+        "tcd-segformer-mit-b2",
+        lambda image_bytes: run_tree_detection(segformer, image_bytes),
+    )
 
 
 @router.post("/tree/satlas", response_model=PredictionResponse)
-async def predict_tree_satlas(request: TreePredictionRequest, satlas=Depends(get_satlas_tree_model)):
-    return _predict(request, "satlas-tree-5m",
-                    lambda ib: run_tree_detection(satlas, ib))
+def predict_tree_satlas(
+    request: TreePredictionRequest,
+    satlas=Depends(get_satlas_tree_model),
+    _inference_slot=Depends(acquire_inference_slot),
+):
+    return _predict(
+        request,
+        "satlas-tree-5m",
+        lambda image_bytes: run_tree_detection(satlas, image_bytes),
+    )
 
 
 @router.post("/tree/unet", response_model=PredictionResponse)
-async def predict_tree_unet(request: TreePredictionRequest, unet=Depends(get_unet_tree_model)):
-    return _predict(request, "unet-resnet50-tree-5m",
-                    lambda ib: run_tree_detection(unet, ib))
+def predict_tree_unet(
+    request: TreePredictionRequest,
+    unet=Depends(get_unet_tree_model),
+    _inference_slot=Depends(acquire_inference_slot),
+):
+    return _predict(
+        request,
+        "unet-resnet50-tree-5m",
+        lambda image_bytes: run_tree_detection(unet, image_bytes),
+    )
 
 
 @router.post("/tree/deepforest", response_model=PredictionResponse)
-async def predict_tree_deepforest(request: TreePredictionRequest, deepforest=Depends(get_deepforest_model)):
-    return _predict(request, "deepforest-tree",
-                    lambda ib: deepforest.predict_boxes_geojson(ib))
+def predict_tree_deepforest(
+    request: TreePredictionRequest,
+    deepforest=Depends(get_deepforest_model),
+    _inference_slot=Depends(acquire_inference_slot),
+):
+    return _predict(
+        request,
+        "deepforest-tree",
+        lambda image_bytes: deepforest.predict_boxes_geojson(image_bytes),
+    )

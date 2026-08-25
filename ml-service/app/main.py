@@ -6,6 +6,8 @@ import time
 from fastapi import FastAPI
 from app.api.router import api_router
 from app.utils.logger import get_logger
+from app.core.config import settings
+from app.services.inference_gate import InferenceGate
 
 # Consts & inits
 logger = get_logger(__name__)
@@ -48,8 +50,23 @@ def _load_all(app: FastAPI) -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    app.state.inference_gate = InferenceGate(
+        settings.max_concurrent_inferences
+    )
+
+    logger.info(
+        "GPU inference admission capacity: "
+        f"{settings.max_concurrent_inferences}"
+    )
+
     app.state.models = {n: None for n in MODEL_NAMES}
-    threading.Thread(target=_load_all, args=(app,), name="loader", daemon=True).start()
+    threading.Thread(
+        target=_load_all,
+        args=(app,),
+        name="loader",
+        daemon=True,
+    ).start()
+
     logger.info("ML service up - models loading in background")
     yield
 
@@ -76,7 +93,11 @@ def root():
 def health_check():
     return {
         "status": "healthy",
-        "loaded": {n: m is not None for n, m in app.state.models.items()},
+        "loaded": {
+            name: model is not None
+            for name, model in app.state.models.items()
+        },
+        "admission": app.state.inference_gate.snapshot(),
     }
 
 

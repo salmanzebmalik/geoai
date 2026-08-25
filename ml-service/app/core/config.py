@@ -1,5 +1,5 @@
 from pathlib import Path
-
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -11,6 +11,9 @@ DEFAULT_SHARED_STORAGE = REPOSITORY_ROOT / "storage"
 
 class Settings(BaseSettings):
     shared_storage_dir: str = str(DEFAULT_SHARED_STORAGE)
+
+    max_concurrent_inferences: int = Field(default=1, ge=1)
+    busy_retry_after_seconds: int = Field(default=30, ge=1)
 
     model_config = SettingsConfigDict(
         env_file=ENV_FILE,

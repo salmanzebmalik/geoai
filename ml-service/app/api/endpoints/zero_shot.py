@@ -2,7 +2,11 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.dependencies import get_lang_sam_model
+from app.dependencies import (
+    acquire_inference_slot,
+    get_lang_sam_model,
+)
+
 from app.schemas.prediction import ZeroShotPredictionRequest, PredictionResponse
 from app.services.storage_service import (
     read_image_from_shared_storage,
@@ -15,9 +19,10 @@ router = APIRouter()
 
 
 @router.post("/zeroshot", response_model=PredictionResponse)
-async def predict_zero_shot(
+def predict_zero_shot(
     request: ZeroShotPredictionRequest,
     lang_sam=Depends(get_lang_sam_model),
+    _inference_slot=Depends(acquire_inference_slot),
 ):
     query_id = request.query_id or str(uuid4())
 

@@ -37,7 +37,10 @@ trap cleanup SIGINT SIGTERM
 # Start all services in the background with logs
 echo "Starting ml-service on port $ML_SERVICE_PORT..."
 cd "$SCRIPT_DIR/ml-service"
-uvicorn app.main:app --host 127.0.0.1 --port "$ML_SERVICE_PORT" &
+uvicorn app.main:app \
+  --host 127.0.0.1 \
+  --port "$ML_SERVICE_PORT" \
+  --workers 1 &
 ML_PID=$!
 
 echo "Starting image-pipeline (Titiler) on port $TITILER_PORT..."
