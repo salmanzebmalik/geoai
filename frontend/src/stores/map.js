@@ -44,7 +44,9 @@ export const useMapStore = defineStore('map', () => {
   const startDrawingTrigger = ref(0)
   const runTrigger = ref(0)
   const exportDialogTrigger = ref(0)
-  const errorMessage = ref(null)
+ const errorMessage = ref(null)
+  const errorTitle = ref('Something went wrong')
+  const errorKind = ref('error')
 
   function setMapType(type) {
     mapType.value = type
@@ -94,12 +96,16 @@ export const useMapStore = defineStore('map', () => {
     currentExport.value = value
   }
 
-  function setError(message) {
+  function setError(message, options = {}) {
     errorMessage.value = message
+    errorTitle.value = options.title ?? 'Something went wrong'
+    errorKind.value = options.kind ?? 'error'
   }
 
   function clearError() {
     errorMessage.value = null
+    errorTitle.value = 'Something went wrong'
+    errorKind.value = 'error'
   }
   
   function clearRasterEstimate() {
@@ -124,6 +130,6 @@ export const useMapStore = defineStore('map', () => {
     sentinelRefreshTrigger, triggerSentinelRefresh,
     exportDialogTrigger, openExportDialog,
     setViewedPrediction, setCurrentPrediction, setCurrentExport,
-    errorMessage, setError, clearError,
+    errorMessage, setError, clearError, errorTitle, errorKind
   }
 })

@@ -260,7 +260,14 @@
             prepend-icon="mdi-rocket-launch"
             class="run-btn"
             color="success"
-            :disabled="runDisabled"
+            :disabled="
+              mapStore.isPredicting ||
+              mapStore.mapType === 'osm' ||
+              mapStore.mapType === 'sentinel' ||
+              !mapStore.bbox ||
+              !mapStore.selectedTask ||
+              (mapStore.selectedTask === 'Zero-Shot' && !mapStore.keyword.trim())
+            "
           >Run</v-btn>
 
           <v-list-item

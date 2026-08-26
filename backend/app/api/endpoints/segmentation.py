@@ -6,6 +6,7 @@ from sqlmodel import Session
 
 from app.db.database import get_session
 from app.db.models import SegmentationQuery
+from app.services.ml_service_client import MLServiceBusyError
 
 from app.schemas.segmentation import (
     ExportArtifact,
@@ -44,7 +45,22 @@ from app.utils.raster_budget import (
 
 router = APIRouter()
 
+def build_ml_busy_http_exception(
+    error: MLServiceBusyError,
+) -> HTTPException:
+    retry_after = error.retry_after_seconds
 
+    return HTTPException(
+        status_code=429,
+        detail=(
+            "GPU inference is currently busy. "
+            f"Try again in approximately {retry_after} seconds."
+        ),
+        headers={
+            "Retry-After": str(retry_after),
+        },
+    )
+    
 def build_export_response(manifest: dict) -> ExportResponse:
     export_id = manifest["export_id"]
     prediction = manifest.get("prediction") or {}
@@ -202,17 +218,20 @@ def predict_segmentation(
     try:
         return create_prediction(request=request, session=session)
 
+    except MLServiceBusyError as error:
+        raise build_ml_busy_http_exception(error) from error
+
     except ValueError as e:
         raise HTTPException(
             status_code=400,
             detail=str(e),
-        )
+        ) from e
 
     except Exception as e:
         raise HTTPException(
             status_code=500,
             detail=f"Prediction failed: {str(e)}",
-        )
+        ) from e
 
 
 @router.get("/results", response_model=list[PredictionHistoryItem])
@@ -316,6 +335,9 @@ def predict_and_export_annotations(
             session,
         )
         return PredictionExportResponse(prediction=prediction, export=exported)
+    
+    except MLServiceBusyError as error:
+        raise build_ml_busy_http_exception(error) from error
     except HTTPException:
         raise
     except ValueError as error:

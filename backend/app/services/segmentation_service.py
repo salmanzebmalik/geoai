@@ -2,6 +2,8 @@ import json
 import os
 from pathlib import Path
 from uuid import UUID
+
+from requests import session
 from app.core.config import settings
 from app.utils.raster_budget import validate_raster_budget
 from sqlmodel import Session, select
@@ -15,7 +17,10 @@ from app.schemas.segmentation import (
     PredictionRequest,
     PredictionResponse,
 )
-from app.services.ml_service_client import call_ml_service
+from app.services.ml_service_client import (
+    MLServiceBusyError,
+    call_ml_service,
+)
 from app.services.satellite_image_service import fetch_satellite_image_from_titiler
 
 from pyproj import Geod
@@ -231,7 +236,16 @@ def resolve_prediction_result_path(
 
     return result_path
 
+def mark_prediction_failed(
+    db_query: SegmentationQuery,
+    session: Session,
+) -> None:
+    db_query.status = "failed"
+    db_query.prediction_result = {}
 
+    session.add(db_query)
+    session.commit()
+    
 def create_prediction(
     request: PredictionRequest,
     session: Session,
@@ -327,13 +341,12 @@ def create_prediction(
             created_at=db_query.created_at,
         )
 
+    except MLServiceBusyError:
+        mark_prediction_failed(db_query, session)
+        raise
+
     except Exception as e:
-        db_query.status = "failed"
-        db_query.prediction_result = {}
-
-        session.add(db_query)
-        session.commit()
-
+        mark_prediction_failed(db_query, session)
         raise RuntimeError(f"Prediction failed: {str(e)}") from e
 
 

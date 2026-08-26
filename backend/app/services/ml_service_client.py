@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import Literal, Optional
+from urllib import response
 
 import requests
 
@@ -16,6 +17,27 @@ ML_ENDPOINTS = {
     "zeroshot": "/api/v1/predict/zeroshot",
 }
 
+DEFAULT_BUSY_RETRY_AFTER_SECONDS = 30
+
+
+class MLServiceBusyError(RuntimeError):
+    def __init__(self, retry_after_seconds: int):
+        self.retry_after_seconds = retry_after_seconds
+
+        super().__init__(
+            "GPU inference capacity is currently full. "
+            "Please retry later."
+        )
+
+
+def _parse_retry_after_seconds(value: str | None) -> int:
+    if value is None:
+        return DEFAULT_BUSY_RETRY_AFTER_SECONDS
+
+    try:
+        return max(1, int(value))
+    except (TypeError, ValueError):
+        return DEFAULT_BUSY_RETRY_AFTER_SECONDS
 
 def get_ml_endpoint(model_type: ModelType) -> str:
     try:
@@ -108,6 +130,13 @@ def call_ml_service(
         print("Response preview:", response.text[:500])
         print("==============================================\n")
 
+        if response.status_code == 429:
+            raise MLServiceBusyError(
+                retry_after_seconds=_parse_retry_after_seconds(
+                    response.headers.get("Retry-After")
+                )
+            )
+
         response.raise_for_status()
 
     except requests.exceptions.ConnectionError as e:
@@ -117,7 +146,10 @@ def call_ml_service(
 
     except requests.exceptions.Timeout as e:
         raise RuntimeError(
-            f"ML service request timed out after 300 seconds: {url}"
+            "ML service request timed out "
+            f"(connect={settings.ml_connect_timeout_seconds}s, "
+            f"read={settings.ml_read_timeout_seconds}s): "
+            f"{url}"
         ) from e
 
     except requests.exceptions.HTTPError as e:

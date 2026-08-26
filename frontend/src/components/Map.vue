@@ -463,6 +463,8 @@ watch(() => mapStore.runTrigger, async () => {
     return
   }
 
+  if (!mapStore.bbox || mapStore.isPredicting) return
+
   mapStore.isPredicting = true
 
   try {
@@ -514,18 +516,50 @@ watch(() => mapStore.runTrigger, async () => {
     console.log('Prediction request sent:', requestBody)
 
     // prediction result
-    const result = await response.json()
-    console.log('Prediction result recieved:', result)
+    let result = null
+
+    try {
+      result = await response.json()
+    } catch {
+      // Nginx or another upstream service might return an HTML error page.
+    }
 
     if (!response.ok) {
-      mapStore.setError(
-        getApiErrorMessage(
-          result,
-          'Prediction failed.',
-        ),
-      )
+      if (response.status === 429) {
+        const retryAfter = Number.parseInt(
+          response.headers.get('Retry-After') ?? '',
+          10,
+        )
 
-      console.error('Prediction failed:', result.detail)
+        const message = Number.isFinite(retryAfter)
+          ? `Another prediction is already running. Please try again in about ${retryAfter} seconds.`
+          : 'Another prediction is already running. Please try again shortly.'
+
+        mapStore.setError(message, {
+          title: 'GPU is busy',
+          kind: 'warning',
+        })
+      } else if (response.status === 503) {
+        mapStore.setError(
+          'The prediction service is temporarily unavailable.'
+        )
+      } else if (response.status === 504) {
+        mapStore.setError(
+          'The prediction service took too long to respond.'
+        )
+      } else {
+        mapStore.setError(
+          typeof result?.detail === 'string'
+            ? result.detail
+            : 'Prediction failed.'
+        )
+      }
+
+      console.error(
+        'Prediction failed:',
+        response.status,
+        result?.detail,
+      )
       return
     }
 
