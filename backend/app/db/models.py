@@ -10,7 +10,7 @@ class SegmentationQuery(SQLModel, table=True):
     __tablename__ = "segmentation_queries"
 
     __table_args__ = (
-        Index("idx_segmentation_queries_created_at", "created_at"),
+        Index("idx_created_at", "created_at"),
     )
 
     id: UUID = Field(

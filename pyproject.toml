@@ -111,6 +111,7 @@ dependencies = [
     "deepforest>=2.1.0",
     "satlaspretrain-models==0.3.1",
     "segmentation-models-pytorch>=0.5.0",
+    "alembic>=1.19,<2",
 ]
 
 [project.scripts]
