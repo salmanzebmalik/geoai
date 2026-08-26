@@ -118,6 +118,20 @@ class Settings:
     )
 
     # -----------------------------
+    # Prediction concurrency
+    # -----------------------------
+    max_concurrent_predictions: int = int(
+        os.getenv("MAX_CONCURRENT_PREDICTIONS", "1")
+    )
+
+    prediction_busy_retry_after_seconds: int = int(
+        os.getenv(
+            "PREDICTION_BUSY_RETRY_AFTER_SECONDS",
+            "30",
+        )
+    )
+
+    # -----------------------------
     # Database
     # -----------------------------
     database_echo: bool = os.getenv("DATABASE_ECHO", "false").lower() == "true"

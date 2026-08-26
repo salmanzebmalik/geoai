@@ -7,6 +7,7 @@ from sqlmodel import Session
 from app.db.database import get_session
 from app.db.models import SegmentationQuery
 from app.services.ml_service_client import MLServiceBusyError
+from app.dependencies import acquire_prediction_slot
 
 from app.schemas.segmentation import (
     ExportArtifact,
@@ -202,6 +203,9 @@ def fetch_image(
 @router.post("/predict", response_model=PredictionResponse)
 def predict_segmentation(
     request: PredictionRequest,
+    _prediction_slot: None = Depends(
+        acquire_prediction_slot
+    ),
     session: Session = Depends(get_session),
 ):
     """
@@ -323,11 +327,20 @@ def create_annotation_export_compatibility(
     return create_annotation_export(request, session)
 
 
-@router.post("/export/predict", response_model=PredictionExportResponse)
+@router.post(
+    "/export/predict",
+    response_model=PredictionExportResponse,
+)
 def predict_and_export_annotations(
     request: PredictionExportRequest,
+    _prediction_slot: None = Depends(
+        acquire_prediction_slot
+    ),
     session: Session = Depends(get_session),
 ):
+    """
+    Run segmentation prediction and export the results in one request.
+    """
     try:
         prediction = create_prediction(request=request, session=session)
         exported = create_export_for_query(
