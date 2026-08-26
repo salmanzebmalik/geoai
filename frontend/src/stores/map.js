@@ -33,6 +33,7 @@ export const useMapStore = defineStore('map', () => {
   // Prediction and export state
   const hasPrediction = ref(false)
   const viewedPrediction = ref(null)
+  const viewedQueryId = ref(null)
   const viewedPredictionMeta = ref(null)
   const currentQueryId = ref(null)
   const currentExport = ref(null)
@@ -80,16 +81,49 @@ export const useMapStore = defineStore('map', () => {
     exportDialogTrigger.value++
   }
 
-  function setViewedPrediction(geojson, queryId = null, meta = null) {
+  function setViewedPrediction(
+    geojson,
+    queryId = null,
+    meta = null,
+  ) {
     viewedPrediction.value = geojson
+    viewedQueryId.value = queryId
     viewedPredictionMeta.value = meta
-    if (queryId) currentQueryId.value = queryId
+
+    if (queryId) {
+      currentQueryId.value = queryId
+    }
   }
 
-  function setCurrentPrediction(queryId, geojson = null, meta = null) {
+  function setCurrentPrediction(
+    queryId,
+    geojson = null,
+    meta = null,
+  ) {
     currentQueryId.value = queryId
-    if (geojson) viewedPrediction.value = geojson
-    if (meta) viewedPredictionMeta.value = meta
+
+    if (geojson) {
+      viewedPrediction.value = geojson
+      viewedQueryId.value = queryId
+    }
+
+    if (meta) {
+      viewedPredictionMeta.value = meta
+    }
+  }
+
+  function clearPredictionForQuery(queryId) {
+    if (viewedQueryId.value === queryId) {
+      viewedPrediction.value = null
+      viewedQueryId.value = null
+      viewedPredictionMeta.value = null
+      hasPrediction.value = false
+    }
+
+    if (currentQueryId.value === queryId) {
+      currentQueryId.value = null
+      currentExport.value = null
+    }
   }
 
   function setCurrentExport(value) {
@@ -121,7 +155,7 @@ export const useMapStore = defineStore('map', () => {
     clearRasterEstimate,
     selectedTask, modelType, keyword, setModelType, setKeyword,
     sentinelDateFrom, sentinelDateTo, sentinelMaxCloudCover,
-    hasPrediction, viewedPrediction, viewedPredictionMeta,
+    hasPrediction, viewedPrediction, viewedPredictionMeta, viewedQueryId,
     currentQueryId, currentExport, isPredicting, isExporting,
     historyDrawerOpen, coordinateInputOpen,
     startDrawingTrigger, triggerDrawing,
@@ -129,7 +163,7 @@ export const useMapStore = defineStore('map', () => {
     manualBboxTrigger, triggerManualBboxUpdate,
     sentinelRefreshTrigger, triggerSentinelRefresh,
     exportDialogTrigger, openExportDialog,
-    setViewedPrediction, setCurrentPrediction, setCurrentExport,
+    setViewedPrediction, setCurrentPrediction, clearPredictionForQuery, setCurrentExport,
     errorMessage, setError, clearError, errorTitle, errorKind
   }
 })

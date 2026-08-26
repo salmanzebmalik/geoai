@@ -346,10 +346,17 @@ watch(() => mapStore.startDrawingTrigger, () => startDrawing())
 watch(() => mapStore.manualBboxTrigger, () => drawManualBbox())
 
 // History drawer click -> show past prediction's polygons
-watch(() => mapStore.viewedPrediction, (geojson) => {
-  if (!geojson) return
-  displayPrediction(geojson)
-})
+watch(
+  () => mapStore.viewedPrediction,
+  (geojson) => {
+    if (!geojson) {
+      predictionSource.clear()
+      return
+    }
+
+    displayPrediction(geojson)
+  },
+)
 
 // Nav bar changes bbox or mapType -> estimate raster size for the selected area
 watch(

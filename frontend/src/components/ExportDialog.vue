@@ -113,6 +113,17 @@ watch(() => mapStore.exportDialogTrigger, () => {
   loadHistory()
 })
 
+watch(
+  () => mapStore.currentQueryId,
+  (queryId) => {
+    if (queryId || !open.value) return
+
+    open.value = false
+    history.value = []
+    error.value = null
+  },
+)
+
 async function loadHistory() {
   if (!mapStore.currentQueryId) return
   try {

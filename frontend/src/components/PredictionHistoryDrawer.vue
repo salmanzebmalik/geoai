@@ -35,7 +35,10 @@
       <template v-for="item in history" :key="item.query_id">
         <v-list-item
           class="history-item"
-          :disabled="viewingId === item.query_id"
+          :disabled="
+            viewingId === item.query_id ||
+            deletingId === item.query_id
+          "
           @click="viewPrediction(item)"
         >
           <template #title>
@@ -67,6 +70,23 @@
               variant="text"
               size="small"
               @click.stop="exportPrediction(item)"
+            />
+            <v-btn
+              icon="mdi-delete-outline"
+              color="error"
+              variant="text"
+              size="small"
+              title="Delete prediction"
+              aria-label="Delete prediction"
+              :loading="deletingId === item.query_id"
+              :disabled="
+                Boolean(viewingId) ||
+                (
+                  Boolean(deletingId) &&
+                  deletingId !== item.query_id
+                )
+              "
+              @click.stop="openDeleteDialog(item)"
             />
           </template>
         </v-list-item>
@@ -103,6 +123,77 @@
       </template>
     </v-list>
   </v-navigation-drawer>
+  <v-dialog
+    v-model="deleteDialogOpen"
+    max-width="440"
+    persistent
+  >
+    <v-card>
+      <v-card-title>
+        Delete prediction?
+      </v-card-title>
+
+      <v-card-text>
+        <p>
+          This permanently deletes the prediction record and
+          all associated TIFF, GeoJSON and export files.
+          This action cannot be undone.
+        </p>
+
+        <div
+          v-if="pendingDelete"
+          class="delete-summary"
+        >
+          <strong>{{ formatLabel(pendingDelete) }}</strong>
+          <span>
+            {{ formatDate(pendingDelete.created_at) }}
+          </span>
+          <span class="delete-query-id">
+            {{ pendingDelete.query_id }}
+          </span>
+        </div>
+
+        <v-alert
+          v-if="deleteError"
+          type="error"
+          variant="tonal"
+          class="mt-4"
+        >
+          {{ deleteError }}
+        </v-alert>
+      </v-card-text>
+
+      <v-card-actions>
+        <v-spacer />
+
+        <v-btn
+          variant="text"
+          :disabled="Boolean(deletingId)"
+          @click="closeDeleteDialog"
+        >
+          Cancel
+        </v-btn>
+
+        <v-btn
+          color="error"
+          variant="flat"
+          prepend-icon="mdi-delete"
+          :loading="Boolean(deletingId)"
+          @click="confirmDelete"
+        >
+          Delete permanently
+        </v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+
+  <v-snackbar
+    v-model="deleteSnackbarVisible"
+    color="success"
+    :timeout="3000"
+  >
+    {{ deleteSnackbarMessage }}
+  </v-snackbar>
 </template>
 
 <script setup>
@@ -120,7 +211,12 @@ const loading = ref(false)
 const error = ref(null)
 const viewingId = ref(null)
 const expandedId = ref(null)
-
+const deleteDialogOpen = ref(false)
+const pendingDelete = ref(null)
+const deletingId = ref(null)
+const deleteError = ref(null)
+const deleteSnackbarVisible = ref(false)
+const deleteSnackbarMessage = ref('')
 
 function toggleDrawer() {
   mapStore.historyDrawerOpen = !mapStore.historyDrawerOpen
@@ -268,6 +364,112 @@ async function viewPrediction(item) {
   }
 }
 
+function openDeleteDialog(item) {
+  if (deletingId.value) return
+
+  pendingDelete.value = item
+  deleteError.value = null
+  deleteDialogOpen.value = true
+}
+
+function closeDeleteDialog() {
+  if (deletingId.value) return
+
+  deleteDialogOpen.value = false
+  pendingDelete.value = null
+  deleteError.value = null
+}
+
+async function readErrorDetail(response) {
+  try {
+    const body = await response.json()
+
+    return typeof body.detail === 'string'
+      ? body.detail
+      : null
+  } catch {
+    return null
+  }
+}
+
+function applyDeletedPrediction(queryId) {
+  history.value = history.value.filter(
+    (item) => item.query_id !== queryId,
+  )
+
+  if (expandedId.value === queryId) {
+    expandedId.value = null
+  }
+
+  mapStore.clearPredictionForQuery(queryId)
+}
+
+async function confirmDelete() {
+  if (!pendingDelete.value || deletingId.value) {
+    return
+  }
+
+  const queryId = pendingDelete.value.query_id
+
+  deletingId.value = queryId
+  deleteError.value = null
+
+  try {
+    let response
+
+    try {
+      response = await fetch(
+        `${API_BASE_URL}/results/${queryId}`,
+        {
+          method: 'DELETE',
+        },
+      )
+    } catch {
+      throw new Error(
+        'The server could not be reached. ' +
+        'Please check your connection and try again.',
+      )
+    }
+
+    const alreadyDeleted = response.status === 404
+
+    if (!response.ok && !alreadyDeleted) {
+      const detail = await readErrorDetail(response)
+
+      if (response.status === 409) {
+        throw new Error(
+          detail ||
+          'This prediction is still being processed.',
+        )
+      }
+
+      throw new Error(
+        detail ||
+        'The prediction could not be deleted. ' +
+        'Please try again.',
+      )
+    }
+
+    applyDeletedPrediction(queryId)
+
+    deleteDialogOpen.value = false
+    pendingDelete.value = null
+
+    deleteSnackbarMessage.value = alreadyDeleted
+      ? 'Prediction was already deleted.'
+      : 'Prediction deleted.'
+
+    deleteSnackbarVisible.value = true
+  } catch (err) {
+    deleteError.value =
+      err instanceof Error
+        ? err.message
+        : 'The prediction could not be deleted.'
+  } finally {
+    deletingId.value = null
+  }
+}
+
 // Format task label
 function formatLabel(item) {
   if (!item.prediction_type) return 'Prediction'
@@ -375,4 +577,22 @@ function formatDate(isoString) {
   align-items: flex-end;
   gap: 2px;
 }
+
+.delete-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 16px;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.04);
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.delete-query-id {
+  color: rgba(0, 0, 0, 0.6);
+  font-family: monospace;
+  overflow-wrap: anywhere;
+}
+
 </style>
