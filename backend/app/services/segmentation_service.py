@@ -1,12 +1,15 @@
 import json
 import os
 from pathlib import Path
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from requests import session
 from app.core.config import settings
 from app.utils.raster_budget import validate_raster_budget
 from sqlmodel import Session, select
+
+import logging
+import shutil
 
 from app.db.models import (
     PredictionStatus,
@@ -34,6 +37,22 @@ from datetime import datetime
 # Geodesic area on the WGS84 ellipsoid, used to re-measure trimmed polygons.
 _GEOD = Geod(ellps="WGS84")
 
+logger = logging.getLogger(__name__)
+
+class PredictionDeletionError(RuntimeError):
+    """Prediction could not be deleted safely."""
+
+
+class PredictionNotDeletableError(PredictionDeletionError):
+    """Prediction exists but is still active."""
+
+
+DELETABLE_PREDICTION_STATUSES = frozenset(
+    {
+        "completed",
+        "failed",
+    }
+)
 
 def validate_bbox(bbox: BoundingBox) -> None:
     if bbox.max_lat <= bbox.min_lat:
@@ -460,6 +479,119 @@ def create_prediction(
             f"Prediction failed: {error}"
         ) from error
 
+def delete_prediction(
+    query_id: UUID,
+    session: Session,
+) -> bool:
+    """
+    Permanently delete a prediction and its complete storage directory.
+
+    Returns False when the database record does not exist.
+    Only completed and failed predictions may be deleted.
+    """
+
+    db_query = session.get(SegmentationQuery, query_id)
+
+    if db_query is None:
+        return False
+
+    if db_query.status not in DELETABLE_PREDICTION_STATUSES:
+        raise PredictionNotDeletableError(
+            "This prediction is still being processed and cannot be deleted."
+        )
+
+    queries_root = (
+        settings.shared_storage_path / "queries"
+    ).resolve()
+
+    query_candidate = queries_root / str(query_id)
+
+    if query_candidate.is_symlink():
+        raise PredictionDeletionError(
+            "Prediction storage path is not safe to delete."
+        )
+
+    query_directory = query_candidate.resolve()
+
+    try:
+        query_directory.relative_to(queries_root)
+    except ValueError as error:
+        raise PredictionDeletionError(
+            "Prediction storage path is outside shared storage."
+        ) from error
+
+    quarantined_directory: Path | None = None
+
+    if query_directory.exists():
+        if not query_directory.is_dir():
+            raise PredictionDeletionError(
+                "Prediction storage path is not a directory."
+            )
+
+        trash_root = queries_root / ".trash"
+        trash_root.mkdir(parents=True, exist_ok=True)
+
+        quarantined_directory = (
+            trash_root / f"{query_id}-{uuid4()}"
+        )
+
+        try:
+            os.replace(
+                query_directory,
+                quarantined_directory,
+            )
+        except OSError as error:
+            raise PredictionDeletionError(
+                "Prediction files could not be prepared for deletion."
+            ) from error
+
+    try:
+        session.delete(db_query)
+        session.commit()
+
+    except Exception as database_error:
+        session.rollback()
+
+        if (
+            quarantined_directory is not None
+            and quarantined_directory.exists()
+        ):
+            try:
+                os.replace(
+                    quarantined_directory,
+                    query_directory,
+                )
+            except OSError as restore_error:
+                logger.exception(
+                    "Database deletion failed and files could not be restored "
+                    "for prediction %s",
+                    query_id,
+                )
+                raise PredictionDeletionError(
+                    "Database deletion failed and prediction files "
+                    "could not be restored."
+                ) from restore_error
+
+        raise PredictionDeletionError(
+            "Prediction could not be deleted from the database."
+        ) from database_error
+
+    if (
+        quarantined_directory is not None
+        and quarantined_directory.exists()
+    ):
+        try:
+            shutil.rmtree(quarantined_directory)
+        except OSError:
+            # The prediction is no longer visible, but an administrator should
+            # remove the quarantined directory later.
+            logger.exception(
+                "Prediction %s was deleted from the database, but its "
+                "quarantined files could not be removed.",
+                query_id,
+            )
+
+    return True
 
 def get_prediction_history(
     session: Session,

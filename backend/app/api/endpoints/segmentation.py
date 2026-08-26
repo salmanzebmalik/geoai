@@ -1,6 +1,13 @@
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    Query,
+    Response,
+    status,
+)
 from fastapi.responses import FileResponse, JSONResponse
 from sqlmodel import Session
 
@@ -30,13 +37,18 @@ from app.services.annotation_export_service import (
     list_exports,
 )
 from app.services.satellite_image_service import fetch_satellite_image_from_titiler
+
 from app.services.segmentation_service import (
     create_prediction,
     get_prediction_by_id,
     get_prediction_geojson_source,
     get_prediction_history,
     validate_bbox,
+    PredictionDeletionError,
+    PredictionNotDeletableError,
+    delete_prediction,
 )
+
 from app.utils.raster_budget import validate_raster_budget
 from app.core.config import settings
 from app.utils.raster_budget import (
@@ -263,6 +275,45 @@ def get_result_by_id(
 
     return result
 
+@router.delete(
+    "/results/{query_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_result_by_id(
+    query_id: UUID,
+    session: Session = Depends(get_session),
+) -> Response:
+    try:
+        deleted = delete_prediction(
+            query_id=query_id,
+            session=session,
+        )
+
+    except PredictionNotDeletableError as error:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(error),
+        ) from error
+
+    except PredictionDeletionError as error:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "The prediction could not be deleted safely. "
+                "Please try again."
+            ),
+        ) from error
+
+    if not deleted:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Prediction not found.",
+        )
+
+    return Response(
+        status_code=status.HTTP_204_NO_CONTENT,
+    )
+    
 @router.get("/results/{query_id}/geojson")
 def get_result_geojson(
     query_id: UUID,
