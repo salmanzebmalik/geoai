@@ -8,7 +8,10 @@ from app.core.config import settings
 from app.utils.raster_budget import validate_raster_budget
 from sqlmodel import Session, select
 
-from app.db.models import SegmentationQuery
+from app.db.models import (
+    PredictionStatus,
+    SegmentationQuery,
+)
 from app.schemas.segmentation import (
     BoundingBox,
     ImageInfo,
@@ -26,6 +29,7 @@ from app.services.satellite_image_service import fetch_satellite_image_from_titi
 from pyproj import Geod
 from shapely.geometry import box as shp_box, mapping, shape
 from shapely.ops import unary_union
+from datetime import datetime
 
 # Geodesic area on the WGS84 ellipsoid, used to re-measure trimmed polygons.
 _GEOD = Geod(ellps="WGS84")
@@ -155,7 +159,7 @@ def run_prediction_models(
     # Trim predictions to the drawn AOI. tiTiler reprojects the crop to UTM, so it
     # comes back a few metres larger than the lon/lat box and the model can detect
     # features just past it; clip every polygon so nothing renders outside the box.
-    final["feature_count"] = clip_geojson_to_bbox(final["result_path"], request.bbox)
+    # final["feature_count"] = clip_geojson_to_bbox(final["result_path"], request.bbox)
     return final
 
 
@@ -239,12 +243,70 @@ def resolve_prediction_result_path(
 def mark_prediction_failed(
     db_query: SegmentationQuery,
     session: Session,
+    error: Exception,
 ) -> None:
-    db_query.status = "failed"
+    error_code = (
+        "ml_service_busy"
+        if isinstance(error, MLServiceBusyError)
+        else "prediction_failed"
+    )
+
     db_query.prediction_result = {}
+
+    update_prediction_status(
+        db_query,
+        session,
+        status=PredictionStatus.FAILED,
+        progress_percent=db_query.progress_percent,
+        status_message="Prediction failed",
+        error_code=error_code,
+        error_message=str(error),
+    )
+
+def update_prediction_status(
+    db_query: SegmentationQuery,
+    session: Session,
+    *,
+    status: PredictionStatus,
+    progress_percent: int,
+    status_message: str,
+    error_code: str | None = None,
+    error_message: str | None = None,
+) -> None:
+    if not 0 <= progress_percent <= 100:
+        raise ValueError(
+            "progress_percent must be between 0 and 100"
+        )
+
+    now = datetime.utcnow()
+
+    db_query.status = status.value
+    db_query.progress_percent = progress_percent
+    db_query.status_message = status_message
+    db_query.error_code = error_code
+    db_query.error_message = (
+        error_message[:2000]
+        if error_message
+        else None
+    )
+    db_query.updated_at = now
+
+    if (
+        db_query.started_at is None
+        and status != PredictionStatus.QUEUED
+    ):
+        db_query.started_at = now
+
+    if status in {
+        PredictionStatus.COMPLETED,
+        PredictionStatus.FAILED,
+        PredictionStatus.CANCELLED,
+    }:
+        db_query.completed_at = now
 
     session.add(db_query)
     session.commit()
+    session.refresh(db_query)
     
 def create_prediction(
     request: PredictionRequest,
@@ -280,12 +342,19 @@ def create_prediction(
     print("Estimated megapixels:", round(raster_estimate.megapixels, 2))
     print("Projected CRS:", raster_estimate.projected_crs)
     print("===================================\n")
+    now = datetime.utcnow()
+
     db_query = SegmentationQuery(
         min_lat=request.bbox.min_lat,
         max_lat=request.bbox.max_lat,
         min_lon=request.bbox.min_lon,
         max_lon=request.bbox.max_lon,
-        status="processing",
+        status=PredictionStatus.PREPARING.value,
+        request_payload=request.model_dump(mode="json"),
+        progress_percent=10,
+        status_message="Preparing imagery",
+        started_at=now,
+        updated_at=now,
         image_url=None,
         image_width=None,
         image_height=None,
@@ -305,10 +374,35 @@ def create_prediction(
             source_type=request.source_type,
         )
 
+        db_query.image_url = image_info.image_url
+        db_query.image_width = image_info.width
+        db_query.image_height = image_info.height
+
+        update_prediction_status(
+            db_query,
+            session,
+            status=PredictionStatus.INFERENCING,
+            progress_percent=45,
+            status_message="Running model inference",
+        )
+
         ml_result = run_prediction_models(
             query_id=query_id,
             image_path=image_path,
             request=request,
+        )
+
+        update_prediction_status(
+            db_query,
+            session,
+            status=PredictionStatus.POSTPROCESSING,
+            progress_percent=85,
+            status_message="Preparing prediction results",
+        )
+
+        ml_result["feature_count"] = clip_geojson_to_bbox(
+            ml_result["result_path"],
+            request.bbox,
         )
 
         resolve_prediction_result_path(
@@ -320,7 +414,13 @@ def create_prediction(
             ml_result=ml_result,
         )
 
-        db_query.status = "completed"
+        update_prediction_status(
+            db_query,
+            session,
+            status=PredictionStatus.COMPLETED,
+            progress_percent=100,
+            status_message="Prediction completed",
+        )
         db_query.image_url = image_info.image_url
         db_query.image_width = image_info.width
         db_query.image_height = image_info.height
@@ -341,13 +441,24 @@ def create_prediction(
             created_at=db_query.created_at,
         )
 
-    except MLServiceBusyError:
-        mark_prediction_failed(db_query, session)
+    except MLServiceBusyError as error:
+        mark_prediction_failed(
+            db_query,
+            session,
+            error,
+        )
         raise
 
-    except Exception as e:
-        mark_prediction_failed(db_query, session)
-        raise RuntimeError(f"Prediction failed: {str(e)}") from e
+    except Exception as error:
+        mark_prediction_failed(
+            db_query,
+            session,
+            error,
+        )
+
+        raise RuntimeError(
+            f"Prediction failed: {error}"
+        ) from error
 
 
 def get_prediction_history(
