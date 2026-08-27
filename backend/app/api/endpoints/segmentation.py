@@ -49,11 +49,13 @@ from app.services.segmentation_service import (
     delete_prediction,
 )
 
-from app.utils.raster_budget import validate_raster_budget
 from app.core.config import settings
 from app.utils.raster_budget import (
+    RasterBudgetExceededError,
     estimate_raster_size,
+    get_raster_budget,
     raster_fits_budget,
+    validate_raster_budget,
 )
 
 router = APIRouter()
@@ -155,17 +157,27 @@ def estimate_prediction_raster(
             source_type=request.source_type,
         )
 
+        budget = get_raster_budget(
+            source_type=request.source_type,
+            model_type=request.model_type,
+        )
+        
         return RasterEstimateResponse(
             source_type=request.source_type,
+            model_type=request.model_type,
             width_pixels=estimate.width_pixels,
             height_pixels=estimate.height_pixels,
             total_pixels=estimate.total_pixels,
             megapixels=round(estimate.megapixels, 2),
             resolution_meters=estimate.resolution_meters,
             projected_crs=estimate.projected_crs,
-            allowed=raster_fits_budget(estimate),
-            max_total_pixels=settings.max_input_raster_pixels,
-            max_side_pixels=settings.max_input_raster_side_pixels,
+            allowed=raster_fits_budget(
+                estimate,
+                source_type=request.source_type,
+                model_type=request.model_type,
+            ),
+            max_total_pixels=budget.max_total_pixels,
+            max_side_pixels=budget.max_side_pixels,
         )
 
     except ValueError as error:
@@ -189,7 +201,9 @@ def fetch_image(
         validate_raster_budget(
             bbox=request.bbox,
             source_type=request.source_type,
+            model_type=None,
         )
+        
         query_id = str(uuid4())
 
         image_path, image_info = fetch_satellite_image_from_titiler(
@@ -200,6 +214,11 @@ def fetch_image(
 
         return image_info
     
+    except RasterBudgetExceededError as error:
+        raise HTTPException(
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+            detail=str(error),
+        ) from error
     except ValueError as e:
         raise HTTPException(
             status_code=400,
@@ -237,12 +256,16 @@ def predict_segmentation(
     except MLServiceBusyError as error:
         raise build_ml_busy_http_exception(error) from error
 
+    except RasterBudgetExceededError as error:
+        raise HTTPException(
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+            detail=str(error),
+        ) from error
     except ValueError as e:
         raise HTTPException(
             status_code=400,
             detail=str(e),
         ) from e
-
     except Exception as e:
         raise HTTPException(
             status_code=500,

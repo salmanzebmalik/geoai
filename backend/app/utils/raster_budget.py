@@ -4,7 +4,11 @@ from math import ceil
 from pyproj import Transformer
 
 from app.core.config import settings
-from app.schemas.segmentation import BoundingBox, SourceType
+from app.schemas.segmentation import (
+    BoundingBox,
+    ModelType,
+    SourceType,
+)
 from app.utils.crs import best_crs_for_bbox
 
 
@@ -21,17 +25,97 @@ class RasterSizeEstimate:
         return self.total_pixels / 1_000_000
 
 
-def get_source_resolution(source_type: SourceType) -> float:
-    if source_type == "ortho":
-        resolution = settings.ortho_resolution_meters_per_pixel
-    elif source_type == "satellite":
-        resolution = settings.satellite_resolution_meters_per_pixel
+@dataclass(frozen=True)
+class RasterBudget:
+    max_total_pixels: int
+    max_side_pixels: int
+
+
+class RasterBudgetExceededError(ValueError):
+    """Estimated raster exceeds its configured synchronous budget."""
+
+    def __init__(
+        self,
+        estimate: RasterSizeEstimate,
+        budget: RasterBudget,
+    ) -> None:
+        self.estimate = estimate
+        self.budget = budget
+
+        super().__init__(
+            "Requested area is too large for the selected "
+            "imagery and model combination. Estimated raster: "
+            f"{estimate.width_pixels:,} × "
+            f"{estimate.height_pixels:,} pixels "
+            f"({estimate.megapixels:.1f} MP). Current limits: "
+            f"{budget.max_total_pixels / 1_000_000:.1f} MP "
+            f"total and {budget.max_side_pixels:,} pixels "
+            "per side. Please select a smaller area."
+        )
+
+
+def get_raster_budget(
+    source_type: SourceType | None = None,
+    model_type: ModelType | None = None,
+) -> RasterBudget:
+    """
+    Return the tested budget for a model/source combination.
+
+    Untested or unspecified combinations use the conservative
+    general fallback.
+    """
+
+    if source_type == "ortho" and model_type == "tree":
+        max_total_pixels = (
+            settings.max_ortho_tree_raster_pixels
+        )
+        max_side_pixels = (
+            settings.max_ortho_tree_raster_side_pixels
+        )
     else:
-        raise ValueError(f"Unsupported source_type: {source_type}")
+        max_total_pixels = settings.max_input_raster_pixels
+        max_side_pixels = (
+            settings.max_input_raster_side_pixels
+        )
+
+    if max_total_pixels <= 0:
+        raise RuntimeError(
+            "Configured maximum raster pixels must be "
+            "greater than zero"
+        )
+
+    if max_side_pixels <= 0:
+        raise RuntimeError(
+            "Configured maximum raster side must be "
+            "greater than zero"
+        )
+
+    return RasterBudget(
+        max_total_pixels=max_total_pixels,
+        max_side_pixels=max_side_pixels,
+    )
+
+
+def get_source_resolution(
+    source_type: SourceType,
+) -> float:
+    if source_type == "ortho":
+        resolution = (
+            settings.ortho_resolution_meters_per_pixel
+        )
+    elif source_type == "satellite":
+        resolution = (
+            settings.satellite_resolution_meters_per_pixel
+        )
+    else:
+        raise ValueError(
+            f"Unsupported source_type: {source_type}"
+        )
 
     if resolution <= 0:
         raise RuntimeError(
-            f"Resolution for source '{source_type}' must be greater than zero"
+            f"Resolution for source '{source_type}' "
+            "must be greater than zero"
         )
 
     return resolution
@@ -46,7 +130,9 @@ def estimate_raster_size(
     resolution = get_source_resolution(source_type)
 
     if settings.raster_estimate_margin < 1:
-        raise RuntimeError("RASTER_ESTIMATE_MARGIN must be at least 1.0")
+        raise RuntimeError(
+            "RASTER_ESTIMATE_MARGIN must be at least 1.0"
+        )
 
     projected_crs = best_crs_for_bbox(
         min_lon=bbox.min_lon,
@@ -79,8 +165,12 @@ def estimate_raster_size(
         latitudes,
     )
 
-    width_meters = max(x_coordinates) - min(x_coordinates)
-    height_meters = max(y_coordinates) - min(y_coordinates)
+    width_meters = (
+        max(x_coordinates) - min(x_coordinates)
+    )
+    height_meters = (
+        max(y_coordinates) - min(y_coordinates)
+    )
 
     margin = settings.raster_estimate_margin
 
@@ -101,62 +191,55 @@ def estimate_raster_size(
         projected_crs=projected_crs,
     )
 
+
 def raster_fits_budget(
     estimate: RasterSizeEstimate,
+    *,
+    source_type: SourceType | None = None,
+    model_type: ModelType | None = None,
 ) -> bool:
-    """Return whether an estimate fits all configured raster limits."""
+    """Return whether an estimate fits its configured budget."""
 
-    within_total_limit = (
-        estimate.total_pixels
-        <= settings.max_input_raster_pixels
-    )
-
-    within_width_limit = (
-        estimate.width_pixels
-        <= settings.max_input_raster_side_pixels
-    )
-
-    within_height_limit = (
-        estimate.height_pixels
-        <= settings.max_input_raster_side_pixels
+    budget = get_raster_budget(
+        source_type=source_type,
+        model_type=model_type,
     )
 
     return (
-        within_total_limit
-        and within_width_limit
-        and within_height_limit
+        estimate.total_pixels
+        <= budget.max_total_pixels
+        and estimate.width_pixels
+        <= budget.max_side_pixels
+        and estimate.height_pixels
+        <= budget.max_side_pixels
     )
+
 
 def validate_raster_budget(
     bbox: BoundingBox,
     source_type: SourceType,
+    model_type: ModelType | None = None,
 ) -> RasterSizeEstimate:
-    """Reject raster requests that exceed the configured safety limits."""
-
-    if settings.max_input_raster_pixels <= 0:
-        raise RuntimeError(
-            "MAX_INPUT_RASTER_PIXELS must be greater than zero"
-        )
-
-    if settings.max_input_raster_side_pixels <= 0:
-        raise RuntimeError(
-            "MAX_INPUT_RASTER_SIDE_PIXELS must be greater than zero"
-        )
+    """Reject requests exceeding their synchronous budget."""
 
     estimate = estimate_raster_size(
         bbox=bbox,
         source_type=source_type,
     )
 
-    if not raster_fits_budget(estimate):
-        raise ValueError(
-            "Requested area is too large for the current synchronous "
-            f"prediction pipeline. Estimated raster: "
-            f"{estimate.width_pixels:,} × {estimate.height_pixels:,} "
-            f"pixels ({estimate.megapixels:.1f} MP). Current limits: "
-            f"{settings.max_input_raster_pixels / 1_000_000:.1f} MP total "
-            f"and {settings.max_input_raster_side_pixels:,} pixels per side. "
-            "Please select a smaller area."
+    budget = get_raster_budget(
+        source_type=source_type,
+        model_type=model_type,
+    )
+
+    if not raster_fits_budget(
+        estimate,
+        source_type=source_type,
+        model_type=model_type,
+    ):
+        raise RasterBudgetExceededError(
+            estimate=estimate,
+            budget=budget,
         )
 
     return estimate

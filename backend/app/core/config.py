@@ -96,6 +96,21 @@ class Settings:
         os.getenv("MAX_INPUT_RASTER_SIDE_PIXELS", "8000")
     )
     
+    # Tested specifically with: source_type="ortho", model_type="tree"
+    max_ortho_tree_raster_pixels: int = int(
+        os.getenv(
+            "MAX_ORTHO_TREE_RASTER_PIXELS",
+            "210000000",
+        )
+    )
+
+    max_ortho_tree_raster_side_pixels: int = int(
+        os.getenv(
+            "MAX_ORTHO_TREE_RASTER_SIDE_PIXELS",
+            "18000",
+        )
+    )
+    
     # -----------------------------
     # Shared storage
     # -----------------------------

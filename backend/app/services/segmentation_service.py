@@ -348,6 +348,7 @@ def create_prediction(
     raster_estimate = validate_raster_budget(
         bbox=request.bbox,
         source_type=request.source_type,
+        model_type=request.model_type,
     )
 
     print("\n========== Raster Budget ==========")

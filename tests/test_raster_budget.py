@@ -4,9 +4,11 @@ from unittest.mock import patch
 from app.core.config import settings
 from app.schemas.segmentation import BoundingBox
 from app.utils.raster_budget import (
+    RasterBudgetExceededError,
+    RasterSizeEstimate,
     estimate_raster_size,
-    validate_raster_budget,
     raster_fits_budget,
+    validate_raster_budget,
 )
 
 class RasterBudgetTests(unittest.TestCase):
@@ -100,6 +102,90 @@ class RasterBudgetTests(unittest.TestCase):
     @patch.object(settings, "raster_estimate_margin", 1.1)
     @patch.object(settings, "max_input_raster_pixels", 25_000_000)
     @patch.object(settings, "max_input_raster_side_pixels", 8_000)
+    
+    @patch.object(
+        settings,
+        "max_ortho_tree_raster_pixels",
+        210_000_000,
+    )
+    @patch.object(
+        settings,
+        "max_ortho_tree_raster_side_pixels",
+        18_000,
+    )
+    def test_ortho_tree_uses_tested_large_budget(self):
+        estimate = RasterSizeEstimate(
+            width_pixels=17_557,
+            height_pixels=11_392,
+            total_pixels=200_009_344,
+            resolution_meters=0.1,
+            projected_crs="EPSG:32632",
+        )
+
+        self.assertTrue(
+            raster_fits_budget(
+                estimate,
+                source_type="ortho",
+                model_type="tree",
+            )
+        )
+
+
+    @patch.object(
+        settings,
+        "max_input_raster_pixels",
+        25_000_000,
+    )
+    @patch.object(
+        settings,
+        "max_input_raster_side_pixels",
+        8_000,
+    )
+    def test_untested_model_uses_conservative_budget(self):
+        estimate = RasterSizeEstimate(
+            width_pixels=9_000,
+            height_pixels=6_000,
+            total_pixels=54_000_000,
+            resolution_meters=0.1,
+            projected_crs="EPSG:32632",
+        )
+
+        self.assertFalse(
+            raster_fits_budget(
+                estimate,
+                source_type="ortho",
+                model_type="zeroshot",
+            )
+        )
+
+
+    @patch.object(
+        settings,
+        "max_ortho_tree_raster_pixels",
+        210_000_000,
+    )
+    @patch.object(
+        settings,
+        "max_ortho_tree_raster_side_pixels",
+        18_000,
+    )
+    def test_oversized_ortho_tree_raises_typed_error(self):
+        large_bbox = BoundingBox(
+            min_lon=7.54335,
+            min_lat=51.92410,
+            max_lon=7.70930,
+            max_lat=51.98949,
+        )
+
+        with self.assertRaises(
+            RasterBudgetExceededError
+        ):
+            validate_raster_budget(
+                bbox=large_bbox,
+                source_type="ortho",
+                model_type="tree",
+            )
+        
     def test_large_raster_does_not_fit_budget(self):
         large_bbox = BoundingBox(
             min_lon=7.60,

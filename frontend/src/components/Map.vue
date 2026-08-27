@@ -366,6 +366,7 @@ watch(
     () => mapStore.bbox?.max_lon,
     () => mapStore.bbox?.max_lat,
     () => mapStore.mapType,
+    () => mapStore.modelType,
   ],
   async () => {
     mapStore.clearRasterEstimate()
@@ -397,6 +398,7 @@ watch(
           body: JSON.stringify({
             bbox,
             source_type: sourceType,
+            model_type: mapStore.modelType || 'tree',
           }),
         },
       )

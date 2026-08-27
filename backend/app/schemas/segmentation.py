@@ -96,10 +96,32 @@ class FetchImageRequest(BaseModel):
 class RasterEstimateRequest(BaseModel):
     bbox: BoundingBox
     source_type: SourceType = "satellite"
+    model_type: Optional[ModelType] = None
+
+    @model_validator(mode="after")
+    def validate_model_source(
+        self,
+    ) -> "RasterEstimateRequest":
+        if self.model_type is None:
+            return self
+
+        allowed_models = MODELS_BY_SOURCE[self.source_type]
+
+        if self.model_type not in allowed_models:
+            allowed_text = ", ".join(allowed_models)
+
+            raise ValueError(
+                f"Model '{self.model_type}' is not compatible "
+                f"with source '{self.source_type}'. Allowed "
+                f"models: {allowed_text}"
+            )
+
+        return self
 
 
 class RasterEstimateResponse(BaseModel):
     source_type: SourceType
+    model_type: Optional[ModelType] = None
     width_pixels: int
     height_pixels: int
     total_pixels: int
