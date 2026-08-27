@@ -3,7 +3,9 @@ import unittest
 from pydantic import ValidationError
 
 from app.schemas.segmentation import PredictionRequest
-
+from app.services.satellite_image_service import (
+    TiTilerTimeoutError,
+)
 
 BBOX = {
     "min_lon": 7.61,

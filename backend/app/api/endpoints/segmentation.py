@@ -36,7 +36,13 @@ from app.services.annotation_export_service import (
     get_export_artifact,
     list_exports,
 )
-from app.services.satellite_image_service import fetch_satellite_image_from_titiler
+from app.services.satellite_image_service import (
+    TiTilerError,
+    TiTilerResponseError,
+    TiTilerTimeoutError,
+    TiTilerUnavailableError,
+    fetch_satellite_image_from_titiler,
+)
 
 from app.services.segmentation_service import (
     create_prediction,
@@ -57,7 +63,10 @@ from app.utils.raster_budget import (
     raster_fits_budget,
     validate_raster_budget,
 )
+import logging
 
+
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 def build_ml_busy_http_exception(
@@ -74,6 +83,35 @@ def build_ml_busy_http_exception(
         headers={
             "Retry-After": str(retry_after),
         },
+    )
+
+def build_titiler_http_exception(
+    error: TiTilerError,
+) -> HTTPException:
+    if isinstance(error, TiTilerTimeoutError):
+        return HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            detail=str(error),
+        )
+
+    if isinstance(error, TiTilerUnavailableError):
+        return HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(error),
+        )
+
+    if isinstance(error, TiTilerResponseError):
+        return HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(error),
+        )
+
+    return HTTPException(
+        status_code=status.HTTP_502_BAD_GATEWAY,
+        detail=(
+            "Imagery service failed unexpectedly. "
+            "Please try again later."
+        ),
     )
     
 def build_export_response(manifest: dict) -> ExportResponse:
@@ -224,12 +262,21 @@ def fetch_image(
             status_code=400,
             detail=str(e),
         ) from e
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to fetch satellite image: {str(e)}",
+    except TiTilerError as error:
+            raise build_titiler_http_exception(error) from error
+    except Exception as error:
+        logger.exception(
+            "Unexpected imagery-fetch failure"
         )
 
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Imagery preparation failed unexpectedly. "
+                "Please try again."
+            ),
+        ) from error
+    
 
 @router.post("/predict", response_model=PredictionResponse)
 def predict_segmentation(
@@ -266,12 +313,21 @@ def predict_segmentation(
             status_code=400,
             detail=str(e),
         ) from e
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Prediction failed: {str(e)}",
-        ) from e
+    except TiTilerError as error:
+            raise build_titiler_http_exception(error) from error
+    except Exception as error:
+        logger.exception(
+            "Unexpected prediction failure"
+        )
 
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Prediction failed unexpectedly. "
+                "Please try again."
+            ),
+        ) from error
+    
 
 @router.get("/results", response_model=list[PredictionHistoryItem])
 def get_all_results(

@@ -12,7 +12,42 @@ from app.schemas.segmentation import BoundingBox, ImageInfo, SourceType
 from app.utils.crs import best_crs_for_bbox
 from app.utils.http import get_http_session
 from uuid import uuid4
+import logging
 
+logger = logging.getLogger(__name__)
+
+class TiTilerError(RuntimeError):
+    """Base error for safe TiTiler failures."""
+
+
+class TiTilerUnavailableError(TiTilerError):
+    def __init__(self) -> None:
+        super().__init__(
+            "Imagery service is temporarily unavailable. "
+            "Please try again later."
+        )
+
+
+class TiTilerTimeoutError(TiTilerError):
+    def __init__(self) -> None:
+        super().__init__(
+            "Imagery preparation timed out. "
+            "Please select a smaller area and try again."
+        )
+
+
+class TiTilerResponseError(TiTilerError):
+    def __init__(
+        self,
+        status_code: int | None = None,
+    ) -> None:
+        self.status_code = status_code
+
+        super().__init__(
+            "Imagery service returned an invalid response. "
+            "Please try again later."
+        )
+        
 TITILER_DOWNLOAD_CHUNK_SIZE_BYTES = 1024 * 1024
 
 def get_shared_storage_dir() -> Path:
@@ -230,47 +265,50 @@ def fetch_satellite_image_from_titiler(
 
             print("Downloaded tiTiler bytes:", bytes_written)
 
-        except requests.exceptions.ConnectionError as e:
-            raise RuntimeError(
-                f"Could not connect to tiTiler at "
-                f"{settings.titiler_base_url}: {e}"
-            ) from e
-
-        except requests.exceptions.Timeout as e:
-            raise RuntimeError(
-                "tiTiler request timed out "
-                f"(connect={settings.titiler_connect_timeout_seconds}s, "
-                f"read={settings.titiler_read_timeout_seconds}s): "
-                f"{request_url}"
-            ) from e
-
-        except requests.exceptions.HTTPError as e:
-            status_code = (
-                e.response.status_code
-                if e.response is not None
-                else "unknown"
-            )
-            response_preview = (
-                e.response.text[:1000]
-                if e.response is not None
-                else str(e)
+        except requests.exceptions.ConnectionError as error:
+            logger.warning(
+                "Could not connect to TiTiler for query %s",
+                query_id,
+                exc_info=True,
             )
 
-            raise RuntimeError(
-                f"tiTiler returned HTTP {status_code}: "
-                f"{response_preview}"
-            ) from e
+            raise TiTilerUnavailableError() from error
 
-        except requests.exceptions.RequestException as e:
-            raise RuntimeError(
-                f"Failed while downloading the crop from tiTiler: {e}"
-            ) from e
+        except requests.exceptions.Timeout as error:
+            logger.warning(
+                "TiTiler timed out for query %s",
+                query_id,
+                exc_info=True,
+            )
 
-        except OSError as e:
-            raise RuntimeError(
-                f"Failed to stream the tiTiler crop to "
-                f"{download_path}: {e}"
-            ) from e
+            raise TiTilerTimeoutError() from error
+
+        except requests.exceptions.HTTPError as error:
+            upstream_status = (
+                error.response.status_code
+                if error.response is not None
+                else None
+            )
+
+            logger.warning(
+                "TiTiler returned HTTP %s for query %s",
+                upstream_status,
+                query_id,
+                exc_info=True,
+            )
+
+            raise TiTilerResponseError(
+                status_code=upstream_status,
+            ) from error
+
+        except requests.exceptions.RequestException as error:
+            logger.warning(
+                "TiTiler request failed for query %s",
+                query_id,
+                exc_info=True,
+            )
+
+            raise TiTilerUnavailableError() from error
 
         finally:
             if response is not None:

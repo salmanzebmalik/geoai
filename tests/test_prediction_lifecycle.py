@@ -8,7 +8,8 @@ from app.db.models import (
 from app.services.segmentation_service import (
     mark_prediction_failed,
     update_prediction_status,
-)
+    TiTilerTimeoutError,
+)    
 
 
 def build_query() -> SegmentationQuery:
@@ -106,6 +107,26 @@ class PredictionLifecycleTests(unittest.TestCase):
             )
 
         session.commit.assert_not_called()
+    
+    def test_titiler_timeout_records_specific_code(self):
+        query = build_query()
+        session = MagicMock()
+
+        mark_prediction_failed(
+            query,
+            session,
+            TiTilerTimeoutError(),
+        )
+
+        self.assertEqual(query.status, "failed")
+        self.assertEqual(
+            query.error_code,
+            "titiler_timeout",
+        )
+        self.assertNotIn(
+            "127.0.0.1",
+            query.error_message,
+        )
 
 
 if __name__ == "__main__":

@@ -27,8 +27,12 @@ from app.services.ml_service_client import (
     MLServiceBusyError,
     call_ml_service,
 )
-from app.services.satellite_image_service import fetch_satellite_image_from_titiler
-
+from app.services.satellite_image_service import (
+    TiTilerResponseError,
+    TiTilerTimeoutError,
+    TiTilerUnavailableError,
+    fetch_satellite_image_from_titiler,
+)
 from pyproj import Geod
 from shapely.geometry import box as shp_box, mapping, shape
 from shapely.ops import unary_union
@@ -264,11 +268,16 @@ def mark_prediction_failed(
     session: Session,
     error: Exception,
 ) -> None:
-    error_code = (
-        "ml_service_busy"
-        if isinstance(error, MLServiceBusyError)
-        else "prediction_failed"
-    )
+    if isinstance(error, MLServiceBusyError):
+        error_code = "ml_service_busy"
+    elif isinstance(error, TiTilerTimeoutError):
+        error_code = "titiler_timeout"
+    elif isinstance(error, TiTilerUnavailableError):
+        error_code = "titiler_unavailable"
+    elif isinstance(error, TiTilerResponseError):
+        error_code = "titiler_bad_response"
+    else:
+        error_code = "prediction_failed"
 
     db_query.prediction_result = {}
 
@@ -475,10 +484,7 @@ def create_prediction(
             session,
             error,
         )
-
-        raise RuntimeError(
-            f"Prediction failed: {error}"
-        ) from error
+        raise
 
 def delete_prediction(
     query_id: UUID,
