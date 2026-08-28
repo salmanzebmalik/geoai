@@ -1,11 +1,9 @@
 from pathlib import Path
 from typing import Literal, Optional
-from urllib import response
-
 import requests
-
 from app.core.config import settings
 from app.utils.http import get_http_session
+import logging
 
 ModelType = Literal["tree", "tree_satlas", "tree_unet", "tree_deepforest", "zeroshot"]
 
@@ -19,8 +17,41 @@ ML_ENDPOINTS = {
 
 DEFAULT_BUSY_RETRY_AFTER_SECONDS = 30
 
+logger = logging.getLogger(__name__)
 
-class MLServiceBusyError(RuntimeError):
+
+class MLServiceError(RuntimeError):
+    """Base class for safe ML-service failures."""
+
+
+class MLServiceUnavailableError(MLServiceError):
+    def __init__(self):
+        super().__init__(
+            "The prediction service is temporarily unavailable. "
+            "Please try again."
+        )
+
+
+class MLServiceTimeoutError(MLServiceError):
+    def __init__(self):
+        super().__init__(
+            "Model inference timed out. Please try a smaller area."
+        )
+
+
+class MLServiceResponseError(MLServiceError):
+    def __init__(
+        self,
+        status_code: int | None = None,
+    ):
+        self.status_code = status_code
+
+        super().__init__(
+            "The prediction service returned an invalid response. "
+            "Please try again."
+        )
+
+class MLServiceBusyError(MLServiceError):
     def __init__(self, retry_after_seconds: int):
         self.retry_after_seconds = retry_after_seconds
 
@@ -113,7 +144,6 @@ def call_ml_service(
     print("=============================================\n")
 
     try:
-        
         response = session.post(
             url,
             json=payload,
@@ -139,30 +169,88 @@ def call_ml_service(
 
         response.raise_for_status()
 
-    except requests.exceptions.ConnectionError as e:
-        raise RuntimeError(
-            f"Could not connect to ML service at {settings.ml_service_url}: {e}"
-        ) from e
+    except MLServiceBusyError:
+        raise
 
-    except requests.exceptions.Timeout as e:
-        raise RuntimeError(
-            "ML service request timed out "
-            f"(connect={settings.ml_connect_timeout_seconds}s, "
-            f"read={settings.ml_read_timeout_seconds}s): "
-            f"{url}"
-        ) from e
+    except requests.exceptions.Timeout as error:
+        logger.exception(
+            "ML service timed out for query %s using model %s",
+            query_id,
+            model_type,
+        )
 
-    except requests.exceptions.HTTPError as e:
-        raise RuntimeError(
-            f"ML service returned HTTP {response.status_code}: {response.text[:1000]}"
-        ) from e
+        raise MLServiceTimeoutError() from error
 
-    except requests.exceptions.RequestException as e:
-        raise RuntimeError(f"ML service request failed: {e}") from e
+    except requests.exceptions.ConnectionError as error:
+        logger.exception(
+            "ML service connection failed for query %s using model %s",
+            query_id,
+            model_type,
+        )
+
+        raise MLServiceUnavailableError() from error
+
+    except requests.exceptions.HTTPError as error:
+        upstream_response = error.response
+
+        status_code = (
+            upstream_response.status_code
+            if upstream_response is not None
+            else None
+        )
+
+        response_preview = (
+            upstream_response.text[:1000]
+            if upstream_response is not None
+            else str(error)
+        )
+
+        logger.exception(
+            "ML service returned HTTP %s for query %s using model %s. "
+            "Response preview: %r",
+            status_code,
+            query_id,
+            model_type,
+            response_preview,
+        )
+
+        raise MLServiceResponseError(
+            status_code=status_code,
+        ) from error
+
+    except requests.exceptions.RequestException as error:
+        logger.exception(
+            "ML service request failed for query %s using model %s",
+            query_id,
+            model_type,
+        )
+
+        raise MLServiceUnavailableError() from error
 
     try:
-        return response.json()
-    except ValueError as e:
-        raise RuntimeError(
-            f"ML service returned invalid JSON: {response.text[:1000]}"
-        ) from e
+        result = response.json()
+
+    except ValueError as error:
+        logger.exception(
+            "ML service returned invalid JSON for query %s. "
+            "Response preview: %r",
+            query_id,
+            response.text[:1000],
+        )
+
+        raise MLServiceResponseError(
+            status_code=response.status_code,
+        ) from error
+
+    if not isinstance(result, dict):
+        logger.error(
+            "ML service returned a non-object JSON response for query %s: %s",
+            query_id,
+            type(result).__name__,
+        )
+
+        raise MLServiceResponseError(
+            status_code=response.status_code,
+        )
+
+    return result

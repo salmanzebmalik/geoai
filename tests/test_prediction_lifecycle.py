@@ -11,6 +11,11 @@ from app.services.segmentation_service import (
     TiTilerTimeoutError,
 )    
 
+from app.services.ml_service_client import (
+    MLServiceResponseError,
+    MLServiceTimeoutError,
+    MLServiceUnavailableError,
+)
 
 def build_query() -> SegmentationQuery:
     return SegmentationQuery(
@@ -127,7 +132,41 @@ class PredictionLifecycleTests(unittest.TestCase):
             "127.0.0.1",
             query.error_message,
         )
+    def test_ml_failures_record_specific_codes(self):
+        cases = (
+            (
+                MLServiceTimeoutError(),
+                "ml_service_timeout",
+            ),
+            (
+                MLServiceUnavailableError(),
+                "ml_service_unavailable",
+            ),
+            (
+                MLServiceResponseError(503),
+                "ml_service_bad_response",
+            ),
+        )
 
+        for error, expected_code in cases:
+            with self.subTest(error=type(error).__name__):
+                query = build_query()
+                session = MagicMock()
+
+                mark_prediction_failed(
+                    query,
+                    session,
+                    error,
+                )
+
+                self.assertEqual(
+                    query.status,
+                    PredictionStatus.FAILED.value,
+                )
+                self.assertEqual(
+                    query.error_code,
+                    expected_code,
+                )
 
 if __name__ == "__main__":
     unittest.main()

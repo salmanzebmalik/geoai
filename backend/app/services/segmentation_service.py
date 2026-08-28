@@ -23,10 +23,15 @@ from app.schemas.segmentation import (
     PredictionRequest,
     PredictionResponse,
 )
+
 from app.services.ml_service_client import (
     MLServiceBusyError,
+    MLServiceResponseError,
+    MLServiceTimeoutError,
+    MLServiceUnavailableError,
     call_ml_service,
 )
+
 from app.services.satellite_image_service import (
     TiTilerResponseError,
     TiTilerTimeoutError,
@@ -270,12 +275,25 @@ def mark_prediction_failed(
 ) -> None:
     if isinstance(error, MLServiceBusyError):
         error_code = "ml_service_busy"
+
+    elif isinstance(error, MLServiceTimeoutError):
+        error_code = "ml_service_timeout"
+
+    elif isinstance(error, MLServiceUnavailableError):
+        error_code = "ml_service_unavailable"
+
+    elif isinstance(error, MLServiceResponseError):
+        error_code = "ml_service_bad_response"
+
     elif isinstance(error, TiTilerTimeoutError):
         error_code = "titiler_timeout"
+
     elif isinstance(error, TiTilerUnavailableError):
         error_code = "titiler_unavailable"
+
     elif isinstance(error, TiTilerResponseError):
         error_code = "titiler_bad_response"
+
     else:
         error_code = "prediction_failed"
 

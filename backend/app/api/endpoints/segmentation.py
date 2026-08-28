@@ -13,7 +13,15 @@ from sqlmodel import Session
 
 from app.db.database import get_session
 from app.db.models import SegmentationQuery
-from app.services.ml_service_client import MLServiceBusyError
+
+from app.services.ml_service_client import (
+    MLServiceBusyError,
+    MLServiceError,
+    MLServiceResponseError,
+    MLServiceTimeoutError,
+    MLServiceUnavailableError,
+)
+
 from app.dependencies import acquire_prediction_slot
 
 from app.schemas.segmentation import (
@@ -85,6 +93,26 @@ def build_ml_busy_http_exception(
         },
     )
 
+def build_ml_service_http_exception(
+    error: MLServiceError,
+) -> HTTPException:
+    if isinstance(error, MLServiceTimeoutError):
+        status_code = status.HTTP_504_GATEWAY_TIMEOUT
+
+    elif isinstance(error, MLServiceUnavailableError):
+        status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+
+    elif isinstance(error, MLServiceResponseError):
+        status_code = status.HTTP_502_BAD_GATEWAY
+
+    else:
+        status_code = status.HTTP_502_BAD_GATEWAY
+
+    return HTTPException(
+        status_code=status_code,
+        detail=str(error),
+    )
+    
 def build_titiler_http_exception(
     error: TiTilerError,
 ) -> HTTPException:
@@ -302,19 +330,25 @@ def predict_segmentation(
 
     except MLServiceBusyError as error:
         raise build_ml_busy_http_exception(error) from error
-
+    
+    except MLServiceError as error:
+        raise build_ml_service_http_exception(error) from error
+    
     except RasterBudgetExceededError as error:
         raise HTTPException(
             status_code=status.HTTP_413_CONTENT_TOO_LARGE,
             detail=str(error),
         ) from error
+    
     except ValueError as e:
         raise HTTPException(
             status_code=400,
             detail=str(e),
         ) from e
+    
     except TiTilerError as error:
             raise build_titiler_http_exception(error) from error
+    
     except Exception as error:
         logger.exception(
             "Unexpected prediction failure"
@@ -481,6 +515,8 @@ def predict_and_export_annotations(
     
     except MLServiceBusyError as error:
         raise build_ml_busy_http_exception(error) from error
+    except MLServiceError as error:
+        raise build_ml_service_http_exception(error) from error
     except HTTPException:
         raise
     except ValueError as error:
