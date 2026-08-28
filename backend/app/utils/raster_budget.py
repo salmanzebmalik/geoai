@@ -59,41 +59,42 @@ def get_raster_budget(
     model_type: ModelType | None = None,
 ) -> RasterBudget:
     """
-    Return the tested budget for a model/source combination.
-
-    Untested or unspecified combinations use the conservative
-    general fallback.
+    Return the configured raster budget for an imagery source.
     """
 
-    if source_type == "ortho" and model_type == "tree":
-        max_total_pixels = (
-            settings.max_ortho_tree_raster_pixels
+    if source_type == "ortho":
+        budget = RasterBudget(
+            max_total_pixels=(
+                settings.max_ortho_raster_pixels
+            ),
+            max_side_pixels=(
+                settings.max_ortho_raster_side_pixels
+            ),
         )
-        max_side_pixels = (
-            settings.max_ortho_tree_raster_side_pixels
-        )
+
     else:
-        max_total_pixels = settings.max_input_raster_pixels
-        max_side_pixels = (
-            settings.max_input_raster_side_pixels
+        # Satellite and requests without a resolved source use the
+        # conservative general budget.
+        budget = RasterBudget(
+            max_total_pixels=(
+                settings.max_input_raster_pixels
+            ),
+            max_side_pixels=(
+                settings.max_input_raster_side_pixels
+            ),
         )
 
-    if max_total_pixels <= 0:
+    if budget.max_total_pixels <= 0:
         raise RuntimeError(
-            "Configured maximum raster pixels must be "
-            "greater than zero"
+            "Maximum raster pixels must be greater than zero"
         )
 
-    if max_side_pixels <= 0:
+    if budget.max_side_pixels <= 0:
         raise RuntimeError(
-            "Configured maximum raster side must be "
-            "greater than zero"
+            "Maximum raster side pixels must be greater than zero"
         )
 
-    return RasterBudget(
-        max_total_pixels=max_total_pixels,
-        max_side_pixels=max_side_pixels,
-    )
+    return budget
 
 
 def get_source_resolution(

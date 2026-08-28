@@ -97,16 +97,16 @@ class Settings:
     )
     
     # Tested specifically with: source_type="ortho", model_type="tree"
-    max_ortho_tree_raster_pixels: int = int(
+    max_ortho_raster_pixels: int = int(
         os.getenv(
-            "MAX_ORTHO_TREE_RASTER_PIXELS",
+            "MAX_ORTHO_RASTER_PIXELS",
             "210000000",
         )
     )
 
-    max_ortho_tree_raster_side_pixels: int = int(
+    max_ortho_raster_side_pixels: int = int(
         os.getenv(
-            "MAX_ORTHO_TREE_RASTER_SIDE_PIXELS",
+            "MAX_ORTHO_RASTER_SIDE_PIXELS",
             "18000",
         )
     )
