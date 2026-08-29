@@ -37,15 +37,15 @@ htmlcov/
 # Environment variables / secrets
 # ============================================================
 
-.env
-*.env
-backend/.env
-ml-service/.env
+# .env
+# *.env
+# backend/.env
+# ml-service/.env
 
-# Keep example env files
-!.env.example
-!backend/.env.example
-!ml-service/.env.example
+# # Keep example env files
+# !.env.example
+# !backend/.env.example
+# !ml-service/.env.example
 
 
 # ============================================================
