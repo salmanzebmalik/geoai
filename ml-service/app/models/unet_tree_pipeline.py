@@ -24,7 +24,7 @@ class UNetTreePipeline:
                               in_channels=3, classes=1, activation=None)
 
         if weights_path is None:
-            weights_path = Path(__file__).parent / "best_unet_tree_seg.pth"
+            weights_path = Path(__file__).parent / "local_unet" / "best_unet_tree_seg.pth"
         weights_path = Path(weights_path)
         if not weights_path.exists():
             raise FileNotFoundError(f"UNet tree weights not found at {weights_path}. Train with tree_crown_5m.ipynb.")
