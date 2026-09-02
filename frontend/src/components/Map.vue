@@ -73,6 +73,10 @@ function getApiErrorMessage(payload, fallback) {
 // The .jp2 collections (sentinel-2-l2a-worldwide-2018..2024) are still in the
 // database but need different render params -- see refreshSentinelLayer below.
 const SENTINEL_COLLECTIONS = [
+  'sentinel-2-l2a-rgb-cog-v2-2018',
+  'sentinel-2-l2a-rgb-cog-v2-2019',
+  'sentinel-2-l2a-rgb-cog-v2-2020',
+  'sentinel-2-l2a-rgb-cog-v2-2021',
   'sentinel-2-l2a-rgb-cog-v2-2022',
   'sentinel-2-l2a-rgb-cog-v2-2023',
   'sentinel-2-l2a-rgb-cog-v2-2024',
