@@ -34,20 +34,25 @@ def tiled_mask(image_bytes: bytes, patch_size: int, overlap: int,
             shape = (min(patch_size, h - y), min(patch_size, w - x))
             by_shape.setdefault(shape, []).append((x, y))
 
-        done = failed = 0
+        done = failed = skipped = 0
         for (th, tw), coords in by_shape.items():
             for start in range(0, len(coords), batch_size):
                 chunk = coords[start:start + batch_size]
                 try:
-                    patches = [read_rgb(src, Window(x, y, tw, th)) for x, y in chunk]
-                    masks = predict(patches)
-                    for (x, y), mask in zip(chunk, masks):
+                    read = [(xy, read_rgb(src, Window(xy[0], xy[1], tw, th))) for xy in chunk]
+                    kept = [(xy, patch) for xy, patch in read if patch.any()]
+                    skipped += len(read) - len(kept)
+                    if not kept:
+                        continue
+
+                    masks = predict([patch for _, patch in kept])
+                    for ((x, y), _), mask in zip(kept, masks):
                         if mask is not None:
                             full[y:y + th, x:x + tw] |= np.asarray(mask).astype(bool)
-                    done += len(chunk)
+                    done += len(kept)
                 except Exception as e:
                     failed += len(chunk)
                     logger.warning(f"{label} batch at {chunk[0]} ({th}x{tw}) failed: {e}")
 
-    logger.info(f"{label} | {done}/{len(tiles)} tiles | {failed} failed | {time.time() - t0:.1f}s")
+    logger.info(f"{label} | {done}/{len(tiles)} tiles | {skipped} empty | {failed} failed | {time.time() - t0:.1f}s")
     return full.astype(np.uint8)

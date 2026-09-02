@@ -1,5 +1,6 @@
 from fastapi import HTTPException, Request
 
+import sys
 from collections.abc import Iterator
 
 from fastapi import HTTPException, Request
@@ -62,3 +63,6 @@ def acquire_inference_slot(request: Request) -> Iterator[None]:
         yield
     finally:
         gate.release()
+        torch = sys.modules.get("torch")
+        if torch is not None and torch.cuda.is_available():
+            torch.cuda.empty_cache()

@@ -22,8 +22,7 @@ def _load_all(app: FastAPI) -> None:
     if torch.cuda.is_available():
         torch.backends.cuda.matmul.allow_tf32 = True
         torch.backends.cudnn.allow_tf32 = True
-        torch.backends.cudnn.benchmark = True
-        logger.info(f"cuda: {torch.cuda.get_device_name(0)} | tf32 + cudnn.benchmark on")
+        logger.info(f"cuda: {torch.cuda.get_device_name(0)} | tf32 on")
 
     # Imports sequential´ly to avoid deadlocks when loading models in parallel
     from app.models.tree_pipeline import TCDSegformer
@@ -39,12 +38,12 @@ def _load_all(app: FastAPI) -> None:
         "deepforest":  lambda: DeepForestPipeline(),
         "lang_sam_large": lambda: LangSAMPipeline(
             patch_size=1024,
-            overlap=128,
+            overlap=64,
             offline=OFFLINE,
             text_threshold=0.2,
-            box_threshold=0.4,
+            box_threshold=0.3,
             variant="sam2.1_hiera_large",
-            batch_size=4
+            batch_size=2
         ),
         "segformer":   lambda: TCDSegformer(offline=OFFLINE, patch_size=1024, overlap=128, batch_size=8),
         "satlas_tree": lambda: SatlasTreePipeline(patch_size=512, overlap=64),
@@ -66,12 +65,12 @@ def _load_all(app: FastAPI) -> None:
         try:
             app.state.models["lang_sam_tiny"] = LangSAMPipeline(
                 patch_size=1024,
-                overlap=128,
+                overlap=64,
                 offline=OFFLINE,
                 text_threshold=0.2,
-                box_threshold=0.4,
+                box_threshold=0.3,
                 variant="sam2.1_hiera_tiny",
-                batch_size=8,
+                batch_size=2,
                 share_gdino_from=large,
             )
             logger.info(f"lang_sam_tiny ready:   {time.time() - t0:.1f}s")
