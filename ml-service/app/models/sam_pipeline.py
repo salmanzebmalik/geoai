@@ -4,6 +4,7 @@ import numpy as np
 import torch
 from PIL import Image
 from lang_sam import LangSAM  # https://github.com/luca-medeiros/lang-segment-anything.git
+from lang_sam.models.sam import SAM
 import contextlib
 import io
 
@@ -29,7 +30,8 @@ logger = get_logger(__name__)
 class LangSAMPipeline:
     def __init__(self,patch_size: int = 1024,overlap: int = 128,device: Optional[str] = None,
                  offline: bool = True,text_threshold: float = 0.15,box_threshold: float = 0.3,
-                 variant: str = "sam2.1_hiera_large",batch_size: int = 1):
+                 variant: str = "sam2.1_hiera_large",batch_size: int = 1,
+                 share_gdino_from: Optional["LangSAMPipeline"] = None):
         self.patch_size = patch_size
         self.overlap = overlap
         self.batch_size = batch_size
@@ -45,7 +47,18 @@ class LangSAMPipeline:
             sam_ckpt_path = f"{model_dir}/{variant}.pt"
             gdino_model_path = f"{model_dir}/groundingdino_hf_model"
 
-            self.model = LangSAM(sam_type=variant,sam_ckpt_path=sam_ckpt_path,gdino_model_ckpt_path=gdino_model_path,gdino_processor_ckpt_path=gdino_model_path,device=self.device)
+            if share_gdino_from is None:
+                self.model = LangSAM(sam_type=variant,sam_ckpt_path=sam_ckpt_path,gdino_model_ckpt_path=gdino_model_path,gdino_processor_ckpt_path=gdino_model_path,device=self.device)
+            else:
+                # only the SAM checkpoint differs between variants
+                self.model = LangSAM.__new__(LangSAM)
+                # initialize the SAM model with the specified variant and checkpoint
+                self.model.sam_type = variant
+                self.model.sam = SAM()
+                self.model.sam.build_model(variant, sam_ckpt_path, device=self.device)
+                # reuse the GroundingDINO model from the first LangSAMPipeline instance 
+                self.model.gdino = share_gdino_from.model.gdino
+                logger.info(f"{variant} reusing GroundingDINO from {share_gdino_from.model.sam_type}")
         else:  # online
             self.model = LangSAM()
 

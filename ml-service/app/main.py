@@ -42,18 +42,9 @@ def _load_all(app: FastAPI) -> None:
             overlap=128,
             offline=OFFLINE,
             text_threshold=0.2,
-            box_threshold=0.3,
+            box_threshold=0.4,
             variant="sam2.1_hiera_large",
             batch_size=4
-        ),
-        "lang_sam_tiny": lambda: LangSAMPipeline(
-            patch_size=1024,
-            overlap=128,
-            offline=OFFLINE,
-            text_threshold=0.2,
-            box_threshold=0.3,
-            variant="sam2.1_hiera_tiny",
-            batch_size=8
         ),
         "segformer":   lambda: TCDSegformer(offline=OFFLINE, patch_size=1024, overlap=128, batch_size=8),
         "satlas_tree": lambda: SatlasTreePipeline(patch_size=512, overlap=64),
@@ -69,6 +60,23 @@ def _load_all(app: FastAPI) -> None:
                 logger.info(f"{name} ready:   {time.time() - t0:.1f}s")
             except Exception:
                 logger.exception(f"{name} failed to load")
+
+    large = app.state.models.get("lang_sam_large")
+    if large is not None:
+        try:
+            app.state.models["lang_sam_tiny"] = LangSAMPipeline(
+                patch_size=1024,
+                overlap=128,
+                offline=OFFLINE,
+                text_threshold=0.2,
+                box_threshold=0.4,
+                variant="sam2.1_hiera_tiny",
+                batch_size=8,
+                share_gdino_from=large,
+            )
+            logger.info(f"lang_sam_tiny ready:   {time.time() - t0:.1f}s")
+        except Exception:
+            logger.exception("lang_sam_tiny failed to load")
 
     logger.info(f"all models loaded in {time.time()-t0:.1f}s")
 
