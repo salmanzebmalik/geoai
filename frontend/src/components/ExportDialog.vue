@@ -1,6 +1,6 @@
 <template>
   <v-dialog v-model="open" max-width="680" scrollable>
-    <v-card class="export-dialog-card" theme="dark" rounded="lg" elevation="16">
+    <v-card class="export-dialog-card" rounded="lg" elevation="16">
       <v-card-title class="export-title">
         <v-icon icon="mdi-tray-arrow-down" size="small" />
         Export annotations
@@ -68,7 +68,7 @@
               <template #append>
                 <v-btn
                   v-if="item.artifacts.find((artifact) => artifact.name === 'zip')"
-                  icon="mdi-folder-zip"
+                  icon="mdi-download"
                   size="small"
                   variant="text"
                   @click="download(item.artifacts.find((artifact) => artifact.name === 'zip'))"
@@ -174,11 +174,6 @@ function download(artifact) {
 <style scoped>
 .export-dialog-card {
   padding: 8px;
-  color: #f2f7f3;
-  background:
-    linear-gradient(145deg, rgba(36, 66, 45, 0.38), transparent 45%),
-    #111c15;
-  border: 1px solid rgba(126, 190, 143, 0.18);
 }
 
 .export-title {
@@ -192,7 +187,6 @@ function download(artifact) {
 
 .export-subtitle {
   padding: 0 20px 14px;
-  color: rgba(226, 239, 229, 0.68);
 }
 
 .export-content {
@@ -204,8 +198,8 @@ function download(artifact) {
   flex-direction: column;
   gap: 22px;
   padding: 16px;
-  background: rgba(255, 255, 255, 0.035);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(72, 72, 72, 0.035);
+  border: 1px solid rgba(69, 67, 67, 0.08);
   border-radius: 10px;
 }
 
@@ -215,7 +209,6 @@ function download(artifact) {
 
 .control-label {
   margin-bottom: 8px;
-  color: rgba(242, 247, 243, 0.78);
   font-size: 0.82rem;
 }
 
