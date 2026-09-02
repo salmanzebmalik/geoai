@@ -43,7 +43,8 @@ def _load_all(app: FastAPI) -> None:
             offline=OFFLINE,
             text_threshold=0.2,
             box_threshold=0.3,
-            variant="sam2.1_hiera_large"
+            variant="sam2.1_hiera_large",
+            batch_size=4
         ),
         "lang_sam_tiny": lambda: LangSAMPipeline(
             patch_size=1024,
@@ -51,9 +52,10 @@ def _load_all(app: FastAPI) -> None:
             offline=OFFLINE,
             text_threshold=0.2,
             box_threshold=0.3,
-            variant="sam2.1_hiera_tiny"
+            variant="sam2.1_hiera_tiny",
+            batch_size=8
         ),
-        "segformer":   lambda: TCDSegformer(offline=OFFLINE, patch_size=1024, overlap=128),
+        "segformer":   lambda: TCDSegformer(offline=OFFLINE, patch_size=1024, overlap=128, batch_size=8),
         "satlas_tree": lambda: SatlasTreePipeline(patch_size=512, overlap=64),
         "unet_tree":   lambda: UNetTreePipeline(),
     }
