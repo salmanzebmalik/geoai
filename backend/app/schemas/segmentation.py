@@ -36,6 +36,8 @@ class PredictionRequest(BaseModel):
     # Frontend can omit this and tree detection will run.
     model_type: ModelType = "tree"
 
+    model_variant: Literal["sam2.1_hiera_large", "sam2.1_hiera_tiny"] = "sam2.1_hiera_large"
+
     # Only used when model_type = "zeroshot".
     # Supply either one keyword or the keywords list below.
     keyword: Optional[str] = None

@@ -27,7 +27,9 @@ logger = get_logger(__name__)
 
 
 class LangSAMPipeline:
-    def __init__(self,patch_size: int = 1024,overlap: int = 128,device: Optional[str] = None,offline: bool = True,text_threshold: float = 0.15,box_threshold: float = 0.3):
+    def __init__(self,patch_size: int = 1024,overlap: int = 128,device: Optional[str] = None,
+                 offline: bool = True,text_threshold: float = 0.15,box_threshold: float = 0.3,
+                 variant: str = "sam2.1_hiera_large"):
         self.patch_size = patch_size
         self.overlap = overlap
         self.text_threshold = text_threshold
@@ -38,11 +40,11 @@ class LangSAMPipeline:
             # set directory paths for local model files
             current_dir = Path(__file__).parent.resolve()
             model_dir = current_dir.parent / "models" / "local_langsam"
-            ensure_langsam_models(model_dir)  # will download if missing (with lock)
-            sam_ckpt_path = f"{model_dir}/sam2.1_hiera_large.pt"
+            ensure_langsam_models(model_dir, variant=variant)  # will download if missing (with lock)
+            sam_ckpt_path = f"{model_dir}/{variant}.pt"
             gdino_model_path = f"{model_dir}/groundingdino_hf_model"
 
-            self.model = LangSAM(sam_type="sam2.1_hiera_large",sam_ckpt_path=sam_ckpt_path,gdino_model_ckpt_path=gdino_model_path,gdino_processor_ckpt_path=gdino_model_path,device=self.device)
+            self.model = LangSAM(sam_type=variant,sam_ckpt_path=sam_ckpt_path,gdino_model_ckpt_path=gdino_model_path,gdino_processor_ckpt_path=gdino_model_path,device=self.device)
         else:  # online
             self.model = LangSAM()
 

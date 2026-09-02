@@ -11,7 +11,7 @@ from app.services.inference_gate import InferenceGate
 
 # Consts & inits
 logger = get_logger(__name__)
-MODEL_NAMES = ["segformer", "lang_sam", "satlas_tree", "unet_tree", "deepforest"]
+MODEL_NAMES = ["segformer", "lang_sam_large", "lang_sam_tiny", "satlas_tree", "unet_tree", "deepforest"]
 OFFLINE = True
 
 def _load_all(app: FastAPI) -> None:
@@ -29,7 +29,22 @@ def _load_all(app: FastAPI) -> None:
     # Loads weights paralelly
     model_mapping = {
         "deepforest":  lambda: DeepForestPipeline(),
-        "lang_sam":    lambda: LangSAMPipeline(patch_size=1024, overlap=128, offline=OFFLINE,text_threshold=0.2, box_threshold=0.3),
+        "lang_sam_large": lambda: LangSAMPipeline(
+            patch_size=1024,
+            overlap=128,
+            offline=OFFLINE,
+            text_threshold=0.2,
+            box_threshold=0.3,
+            variant="sam2.1_hiera_large"
+        ),
+        "lang_sam_tiny": lambda: LangSAMPipeline(
+            patch_size=1024,
+            overlap=128,
+            offline=OFFLINE,
+            text_threshold=0.2,
+            box_threshold=0.3,
+            variant="sam2.1_hiera_tiny"
+        ),
         "segformer":   lambda: TCDSegformer(offline=OFFLINE, patch_size=1024, overlap=128),
         "satlas_tree": lambda: SatlasTreePipeline(patch_size=512, overlap=64),
         "unet_tree":   lambda: UNetTreePipeline(),

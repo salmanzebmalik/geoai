@@ -13,11 +13,11 @@ def get_segformer_model(request: Request):
     return model
 
 
-def get_lang_sam_model(request: Request):
-    model = request.app.state.models.get("lang_sam")
-    if model is None:
-        raise HTTPException(503, "LangSAM still loading")
-    return model
+def get_lang_sam_models(request: Request):
+    return {
+        "sam2.1_hiera_large": request.app.state.models.get("lang_sam_large"),
+        "sam2.1_hiera_tiny": request.app.state.models.get("lang_sam_tiny"),
+    }
 
 
 def get_satlas_tree_model(request: Request):

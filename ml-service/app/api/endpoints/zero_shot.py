@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.dependencies import (
     acquire_inference_slot,
-    get_lang_sam_model,
+    get_lang_sam_models,
 )
 
 from app.schemas.prediction import ZeroShotPredictionRequest, PredictionResponse
@@ -21,9 +21,13 @@ router = APIRouter()
 @router.post("/zeroshot", response_model=PredictionResponse)
 def predict_zero_shot(
     request: ZeroShotPredictionRequest,
-    lang_sam=Depends(get_lang_sam_model),
+    lang_sam_models=Depends(get_lang_sam_models),
     _inference_slot=Depends(acquire_inference_slot),
 ):
+    lang_sam = lang_sam_models.get(request.model_variant)
+    if lang_sam is None:
+        raise HTTPException(503, f"LangSAM ({request.model_variant}) still loading")
+
     query_id = request.query_id or str(uuid4())
 
     print("ML Service: Running Zero-Shot Query:", query_id)
@@ -51,7 +55,7 @@ def predict_zero_shot(
         return PredictionResponse(
             query_id=query_id,
             status="completed",
-            model_name="lang-sam",
+            model_name=f"lang-sam-{request.model_variant}",
             prediction_type="zero_shot_detection",
             result_path=result_path,
             feature_count=feature_count,

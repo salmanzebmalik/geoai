@@ -242,7 +242,7 @@
             :items="modelOptions"
             :disabled="!modelOptions.length"
             :placeholder= "modelOptions.length ? 'Select Model' : 'No models available'"
-            v-model="mapStore.modelType"
+            v-model="modelSelection"
             variant="solo"
             density="compact"
             class="ml-task-dropdown"
@@ -399,11 +399,30 @@ const TREE_MODELS_BY_MAP_TYPE = {
   sentinel: [],
 }
 
+const ZEROSHOT_MODEL_OPTIONS = [
+  { title: 'LangSAM (Large)', value: 'sam2.1_hiera_large' },
+  { title: 'LangSAM (Tiny)', value: 'sam2.1_hiera_tiny' },
+]
+
 const modelOptions = computed(() =>
   mapStore.selectedTask === 'Zero-Shot'
-    ? [{ title: 'LangSAM', value: 'zeroshot' }]
+    ? ZEROSHOT_MODEL_OPTIONS
     : TREE_MODELS_BY_MAP_TYPE[mapStore.mapType] ?? []
 )
+
+const modelSelection = computed({
+  get: () =>
+    mapStore.selectedTask === 'Zero-Shot'
+      ? mapStore.modelVariant
+      : mapStore.modelType,
+  set: (value) => {
+    if (mapStore.selectedTask === 'Zero-Shot') {
+      mapStore.modelVariant = value
+    } else {
+      mapStore.modelType = value
+    }
+  },
+})
 
 //Sentinel date range picker
 // v-date-picker (multiple="range") works with Date objects
@@ -460,6 +479,7 @@ function formatSoccerFields(sqm) {
 function onTaskChange() {
   if (mapStore.selectedTask === 'Zero-Shot') {
     mapStore.modelType = 'zeroshot'
+    mapStore.modelVariant = mapStore.modelVariant || 'sam2.1_hiera_large'
   } else if (mapStore.selectedTask) {
     mapStore.modelType = modelOptions.value[0]?.value ?? null
     mapStore.keyword = ''   // clear keyword for non zero shot

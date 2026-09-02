@@ -103,6 +103,7 @@ def call_ml_service(
     input_image_path: str,
     model_type: ModelType = "tree",
     keyword: Optional[str] = None,
+    model_variant: Optional[str] = None,
 ) -> dict:
     """
     Call the ML service using the shared-storage image path.
@@ -134,6 +135,7 @@ def call_ml_service(
 
     if model_type == "zeroshot":
         payload["keyword"] = keyword or "tree"
+        payload["model_variant"] = model_variant or "sam2.1_hiera_large"
 
     session = get_http_session()
 

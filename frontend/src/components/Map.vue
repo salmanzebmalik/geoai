@@ -497,6 +497,8 @@ watch(() => mapStore.runTrigger, async () => {
     }
 
     if (requestBody.model_type === 'zeroshot') {
+      requestBody.model_variant = mapStore.modelVariant || 'sam2.1_hiera_large'
+
       const keywords = mapStore.keyword
         .split(',')
         .map((term) => term.trim())

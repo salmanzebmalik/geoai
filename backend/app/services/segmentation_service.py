@@ -147,6 +147,7 @@ def run_prediction_models(
             input_image_path=image_path,
             model_type=request.model_type,
             keyword=keyword,
+            model_variant=request.model_variant,
         )
         result_path = resolve_prediction_result_path(result["result_path"])
         payload = json.loads(result_path.read_text(encoding="utf-8"))
