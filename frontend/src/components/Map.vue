@@ -40,6 +40,8 @@ function getPredictionSourceType(mapType) {
       return 'ortho'
     case 'germany':
       return 'satellite'
+    case 'sentinel':
+      return 'sentinel'
     default:
       return null
   }
@@ -477,23 +479,29 @@ watch(() => mapStore.runTrigger, async () => {
   mapStore.isPredicting = true
 
   try {
-      // Derive satSoruceType from the selected map type
-      const satSourceType = getPredictionSourceType(
-    mapStore.mapType,
-  )
+    // Derive satSourceType from the selected map type
+    const satSourceType = getPredictionSourceType(mapStore.mapType)
 
-  if (!satSourceType) {
-    mapStore.setError(
-      'The selected map does not support prediction.',
-    )
-    return
-  }
+    if (!satSourceType) {
+      mapStore.setError('The selected map does not support prediction.')
+      return
+    }
 
     // assembles POST request body for prediction
     const requestBody = {
       bbox: mapStore.bbox,
       model_type: mapStore.modelType || "tree",  // tree if not set
-      source_type: satSourceType,  // 'ortho' or 'satellite'
+      source_type: satSourceType,  // 'ortho', 'satellite' or 'sentinel'
+    }
+
+    // Sentinel resolves its imagery through a STAC search, so the crop is only
+    // the same picture the user is looking at if it uses the same filters. Send
+    // them explicitly; without this the backend falls back to its own defaults
+    // and the prediction could run on a different date range than the map shows.
+    if (satSourceType === 'sentinel') {
+      requestBody.date_from = mapStore.sentinelDateFrom
+      requestBody.date_to = mapStore.sentinelDateTo
+      requestBody.max_cloud_cover = mapStore.sentinelMaxCloudCover
     }
 
     if (requestBody.model_type === 'zeroshot') {

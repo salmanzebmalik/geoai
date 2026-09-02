@@ -419,6 +419,12 @@ def create_prediction(
             query_id=query_id,
             bbox=request.bbox,
             source_type=request.source_type,
+            # Sentinel only: forward the caller's date range / cloud filter so
+            # the crop is cut from the same imagery the map is showing. These
+            # are None for the other source types and ignored there.
+            date_from=getattr(request, "date_from", None),
+            date_to=getattr(request, "date_to", None),
+            max_cloud_cover=getattr(request, "max_cloud_cover", None),
         )
 
         db_query.image_url = image_info.image_url

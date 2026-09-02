@@ -2,6 +2,8 @@ from pathlib import Path
 from urllib.parse import urlencode
 
 import rasterio
+from functools import lru_cache
+
 import requests
 from rasterio.features import geometry_mask
 from rasterio.warp import transform_geom
@@ -77,9 +79,60 @@ def bbox_to_titiler_string(bbox: BoundingBox) -> str:
     return f"{bbox.min_lon},{bbox.min_lat},{bbox.max_lon},{bbox.max_lat}"
 
 
+@lru_cache(maxsize=32)
+def _register_sentinel_search(
+    collections: tuple[str, ...],
+    date_from: str,
+    date_to: str,
+    max_cloud_cover: float,
+) -> str:
+    """Register a pgstac search and return its id.
+
+    Sentinel is the one source that is not a fixed file: titiler needs a search
+    id before it can serve a crop, so this costs an extra round trip the other
+    source types do not have. Cached because the id is a pure function of the
+    query -- pgstac hashes the search itself, so re-registering the same filters
+    returns the same id anyway.
+
+    sortby cloud-cover ascending makes the clearest scene win per pixel. Without
+    it the mosaic serves whichever scene pgstac returns first, often cloud- or
+    snow-saturated. NB this only works because eo:cloud_cover is registered in
+    pgstac.queryables; otherwise pgstac silently discards the sort.
+    """
+    payload = {
+        "collections": list(collections),
+        "datetime": f"{date_from}T00:00:00Z/{date_to}T23:59:59Z",
+        "sortby": [{"field": "eo:cloud_cover", "direction": "asc"}],
+        "query": {"eo:cloud_cover": {"lte": max_cloud_cover}},
+    }
+    url = f"{settings.titiler_base_url}/searches/register"
+
+    session = requests.Session()
+    session.trust_env = False
+    try:
+        response = session.post(url, json=payload, timeout=30)
+        response.raise_for_status()
+    except requests.exceptions.ConnectionError as e:
+        raise RuntimeError(
+            f"Could not connect to tiTiler at {settings.titiler_base_url}: {e}"
+        ) from e
+    except requests.exceptions.RequestException as e:
+        raise RuntimeError(f"Sentinel search registration failed: {e}") from e
+
+    search_id = response.json().get("id")
+    if not search_id:
+        raise RuntimeError(
+            f"Sentinel search registration returned no id: {response.text[:200]}"
+        )
+    return search_id
+
+
 def build_titiler_request(
     bbox: BoundingBox,
     source_type: SourceType = "satellite",
+    date_from: str | None = None,
+    date_to: str | None = None,
+    max_cloud_cover: float | None = None,
 ) -> tuple[str, dict]:
     bbox_string = bbox_to_titiler_string(bbox)
     
@@ -115,7 +168,34 @@ def build_titiler_request(
         }
         return endpoint, params
 
-    raise ValueError("Invalid source_type. Use 'satellite' or 'ortho'.")
+    if source_type == "sentinel":
+        search_id = _register_sentinel_search(
+            tuple(settings.sentinel_collections),
+            date_from or settings.sentinel_date_from,
+            date_to or settings.sentinel_date_to,
+            settings.sentinel_max_cloud_cover
+            if max_cloud_cover is None
+            else max_cloud_cover,
+        )
+        endpoint = (
+            f"{settings.titiler_base_url}/searches/{search_id}"
+            f"/bbox/{bbox_string}.tif"
+        )
+        params = {
+            # raw 16-bit L2A bands, so the true-colour trio plus the same
+            # reflectance stretch the tile layers use
+            "assets": ["B04", "B03", "B02"],
+            "rescale": "0,3000",
+            # take the first VALID pixel down the cloud-sorted stack; with real
+            # valid-data footprints this lets a partial granule fall through to
+            # a neighbouring scene instead of leaving a hole
+            "pixel_selection": "first",
+            "dst_crs": dst_crs,
+            **resampling,
+        }
+        return endpoint, params
+
+    raise ValueError("Invalid source_type. Use 'satellite', 'ortho' or 'sentinel'.")
 
 
 def _write_bbox_masked_crop(
@@ -198,6 +278,9 @@ def fetch_satellite_image_from_titiler(
     query_id: str,
     bbox: BoundingBox,
     source_type: SourceType = "satellite",
+    date_from: str | None = None,
+    date_to: str | None = None,
+    max_cloud_cover: float | None = None,
 ) -> tuple[str, ImageInfo]:
     """
     Fetch cropped image from tiTiler and save it into shared storage.
@@ -211,6 +294,9 @@ def fetch_satellite_image_from_titiler(
     endpoint, params = build_titiler_request(
         bbox=bbox,
         source_type=source_type,
+        date_from=date_from,
+        date_to=date_to,
+        max_cloud_cover=max_cloud_cover,
     )
 
     request_url = endpoint + "?" + urlencode(params, doseq=True)

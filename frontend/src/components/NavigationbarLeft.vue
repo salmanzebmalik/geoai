@@ -263,7 +263,6 @@
             :disabled="
               mapStore.isPredicting ||
               mapStore.mapType === 'osm' ||
-              mapStore.mapType === 'sentinel' ||
               !mapStore.bbox ||
               !mapStore.selectedTask ||
               (mapStore.selectedTask === 'Zero-Shot' && !mapStore.keyword.trim())
@@ -380,7 +379,9 @@ const TASK_OPTIONS_BY_MAP_TYPE = {
     { title: 'Tree Detection', value: 'Tree Detection' },
   ],
   osm: [],
-  sentinel: [],
+  sentinel: [
+    { title: 'Tree Detection', value: 'Tree Detection' },
+  ],
 }
 
 const availableTasks = computed(() => TASK_OPTIONS_BY_MAP_TYPE[mapStore.mapType] ?? [])
@@ -396,7 +397,13 @@ const TREE_MODELS_BY_MAP_TYPE = {
     { title: 'UNet', value: 'tree_unet' },
   ],
   osm: [],
-  sentinel: [],
+  // Satlas only, matching MODELS_BY_SOURCE["sentinel"] in the backend -- the
+  // API rejects anything else for this source. UNet is omitted because its
+  // checkpoint is missing, Segformer because it is trained at ~10 cm and
+  // Sentinel is 10 m.
+  sentinel: [
+    { title: 'Satlas', value: 'tree_satlas' },
+  ],
 }
 
 const modelOptions = computed(() =>

@@ -84,6 +84,10 @@ class Settings:
         os.getenv("SATELLITE_RESOLUTION_METERS_PER_PIXEL", "3.0")
     )
 
+    sentinel_resolution_meters_per_pixel: float = float(
+        os.getenv("SENTINEL_RESOLUTION_METERS_PER_PIXEL", "10.0")
+    )
+
     raster_estimate_margin: float = float(
         os.getenv("RASTER_ESTIMATE_MARGIN", "1.10")
     )
@@ -131,6 +135,29 @@ class Settings:
         "ORTHO_MOSAIC_PATH",
         "/home/ubuntu/work/saved_data/collections/digital_orthofoto_nrw/mosaic.json",
     )
+
+    # --- Sentinel-2 via STAC --------------------------------------------------
+    # Unlike the satellite/ortho sources above, this is not a fixed file path:
+    # titiler resolves the imagery through a pgstac search, so the crop can be
+    # filtered by date and cloud cover.
+    #
+    # These are the jp2-de-<year> collections: raw 16-bit L2A bands restricted to
+    # the German tiles, with REAL valid-data footprints. Do NOT point this at
+    # sentinel-2-l2a-worldwide-<year>: those items advertise the full MGRS tile
+    # outline, so pgstac's skipcovered shortcut stops early on a partial granule
+    # and the crop comes back entirely black (verified over the area north of
+    # Plzen: worldwide mean 0.0, jp2-de mean 140.1 for the same bbox).
+    sentinel_collections: list[str] = (
+        os.getenv(
+            "SENTINEL_COLLECTIONS",
+            ",".join(f"sentinel-2-l2a-jp2-de-{y}" for y in range(2018, 2025)),
+        ).split(",")
+    )
+    # Growing season by default: wide enough that every tile has a qualifying
+    # scene, and it keeps cloud-ordering from reaching into snowy winter scenes.
+    sentinel_date_from: str = os.getenv("SENTINEL_DATE_FROM", "2024-04-01")
+    sentinel_date_to: str = os.getenv("SENTINEL_DATE_TO", "2024-09-30")
+    sentinel_max_cloud_cover: float = float(os.getenv("SENTINEL_MAX_CLOUD_COVER", "30"))
 
     # -----------------------------
     # Prediction concurrency

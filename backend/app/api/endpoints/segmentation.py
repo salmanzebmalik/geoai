@@ -276,6 +276,9 @@ def fetch_image(
             query_id=query_id,
             bbox=request.bbox,
             source_type=request.source_type,
+            date_from=request.date_from,
+            date_to=request.date_to,
+            max_cloud_cover=request.max_cloud_cover,
         )
 
         return image_info

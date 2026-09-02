@@ -5,7 +5,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 
-SourceType = Literal["satellite", "ortho"]
+SourceType = Literal["satellite", "ortho", "sentinel"]
 ModelType = Literal["tree", "tree_satlas", "tree_unet", "tree_deepforest", "zeroshot"]
 MODELS_BY_SOURCE: dict[SourceType, tuple[ModelType, ...]] = {
     "ortho": (
@@ -14,6 +14,13 @@ MODELS_BY_SOURCE: dict[SourceType, tuple[ModelType, ...]] = {
         "zeroshot",
     ),
     "satellite": (
+        "tree_satlas",
+        "tree_unet",
+    ),
+    # Sentinel-2 is 10 m RGB like the "satellite" source, so the same models
+    # apply. Required: upstream's validators do MODELS_BY_SOURCE[source_type],
+    # which raises KeyError for a source with no entry.
+    "sentinel": (
         "tree_satlas",
         "tree_unet",
     ),
@@ -45,6 +52,15 @@ class PredictionRequest(BaseModel):
 
     # The default tree model expects 10 cm orthophoto imagery.
     source_type: SourceType = "ortho"
+
+    # Sentinel-2 only. The crop must be taken from the same imagery the user is
+    # looking at, so the frontend sends its current date range and cloud filter
+    # rather than letting the backend fall back to its config defaults -- a
+    # prediction run against a different window than the map shows would be
+    # silently wrong.
+    date_from: Optional[str] = None
+    date_to: Optional[str] = None
+    max_cloud_cover: Optional[float] = None
 
     @model_validator(mode="after")
     def validate_model_parameters(self) -> "PredictionRequest":
@@ -92,6 +108,12 @@ class PredictionRequest(BaseModel):
 class FetchImageRequest(BaseModel):
     bbox: BoundingBox
     source_type: SourceType = "satellite"
+
+    # Sentinel-2 only; see PredictionRequest above.
+    date_from: Optional[str] = None
+    date_to: Optional[str] = None
+    max_cloud_cover: Optional[float] = None
+
 
 class RasterEstimateRequest(BaseModel):
     bbox: BoundingBox

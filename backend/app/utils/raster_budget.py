@@ -108,6 +108,10 @@ def get_source_resolution(
         resolution = (
             settings.satellite_resolution_meters_per_pixel
         )
+    elif source_type == "sentinel":
+        resolution = (
+            settings.sentinel_resolution_meters_per_pixel
+        )
     else:
         raise ValueError(
             f"Unsupported source_type: {source_type}"
