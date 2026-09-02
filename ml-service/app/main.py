@@ -17,6 +17,14 @@ OFFLINE = True
 def _load_all(app: FastAPI) -> None:
     t0 = time.time()
 
+    import torch
+
+    if torch.cuda.is_available():
+        torch.backends.cuda.matmul.allow_tf32 = True
+        torch.backends.cudnn.allow_tf32 = True
+        torch.backends.cudnn.benchmark = True
+        logger.info(f"cuda: {torch.cuda.get_device_name(0)} | tf32 + cudnn.benchmark on")
+
     # Imports sequential´ly to avoid deadlocks when loading models in parallel
     from app.models.tree_pipeline import TCDSegformer
     from app.models.sam_pipeline import LangSAMPipeline

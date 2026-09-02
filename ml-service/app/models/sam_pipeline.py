@@ -29,9 +29,10 @@ logger = get_logger(__name__)
 class LangSAMPipeline:
     def __init__(self,patch_size: int = 1024,overlap: int = 128,device: Optional[str] = None,
                  offline: bool = True,text_threshold: float = 0.15,box_threshold: float = 0.3,
-                 variant: str = "sam2.1_hiera_large"):
+                 variant: str = "sam2.1_hiera_large",batch_size: int = 1):
         self.patch_size = patch_size
         self.overlap = overlap
+        self.batch_size = batch_size
         self.text_threshold = text_threshold
         self.box_threshold = box_threshold
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
@@ -48,24 +49,30 @@ class LangSAMPipeline:
         else:  # online
             self.model = LangSAM()
 
-    def _predict(self, patch: np.ndarray, keyword: str):
+    def _predict(self, patches: list[np.ndarray], keyword: str):
         # autocast for bfloat16 on CUDA
         with contextlib.redirect_stdout(io.StringIO()), torch.autocast(device_type=self.device,dtype=torch.bfloat16,enabled=(self.device == "cuda")):
-            # run the model on the patch with the given keyword
-            res = self.model.predict([Image.fromarray(patch)], [keyword],text_threshold=self.text_threshold,box_threshold=self.box_threshold)
-        masks = res[0].get("masks") if res else None
-        if masks is None or len(masks) == 0:
-            return None
+            # run the model on the patches with the given keyword
+            res = self.model.predict([Image.fromarray(p) for p in patches], [keyword] * len(patches),text_threshold=self.text_threshold,box_threshold=self.box_threshold)
 
-        m = masks.cpu().numpy() if hasattr(masks, "cpu") else np.asarray(masks)
-        m = np.any(m, axis=0) if m.ndim == 3 else m
-        th, tw = patch.shape[:2]
-        if m.shape != (th, tw):
-            m = np.array(Image.fromarray(m.astype(bool)).resize((tw, th), Image.NEAREST))
-        return m
+        out = []
+        for patch, item in zip(patches, res or []):
+            masks = item.get("masks") if item else None
+            if masks is None or len(masks) == 0:
+                out.append(None)
+                continue
+
+            m = masks.cpu().numpy() if hasattr(masks, "cpu") else np.asarray(masks)
+            m = np.any(m, axis=0) if m.ndim == 3 else m
+            th, tw = patch.shape[:2]
+            if m.shape != (th, tw):
+                m = np.array(Image.fromarray(m.astype(bool)).resize((tw, th), Image.NEAREST))
+            out.append(m)
+        return out
 
     def get_full_mask_from_bytes(self, image_bytes: bytes, keyword: str = "tree") -> np.ndarray:
             return tiled_mask(image_bytes, self.patch_size, self.overlap,
-                              lambda p: self._predict(p, keyword), label="langsam")
+                              lambda p: self._predict(p, keyword), label="langsam",
+                              batch_size=self.batch_size)
  
 

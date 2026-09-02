@@ -13,7 +13,7 @@ logger = get_logger(__name__)
 from app.utils.tiling import read_rgb, tiled_mask
 
 class TCDSegformer:
-    def __init__(self,model_id="restor/tcd-segformer-mit-b2",offline: bool = True,patch_size: int = 1024,overlap: int = 128,):
+    def __init__(self,model_id="restor/tcd-segformer-mit-b2",offline: bool = True,patch_size: int = 1024,overlap: int = 128,batch_size: int = 8,):
 
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -35,18 +35,19 @@ class TCDSegformer:
 
         self.patch_size = patch_size
         self.overlap = overlap
+        self.batch_size = batch_size
         self.model.eval()
 
 
 
     @torch.inference_mode()
-    def _predict(self, patch: np.ndarray) -> np.ndarray:
-        inputs = self.processor(images=patch, return_tensors="pt").to(self.device)
+    def _predict(self, patches: list[np.ndarray]) -> np.ndarray:
+        inputs = self.processor(images=patches, return_tensors="pt").to(self.device)
         with torch.autocast(device_type=self.device):
             logits = self.model(**inputs).logits
-        up = torch.nn.functional.interpolate(logits, size=patch.shape[:2], mode="bilinear")
-        return up.argmax(1)[0].cpu().numpy() == 1
+        up = torch.nn.functional.interpolate(logits, size=patches[0].shape[:2], mode="bilinear")
+        return (up.argmax(1) == 1).cpu().numpy()
 
     def get_full_mask_from_bytes(self, image_bytes: bytes) -> np.ndarray:
         return tiled_mask(image_bytes, self.patch_size, self.overlap,
-                          self._predict, label="segformer")
+                          self._predict, label="segformer", batch_size=self.batch_size)

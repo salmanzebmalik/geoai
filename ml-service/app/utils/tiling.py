@@ -18,8 +18,8 @@ def read_rgb(src, window=None) -> np.ndarray:
 
 
 def tiled_mask(image_bytes: bytes, patch_size: int, overlap: int,
-               predict, label: str = "") -> np.ndarray:
-    """predict(patch_hwc_uint8) -> (th, tw) bool array"""
+               predict, label: str = "", batch_size: int = 1) -> np.ndarray:
+    """predict(list of (th, tw, 3) uint8 patches) """
     stride = patch_size - overlap
     t0 = time.time()
 
@@ -27,19 +27,27 @@ def tiled_mask(image_bytes: bytes, patch_size: int, overlap: int,
         h, w = src.height, src.width
         full = np.zeros((h, w), dtype=bool)
         tiles = [(x, y) for y in range(0, h, stride) for x in range(0, w, stride)]
-        logger.info(f"{label} | {h}x{w} | {len(tiles)} tiles")
+        logger.info(f"{label} | {h}x{w} | {len(tiles)} tiles | batch {batch_size}")
+
+        by_shape: dict[tuple[int, int], list[tuple[int, int]]] = {}
+        for x, y in tiles:
+            shape = (min(patch_size, h - y), min(patch_size, w - x))
+            by_shape.setdefault(shape, []).append((x, y))
 
         done = failed = 0
-        for x, y in tiles:
-            th, tw = min(patch_size, h - y), min(patch_size, w - x)
-            try:
-                mask = predict(read_rgb(src, Window(x, y, tw, th)))
-                if mask is not None:
-                    full[y:y + th, x:x + tw] |= np.asarray(mask).astype(bool)
-                done += 1
-            except Exception as e:
-                failed += 1
-                logger.warning(f"{label} tile ({x},{y}) failed: {e}")
+        for (th, tw), coords in by_shape.items():
+            for start in range(0, len(coords), batch_size):
+                chunk = coords[start:start + batch_size]
+                try:
+                    patches = [read_rgb(src, Window(x, y, tw, th)) for x, y in chunk]
+                    masks = predict(patches)
+                    for (x, y), mask in zip(chunk, masks):
+                        if mask is not None:
+                            full[y:y + th, x:x + tw] |= np.asarray(mask).astype(bool)
+                    done += len(chunk)
+                except Exception as e:
+                    failed += len(chunk)
+                    logger.warning(f"{label} batch at {chunk[0]} ({th}x{tw}) failed: {e}")
 
     logger.info(f"{label} | {done}/{len(tiles)} tiles | {failed} failed | {time.time() - t0:.1f}s")
     return full.astype(np.uint8)
