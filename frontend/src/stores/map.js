@@ -17,6 +17,7 @@ export const useMapStore = defineStore('map', () => {
 
   const selectedTask = ref('Tree Detection')
   const modelType = ref('tree')  // 'tree' or 'zeroshot'
+  const modelVariant = ref('sam2.1_hiera_large')
   const keyword = ref('house')    // For zeroshot model
 
   // === Sentinel STAC search filters ===
@@ -153,7 +154,7 @@ export const useMapStore = defineStore('map', () => {
     bbox, areaSqm,
     rasterEstimate, rasterEstimateError, isEstimatingRaster,
     clearRasterEstimate,
-    selectedTask, modelType, keyword, setModelType, setKeyword,
+    selectedTask, modelType, modelVariant, keyword, setModelType, setKeyword,
     sentinelDateFrom, sentinelDateTo, sentinelMaxCloudCover,
     hasPrediction, viewedPrediction, viewedPredictionMeta, viewedQueryId,
     currentQueryId, currentExport, isPredicting, isExporting,

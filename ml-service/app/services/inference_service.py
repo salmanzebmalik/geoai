@@ -13,6 +13,16 @@ logger = get_logger(__name__)
 # True  = watershed instances 
 SPLIT_TOUCHING = False
 
+# Drop instances smaller than 1m squared 
+MIN_AREA_M2 = 1.0
+
+def _min_area_px(mask_shape, bounds) -> int:
+    h, w = mask_shape
+    pixel_area = ((bounds.right - bounds.left) / w) * ((bounds.top - bounds.bottom) / h)
+    if pixel_area <= 0:
+        return 0
+    return int(MIN_AREA_M2 / pixel_area)
+
 
 def read_georeference(image_bytes: bytes):
     """Bounds + CRS of the input crop, as written by tiTiler.
@@ -28,7 +38,8 @@ def read_georeference(image_bytes: bytes):
 
 
 def _mask_to_geojson(mask, bounds, crs, keyword: str) -> dict:
-    labels = mask_to_instances(mask, split_touching=SPLIT_TOUCHING, min_area=0)
+    labels = mask_to_instances(mask, split_touching=SPLIT_TOUCHING,
+                               min_area=_min_area_px(mask.shape, bounds)) # ! min area
     gdf = instances_to_geojson(labels, bounds, crs, class_name=keyword)
     return json.loads(gdf.to_json())
 

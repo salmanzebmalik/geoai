@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel
 
 from app.schemas.geojson import GeoJSONFeatureCollection
@@ -15,6 +17,7 @@ class TreePredictionRequest(BasePredictionRequest):
 
 class ZeroShotPredictionRequest(BasePredictionRequest):
     keyword: str = "tree"
+    model_variant: Literal["sam2.1_hiera_large", "sam2.1_hiera_tiny"] = "sam2.1_hiera_large"
 
 
 class PredictionResponse(BaseModel):

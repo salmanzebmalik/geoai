@@ -18,8 +18,8 @@ def read_rgb(src, window=None) -> np.ndarray:
 
 
 def tiled_mask(image_bytes: bytes, patch_size: int, overlap: int,
-               predict, label: str = "") -> np.ndarray:
-    """predict(patch_hwc_uint8) -> (th, tw) bool array"""
+               predict, label: str = "", batch_size: int = 1) -> np.ndarray:
+    """predict(list of (th, tw, 3) uint8 patches) """
     stride = patch_size - overlap
     t0 = time.time()
 
@@ -27,19 +27,32 @@ def tiled_mask(image_bytes: bytes, patch_size: int, overlap: int,
         h, w = src.height, src.width
         full = np.zeros((h, w), dtype=bool)
         tiles = [(x, y) for y in range(0, h, stride) for x in range(0, w, stride)]
-        logger.info(f"{label} | {h}x{w} | {len(tiles)} tiles")
+        logger.info(f"{label} | {h}x{w} | {len(tiles)} tiles | batch {batch_size}")
 
-        done = failed = 0
+        by_shape: dict[tuple[int, int], list[tuple[int, int]]] = {}
         for x, y in tiles:
-            th, tw = min(patch_size, h - y), min(patch_size, w - x)
-            try:
-                mask = predict(read_rgb(src, Window(x, y, tw, th)))
-                if mask is not None:
-                    full[y:y + th, x:x + tw] |= np.asarray(mask).astype(bool)
-                done += 1
-            except Exception as e:
-                failed += 1
-                logger.warning(f"{label} tile ({x},{y}) failed: {e}")
+            shape = (min(patch_size, h - y), min(patch_size, w - x))
+            by_shape.setdefault(shape, []).append((x, y))
 
-    logger.info(f"{label} | {done}/{len(tiles)} tiles | {failed} failed | {time.time() - t0:.1f}s")
+        done = failed = skipped = 0
+        for (th, tw), coords in by_shape.items():
+            for start in range(0, len(coords), batch_size):
+                chunk = coords[start:start + batch_size]
+                try:
+                    read = [(xy, read_rgb(src, Window(xy[0], xy[1], tw, th))) for xy in chunk]
+                    kept = [(xy, patch) for xy, patch in read if patch.any()]
+                    skipped += len(read) - len(kept)
+                    if not kept:
+                        continue
+
+                    masks = predict([patch for _, patch in kept])
+                    for ((x, y), _), mask in zip(kept, masks):
+                        if mask is not None:
+                            full[y:y + th, x:x + tw] |= np.asarray(mask).astype(bool)
+                    done += len(kept)
+                except Exception as e:
+                    failed += len(chunk)
+                    logger.warning(f"{label} batch at {chunk[0]} ({th}x{tw}) failed: {e}")
+
+    logger.info(f"{label} | {done}/{len(tiles)} tiles | {skipped} empty | {failed} failed | {time.time() - t0:.1f}s")
     return full.astype(np.uint8)

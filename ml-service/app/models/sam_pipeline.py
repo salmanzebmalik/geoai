@@ -4,6 +4,7 @@ import numpy as np
 import torch
 from PIL import Image
 from lang_sam import LangSAM  # https://github.com/luca-medeiros/lang-segment-anything.git
+from lang_sam.models.sam import SAM
 import contextlib
 import io
 
@@ -27,9 +28,13 @@ logger = get_logger(__name__)
 
 
 class LangSAMPipeline:
-    def __init__(self,patch_size: int = 1024,overlap: int = 128,device: Optional[str] = None,offline: bool = True,text_threshold: float = 0.15,box_threshold: float = 0.3):
+    def __init__(self,patch_size: int = 1024,overlap: int = 128,device: Optional[str] = None,
+                 offline: bool = True,text_threshold: float = 0.15,box_threshold: float = 0.3,
+                 variant: str = "sam2.1_hiera_large",batch_size: int = 1,
+                 share_gdino_from: Optional["LangSAMPipeline"] = None):
         self.patch_size = patch_size
         self.overlap = overlap
+        self.batch_size = batch_size
         self.text_threshold = text_threshold
         self.box_threshold = box_threshold
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
@@ -38,32 +43,49 @@ class LangSAMPipeline:
             # set directory paths for local model files
             current_dir = Path(__file__).parent.resolve()
             model_dir = current_dir.parent / "models" / "local_langsam"
-            ensure_langsam_models(model_dir)  # will download if missing (with lock)
-            sam_ckpt_path = f"{model_dir}/sam2.1_hiera_large.pt"
+            ensure_langsam_models(model_dir, variant=variant)  # will download if missing (with lock)
+            sam_ckpt_path = f"{model_dir}/{variant}.pt"
             gdino_model_path = f"{model_dir}/groundingdino_hf_model"
 
-            self.model = LangSAM(sam_type="sam2.1_hiera_large",sam_ckpt_path=sam_ckpt_path,gdino_model_ckpt_path=gdino_model_path,gdino_processor_ckpt_path=gdino_model_path,device=self.device)
+            if share_gdino_from is None:
+                self.model = LangSAM(sam_type=variant,sam_ckpt_path=sam_ckpt_path,gdino_model_ckpt_path=gdino_model_path,gdino_processor_ckpt_path=gdino_model_path,device=self.device)
+            else:
+                # only the SAM checkpoint differs between variants
+                self.model = LangSAM.__new__(LangSAM)
+                # initialize the SAM model with the specified variant and checkpoint
+                self.model.sam_type = variant
+                self.model.sam = SAM()
+                self.model.sam.build_model(variant, sam_ckpt_path, device=self.device)
+                # reuse the GroundingDINO model from the first LangSAMPipeline instance 
+                self.model.gdino = share_gdino_from.model.gdino
+                logger.info(f"{variant} reusing GroundingDINO from {share_gdino_from.model.sam_type}")
         else:  # online
             self.model = LangSAM()
 
-    def _predict(self, patch: np.ndarray, keyword: str):
+    def _predict(self, patches: list[np.ndarray], keyword: str):
         # autocast for bfloat16 on CUDA
         with contextlib.redirect_stdout(io.StringIO()), torch.autocast(device_type=self.device,dtype=torch.bfloat16,enabled=(self.device == "cuda")):
-            # run the model on the patch with the given keyword
-            res = self.model.predict([Image.fromarray(patch)], [keyword],text_threshold=self.text_threshold,box_threshold=self.box_threshold)
-        masks = res[0].get("masks") if res else None
-        if masks is None or len(masks) == 0:
-            return None
+            # run the model on the patches with the given keyword
+            res = self.model.predict([Image.fromarray(p) for p in patches], [keyword] * len(patches),text_threshold=self.text_threshold,box_threshold=self.box_threshold)
 
-        m = masks.cpu().numpy() if hasattr(masks, "cpu") else np.asarray(masks)
-        m = np.any(m, axis=0) if m.ndim == 3 else m
-        th, tw = patch.shape[:2]
-        if m.shape != (th, tw):
-            m = np.array(Image.fromarray(m.astype(bool)).resize((tw, th), Image.NEAREST))
-        return m
+        out = []
+        for patch, item in zip(patches, res or []):
+            masks = item.get("masks") if item else None
+            if masks is None or len(masks) == 0:
+                out.append(None)
+                continue
+
+            m = masks.cpu().numpy() if hasattr(masks, "cpu") else np.asarray(masks)
+            m = np.any(m, axis=0) if m.ndim == 3 else m
+            th, tw = patch.shape[:2]
+            if m.shape != (th, tw):
+                m = np.array(Image.fromarray(m.astype(bool)).resize((tw, th), Image.NEAREST))
+            out.append(m)
+        return out
 
     def get_full_mask_from_bytes(self, image_bytes: bytes, keyword: str = "tree") -> np.ndarray:
             return tiled_mask(image_bytes, self.patch_size, self.overlap,
-                              lambda p: self._predict(p, keyword), label="langsam")
+                              lambda p: self._predict(p, keyword), label="langsam",
+                              batch_size=self.batch_size)
  
 

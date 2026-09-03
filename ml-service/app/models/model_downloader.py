@@ -6,13 +6,11 @@ from .download_models.download_langsam import download_langsam
 from .download_models.download_tcd import download_tcd
 
 
-def ensure_langsam_models(
-    model_dir: Path,
-    force_download: bool = False,  # to refresh download
-    timeout: int = 300,
-) -> None:
+def ensure_langsam_models( model_dir: Path, force_download: bool = False,  # to refresh download
+    timeout: int = 300, variant: str  ="sam2.1_hiera_large") -> None:
     required = [
-        model_dir / "sam2.1_hiera_large.pt",
+        # model_dir / "sam2.1_hiera_large.pt",
+        model_dir / f"{variant}.pt",
         model_dir / "groundingdino_hf_model",
         model_dir / "bert-base-uncased",
     ]
@@ -28,15 +26,11 @@ def ensure_langsam_models(
 
         # download
         print(f"Downloading LangSAM models to {model_dir}...")
-        download_langsam(str(model_dir))
+        download_langsam(str(model_dir), variant=variant)
         print(f"LangSAM models ready")
 
 
-def ensure_segformer_models(
-    model_dir: Path,
-    force_download: bool = False,
-    timeout: int = 300,
-) -> None:
+def ensure_segformer_models( model_dir: Path, force_download: bool = False, timeout: int = 300):
     required = model_dir / "config.json"
     if not force_download and required.exists():
         return
