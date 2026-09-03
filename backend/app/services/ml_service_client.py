@@ -1,26 +1,80 @@
 from pathlib import Path
 from typing import Literal, Optional
-
 import requests
-
 from app.core.config import settings
-from app.schemas.segmentation import BoundingBox
+from app.utils.http import get_http_session
+import logging
+
+ModelType = Literal["tree", "tree_satlas", "tree_unet", "tree_deepforest", "zeroshot", "yolo"]
+
+ML_ENDPOINTS = {
+    "tree": "/api/v1/predict/tree",                      # TCD-Segformer, 10cm ortho
+    "tree_satlas": "/api/v1/predict/tree/satlas",        # Satlas, 5m satellite
+    "tree_unet": "/api/v1/predict/tree/unet",            # UNet, 5m satellite
+    "tree_deepforest": "/api/v1/predict/tree/deepforest",  # DeepForest boxes, 10cm ortho
+    "zeroshot": "/api/v1/predict/zeroshot",
+    "yolo": "/api/v1/predict/yolo"
+}
+
+DEFAULT_BUSY_RETRY_AFTER_SECONDS = 30
+
+logger = logging.getLogger(__name__)
+
+class MLServiceError(RuntimeError):
+    """Base class for safe ML-service failures."""
 
 
-ModelType = Literal["tree", "zeroshot", "yolo"]
+class MLServiceUnavailableError(MLServiceError):
+    def __init__(self):
+        super().__init__(
+            "The prediction service is temporarily unavailable. "
+            "Please try again."
+        )
 
+
+class MLServiceTimeoutError(MLServiceError):
+    def __init__(self):
+        super().__init__(
+            "Model inference timed out. Please try a smaller area."
+        )
+
+
+class MLServiceResponseError(MLServiceError):
+    def __init__(
+        self,
+        status_code: int | None = None,
+    ):
+        self.status_code = status_code
+
+        super().__init__(
+            "The prediction service returned an invalid response. "
+            "Please try again."
+        )
+
+class MLServiceBusyError(MLServiceError):
+    def __init__(self, retry_after_seconds: int):
+        self.retry_after_seconds = retry_after_seconds
+
+        super().__init__(
+            "GPU inference capacity is currently full. "
+            "Please retry later."
+        )
+
+
+def _parse_retry_after_seconds(value: str | None) -> int:
+    if value is None:
+        return DEFAULT_BUSY_RETRY_AFTER_SECONDS
+
+    try:
+        return max(1, int(value))
+    except (TypeError, ValueError):
+        return DEFAULT_BUSY_RETRY_AFTER_SECONDS
 
 def get_ml_endpoint(model_type: ModelType) -> str:
-    if model_type == "tree":
-        return "/api/v1/predict/tree"
-
-    if model_type == "zeroshot":
-        return "/api/v1/predict/zeroshot"
-
-    if model_type == "yolo":
-        return "/api/v1/predict/yolo"
-
-    raise ValueError(f"Unsupported model_type: {model_type}")
+    try:
+        return ML_ENDPOINTS[model_type]
+    except KeyError:
+        raise ValueError(f"Unsupported model_type: {model_type}")
 
 def get_shared_storage_relative_path(path: str | Path) -> str:
     """
@@ -46,19 +100,21 @@ def get_shared_storage_relative_path(path: str | Path) -> str:
 
 def call_ml_service(
     query_id: str,
-    bbox: BoundingBox,
     input_image_path: str,
     model_type: ModelType = "tree",
     keyword: Optional[str] = None,
+    model_variant: Optional[str] = None,
 ) -> dict:
     """
     Call the ML service using the shared-storage image path.
+
+    The ML service georeferences the prediction from the input GeoTIFF's own
+    CRS/bounds, so no bounding box is sent.
 
     Backend sends:
         query_id
         input_image_path
         output_dir
-        bbox coordinates
         optional keyword for zero-shot
     """
 
@@ -75,17 +131,13 @@ def call_ml_service(
         "query_id": query_id,
         "input_image_path": relative_input_image_path,
         "output_dir": output_dir,
-        "min_lon": bbox.min_lon,
-        "min_lat": bbox.min_lat,
-        "max_lon": bbox.max_lon,
-        "max_lat": bbox.max_lat,
     }
 
     if model_type == "zeroshot":
         payload["keyword"] = keyword or "tree"
+        payload["model_variant"] = model_variant or "sam2.1_hiera_large"
 
-    session = requests.Session()
-    session.trust_env = False  # avoids proxy problems on some systems
+    session = get_http_session()
 
     print("\n========== ML Service Request Debug ==========")
     print("URL:", url)
@@ -98,6 +150,10 @@ def call_ml_service(
             url,
             json=payload,
             headers={"Accept": "application/json"},
+            timeout=(
+                settings.ml_connect_timeout_seconds,
+                settings.ml_read_timeout_seconds,
+            ),
         )
 
         print("\n========== ML Service Response Debug ==========")
@@ -106,29 +162,97 @@ def call_ml_service(
         print("Response preview:", response.text[:500])
         print("==============================================\n")
 
+        if response.status_code == 429:
+            raise MLServiceBusyError(
+                retry_after_seconds=_parse_retry_after_seconds(
+                    response.headers.get("Retry-After")
+                )
+            )
+
         response.raise_for_status()
 
-    except requests.exceptions.ConnectionError as e:
-        raise RuntimeError(
-            f"Could not connect to ML service at {settings.ml_service_url}: {e}"
-        ) from e
+    except MLServiceBusyError:
+        raise
 
-    except requests.exceptions.Timeout as e:
-        raise RuntimeError(
-            f"ML service request timed out after 300 seconds: {url}"
-        ) from e
+    except requests.exceptions.Timeout as error:
+        logger.exception(
+            "ML service timed out for query %s using model %s",
+            query_id,
+            model_type,
+        )
 
-    except requests.exceptions.HTTPError as e:
-        raise RuntimeError(
-            f"ML service returned HTTP {response.status_code}: {response.text[:1000]}"
-        ) from e
+        raise MLServiceTimeoutError() from error
 
-    except requests.exceptions.RequestException as e:
-        raise RuntimeError(f"ML service request failed: {e}") from e
+    except requests.exceptions.ConnectionError as error:
+        logger.exception(
+            "ML service connection failed for query %s using model %s",
+            query_id,
+            model_type,
+        )
+
+        raise MLServiceUnavailableError() from error
+
+    except requests.exceptions.HTTPError as error:
+        upstream_response = error.response
+
+        status_code = (
+            upstream_response.status_code
+            if upstream_response is not None
+            else None
+        )
+
+        response_preview = (
+            upstream_response.text[:1000]
+            if upstream_response is not None
+            else str(error)
+        )
+
+        logger.exception(
+            "ML service returned HTTP %s for query %s using model %s. "
+            "Response preview: %r",
+            status_code,
+            query_id,
+            model_type,
+            response_preview,
+        )
+
+        raise MLServiceResponseError(
+            status_code=status_code,
+        ) from error
+
+    except requests.exceptions.RequestException as error:
+        logger.exception(
+            "ML service request failed for query %s using model %s",
+            query_id,
+            model_type,
+        )
+
+        raise MLServiceUnavailableError() from error
 
     try:
-        return response.json()
-    except ValueError as e:
-        raise RuntimeError(
-            f"ML service returned invalid JSON: {response.text[:1000]}"
-        ) from e
+        result = response.json()
+
+    except ValueError as error:
+        logger.exception(
+            "ML service returned invalid JSON for query %s. "
+            "Response preview: %r",
+            query_id,
+            response.text[:1000],
+        )
+
+        raise MLServiceResponseError(
+            status_code=response.status_code,
+        ) from error
+
+    if not isinstance(result, dict):
+        logger.error(
+            "ML service returned a non-object JSON response for query %s: %s",
+            query_id,
+            type(result).__name__,
+        )
+
+        raise MLServiceResponseError(
+            status_code=response.status_code,
+        )
+
+    return result

@@ -2,7 +2,11 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.dependencies import get_lang_sam_model
+from app.dependencies import (
+    acquire_inference_slot,
+    get_lang_sam_models,
+)
+
 from app.schemas.prediction import ZeroShotPredictionRequest, PredictionResponse
 from app.services.storage_service import (
     read_image_from_shared_storage,
@@ -15,10 +19,15 @@ router = APIRouter()
 
 
 @router.post("/zeroshot", response_model=PredictionResponse)
-async def predict_zero_shot(
+def predict_zero_shot(
     request: ZeroShotPredictionRequest,
-    lang_sam=Depends(get_lang_sam_model),
+    lang_sam_models=Depends(get_lang_sam_models),
+    _inference_slot=Depends(acquire_inference_slot),
 ):
+    lang_sam = lang_sam_models.get(request.model_variant)
+    if lang_sam is None:
+        raise HTTPException(503, f"LangSAM ({request.model_variant}) still loading")
+
     query_id = request.query_id or str(uuid4())
 
     print("ML Service: Running Zero-Shot Query:", query_id)
@@ -29,17 +38,9 @@ async def predict_zero_shot(
             output_dir=request.output_dir,
         )
 
-        bbox = (
-            request.min_lon,
-            request.min_lat,
-            request.max_lon,
-            request.max_lat,
-        )
-
         geojson_dict = run_zero_shot_detection(
             pipeline=lang_sam,
             image_bytes=image_bytes,
-            bbox_coords=bbox,
             keyword=request.keyword,
         )
 
@@ -54,7 +55,7 @@ async def predict_zero_shot(
         return PredictionResponse(
             query_id=query_id,
             status="completed",
-            model_name="lang-sam",
+            model_name=f"lang-sam-{request.model_variant}",
             prediction_type="zero_shot_detection",
             result_path=result_path,
             feature_count=feature_count,

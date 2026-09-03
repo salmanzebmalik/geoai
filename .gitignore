@@ -37,15 +37,15 @@ htmlcov/
 # Environment variables / secrets
 # ============================================================
 
-.env
-*.env
-backend/.env
-ml-service/.env
+# .env
+# *.env
+# backend/.env
+# ml-service/.env
 
-# Keep example env files
-!.env.example
-!backend/.env.example
-!ml-service/.env.example
+# # Keep example env files
+# !.env.example
+# !backend/.env.example
+# !ml-service/.env.example
 
 
 # ============================================================
@@ -117,6 +117,7 @@ Grounded-SAM-2/
 *.dbf
 *.prj
 *.cpg
+*.arrow
 
 
 # ============================================================
@@ -127,6 +128,9 @@ Grounded-SAM-2/
 *.jpg
 *.jpeg
 *.webp
+
+# ...except UI assets bundled with the frontend
+!frontend/src/assets/**
 
 
 # ============================================================

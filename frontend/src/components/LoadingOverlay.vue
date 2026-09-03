@@ -16,13 +16,6 @@
         />
         <div class="progress-label">{{ Math.round(progress) }}%</div>
       </v-card-text>
-
-      <v-card-actions class="justify-end">
-        <!-- TODO: really cancel prediction if clicked -->
-        <v-btn variant="tonal" color="white" size="small">
-          Cancel prediction
-        </v-btn>
-      </v-card-actions>
     </v-card>
   </div>
 </template>
@@ -44,7 +37,7 @@ watch(() => mapStore.isPredicting, (predicting) => {
     visible.value = true
 
     // estimation for total time based on area size (min 500ms)
-    const totalMs = Math.max((mapStore.areaSqm ?? 0) / 1_000_000 * 30000, 500)
+    const totalMs = Math.max((mapStore.areaSqm ?? 0) / 1_000_000 * 200000, 500) // 1500 seconds per square kilometer, minimum 0.5 seconds
     const tickMs = 100 // update progress every 100ms
     const maxProgress = 95 // don't reach 100% until prediction is done
 
