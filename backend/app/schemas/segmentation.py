@@ -6,12 +6,13 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 SourceType = Literal["satellite", "ortho", "sentinel"]
-ModelType = Literal["tree", "tree_satlas", "tree_unet", "tree_deepforest", "zeroshot"]
+ModelType = Literal["tree", "tree_satlas", "tree_unet", "tree_deepforest", "zeroshot", "yolo"]
 MODELS_BY_SOURCE: dict[SourceType, tuple[ModelType, ...]] = {
     "ortho": (
         "tree",
         "tree_deepforest",
         "zeroshot",
+        "yolo"
     ),
     "satellite": (
         "tree_satlas",
