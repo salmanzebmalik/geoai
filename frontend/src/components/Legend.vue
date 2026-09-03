@@ -21,7 +21,7 @@
           <span
             class="swatch"
             :style="{
-              backgroundColor: fillColor(entry.color, 0.35),
+              backgroundColor: fillColor(entry.color, 0.5),
               borderColor: entry.color,
             }"
           />
@@ -108,10 +108,13 @@ const treeCount = computed(() => {
   flex-direction: column;
   gap: 4px;
   padding: 8px 12px;
-  background-color: #1b2e1be1;
+  /* Light panel like the other overlays; the shadow separates it from bright
+     imagery, where a flat white box would blend into roofs and roads. */
+  background-color: rgba(255, 255, 255, 0.94);
   border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
   font-size: 13px;
-  color: #ffffff;
+  color: rgba(0, 0, 0, 0.87);
   white-space: nowrap;
   transition: right 0.2s ease;
 }
@@ -143,7 +146,7 @@ const treeCount = computed(() => {
 
 /* Hidden class: keep the row readable but clearly switched off. */
 .legend-row--off {
-  opacity: 0.45;
+  opacity: 0.55;
 }
 
 .legend-row--off .label {
@@ -182,10 +185,13 @@ const treeCount = computed(() => {
   border-radius: 3px;
   border: 1.5px solid transparent;
   border-style: solid;
+  /* Hairline ring: the paler palette entries would otherwise wash out
+     against the light panel. */
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15);
 }
 
 .swatch--default {
-  background-color: rgba(0, 200, 100, 0.35);
+  background-color: rgba(0, 200, 100, 0.5);
   border-color: #00c864;
 }
 </style>
