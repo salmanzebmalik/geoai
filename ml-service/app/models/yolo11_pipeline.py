@@ -4,7 +4,7 @@ from pathlib import Path
 
 
 class YOLO11Pipeline:
-    def __init__(self, model_path: str = "app/models/yolo11/best_yolo11v1.pt"):
+    def __init__(self, model_path: str = "app/models/download_models/yolo11/best_yolo11v1.pt"):
         self.model = YOLO(model_path)
 
     def predict(self, image_path: str, conf: float = 0.25):
@@ -29,6 +29,7 @@ class YOLO11Pipeline:
                     "bbox": coords,
                     "confidence": confidence,
                     "class_id": class_id,
-                    "class_name": class_name})
+                    "class_name": class_name
+                })
 
         return detections
