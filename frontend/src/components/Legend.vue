@@ -5,25 +5,43 @@
     :class="{ 'legend--shifted': mapStore.historyDrawerOpen }"
   >
     <!-- Zero-shot runs tag every polygon with its keyword, so one prediction
-         can carry several classes; click a row to hide or show that class. -->
+         can carry several classes; click a row to hide or show that class.
+         Long lists stay collapsed so the legend does not cover the map. -->
     <template v-if="classes.length">
+      <div class="legend-classes">
+        <button
+          v-for="entry in visibleClasses"
+          :key="entry.name"
+          type="button"
+          class="legend-row legend-row--toggle"
+          :class="{ 'legend-row--off': isHidden(entry.name) }"
+          :title="isHidden(entry.name) ? 'Show this class' : 'Hide this class'"
+          @click="mapStore.togglePredictionClass(entry.name)"
+        >
+          <span
+            class="swatch"
+            :style="{
+              backgroundColor: fillColor(entry.color, 0.35),
+              borderColor: entry.color,
+            }"
+          />
+          <span class="label">{{ entry.name }}</span>
+        </button>
+      </div>
+
       <button
-        v-for="entry in classes"
-        :key="entry.name"
+        v-if="isCollapsible"
         type="button"
-        class="legend-row legend-row--toggle"
-        :class="{ 'legend-row--off': isHidden(entry.name) }"
-        :title="isHidden(entry.name) ? 'Show this class' : 'Hide this class'"
-        @click="mapStore.togglePredictionClass(entry.name)"
+        class="legend-row legend-row--toggle legend-more"
+        @click="expanded = !expanded"
       >
-        <span
-          class="swatch"
-          :style="{
-            backgroundColor: fillColor(entry.color, 0.35),
-            borderColor: entry.color,
-          }"
+        <v-icon
+          size="14"
+          :icon="expanded ? 'mdi-chevron-up' : 'mdi-chevron-down'"
         />
-        <span class="label">{{ entry.name }}</span>
+        <span class="label">
+          {{ expanded ? 'Show less' : `${classes.length - COLLAPSED_COUNT} more` }}
+        </span>
       </button>
     </template>
 
@@ -42,13 +60,33 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useMapStore } from '@/stores/map'
 import { fillColor } from '@/utils/predictionColors'
 
 const mapStore = useMapStore()
 
 const classes = computed(() => mapStore.predictionClasses)
+
+// A prediction can carry up to 20 classes; show the first few and let the user
+// unfold the rest instead of running the legend down the whole map.
+const COLLAPSED_COUNT = 5
+const expanded = ref(false)
+
+const isCollapsible = computed(
+  () => classes.value.length > COLLAPSED_COUNT,
+)
+
+const visibleClasses = computed(() =>
+  isCollapsible.value && !expanded.value
+    ? classes.value.slice(0, COLLAPSED_COUNT)
+    : classes.value,
+)
+
+// A new prediction starts collapsed again.
+watch(classes, () => {
+  expanded.value = false
+})
 
 function isHidden(name) {
   return mapStore.hiddenPredictionClasses.includes(name)
@@ -114,6 +152,23 @@ const treeCount = computed(() => {
 
 .legend-row--off .swatch {
   background-color: transparent !important;
+}
+
+.legend-classes {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  /* Even unfolded, 20 classes must not push the legend off screen. */
+  max-height: 45vh;
+  overflow-y: auto;
+}
+
+.legend-more {
+  opacity: 0.8;
+}
+
+.legend-more .label {
+  font-style: italic;
 }
 
 .count {

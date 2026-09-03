@@ -2,8 +2,14 @@
 // Map.vue styles the polygons and Legend.vue draws the swatches, so both have to
 // derive the same colour for the same class - keep the lookup in one place.
 
-// The first entry is the green the map used before multi-class support, so a
-// single-class prediction still looks the way it always did.
+// 20 colours, matching the 20 keywords the backend accepts per prediction
+// (`keywords` in backend/app/schemas/segmentation.py), so no two classes of one
+// prediction can share a colour.
+//
+// The first eight are hand-picked; the rest were chosen offline by maximising
+// the smallest CIELAB distance to all previous ones, which keeps them apart on
+// the imagery and in the legend. The first entry is the green the map used
+// before multi-class support, so a single-class prediction looks unchanged.
 const CLASS_PALETTE = [
   '#00c864',
   '#ff8c1a',
@@ -13,11 +19,24 @@ const CLASS_PALETTE = [
   '#22d3d3',
   '#ff5c5c',
   '#9b7bff',
+  '#dfbf90',
+  '#1414cc',
+  '#df90b5',
+  '#aaea2a',
+  '#bc246b',
+  '#ae6432',
+  '#bee887',
+  '#328dae',
+  '#b72aea',
+  '#aea232',
+  '#2aea36',
+  '#324fae',
 ]
 
 export const DEFAULT_CLASS_COLOR = CLASS_PALETTE[0]
 
-// Palette colour for the n-th class of a prediction; wraps around for long lists.
+// Palette colour for the n-th class of a prediction. Past 20 classes - which
+// the backend does not allow - it wraps and colours repeat.
 export function colorForClassIndex(index) {
   return CLASS_PALETTE[index % CLASS_PALETTE.length]
 }
