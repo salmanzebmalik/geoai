@@ -35,6 +35,31 @@
           </div>
         </div>
 
+        <!-- Classes switched off in the legend are dropped from the export,
+             so the file matches what is on the map. -->
+        <div v-if="canLimitToVisible" class="class-filter">
+          <v-switch
+            v-model="limitToVisible"
+            color="success"
+            density="compact"
+            hide-details
+            :label="`Only export classes visible on the map (${visibleClassNames.length} of ${mapStore.predictionClasses.length})`"
+          />
+          <div class="class-filter-hint">
+            Hidden: {{ hiddenClassNames.join(', ') }}
+          </div>
+        </div>
+
+        <v-alert
+          v-if="allClassesHidden"
+          type="info"
+          variant="tonal"
+          density="compact"
+          class="mt-4"
+        >
+          Every class is hidden on the map, so the export contains all of them.
+        </v-alert>
+
         <v-alert v-if="error" type="error" variant="tonal" class="mt-4">
           {{ error }}
         </v-alert>
@@ -94,7 +119,7 @@
 </template>
 
 <script setup>
-import { reactive, ref, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { useMapStore } from '@/stores/map'
 
 const mapStore = useMapStore()
@@ -107,9 +132,47 @@ const form = reactive({
   overlay_opacity: 0.45,
 })
 
+// Whether to narrow the export to the classes still visible in the legend.
+const limitToVisible = ref(true)
+
+const visibleClassNames = computed(() =>
+  mapStore.predictionClasses
+    .map((entry) => entry.name)
+    .filter((name) => !mapStore.hiddenPredictionClasses.includes(name)),
+)
+
+const hiddenClassNames = computed(() =>
+  mapStore.predictionClasses
+    .map((entry) => entry.name)
+    .filter((name) => mapStore.hiddenPredictionClasses.includes(name)),
+)
+
+// The classes in the store belong to the prediction on the map, which is not
+// necessarily the one being exported - the history drawer can export a
+// prediction without displaying it. Only offer the filter when they match.
+const exportsDisplayedPrediction = computed(
+  () => Boolean(mapStore.currentQueryId)
+    && mapStore.viewedQueryId === mapStore.currentQueryId,
+)
+
+const canLimitToVisible = computed(
+  () => exportsDisplayedPrediction.value
+    && hiddenClassNames.value.length > 0
+    && visibleClassNames.value.length > 0,
+)
+
+// Every class hidden would send an empty label list, which the backend reads
+// as "no filter" - so say plainly that the export covers everything.
+const allClassesHidden = computed(
+  () => exportsDisplayedPrediction.value
+    && mapStore.predictionClasses.length > 0
+    && visibleClassNames.value.length === 0,
+)
+
 watch(() => mapStore.exportDialogTrigger, () => {
   open.value = true
   error.value = null
+  limitToVisible.value = true
   loadHistory()
 })
 
@@ -150,6 +213,10 @@ async function createExport() {
       include_metadata: true,
       include_zip: true,
     }
+
+    if (canLimitToVisible.value && limitToVisible.value) {
+      options.filters = { labels: visibleClassNames.value }
+    }
     const response = await fetch('/api/segmentation/exports', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -174,6 +241,16 @@ function download(artifact) {
 <style scoped>
 .export-dialog-card {
   padding: 8px;
+}
+
+.class-filter {
+  margin-top: 8px;
+}
+
+.class-filter-hint {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.6);
+  margin-left: 4px;
 }
 
 .export-title {
