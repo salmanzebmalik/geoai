@@ -7,7 +7,7 @@ from app.core.config import settings
 from app.schemas.segmentation import BoundingBox
 
 
-ModelType = Literal["tree", "zeroshot"]
+ModelType = Literal["tree", "zeroshot", "yolo"]
 
 
 def get_ml_endpoint(model_type: ModelType) -> str:
@@ -16,6 +16,9 @@ def get_ml_endpoint(model_type: ModelType) -> str:
 
     if model_type == "zeroshot":
         return "/api/v1/predict/zeroshot"
+
+    if model_type == "yolo":
+        return "/api/v1/predict/yolo"
 
     raise ValueError(f"Unsupported model_type: {model_type}")
 
