@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 SourceType = Literal["satellite", "ortho", "sentinel"]
 ModelType = Literal["tree", "tree_satlas", "tree_unet", "tree_deepforest", "zeroshot", "yolo"]
+ModelVariant = Literal["sam2.1_hiera_large", "sam2.1_hiera_tiny"]
 MODELS_BY_SOURCE: dict[SourceType, tuple[ModelType, ...]] = {
     "ortho": (
         "tree",
