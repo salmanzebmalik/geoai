@@ -5,7 +5,7 @@ from app.core.config import settings
 from app.utils.http import get_http_session
 import logging
 
-ModelType = Literal["tree", "tree_satlas", "tree_unet", "tree_deepforest", "zeroshot"]
+ModelType = Literal["tree", "tree_satlas", "tree_unet", "tree_deepforest", "zeroshot", "yolo"]
 
 ML_ENDPOINTS = {
     "tree": "/api/v1/predict/tree",                      # TCD-Segformer, 10cm ortho
@@ -13,12 +13,12 @@ ML_ENDPOINTS = {
     "tree_unet": "/api/v1/predict/tree/unet",            # UNet, 5m satellite
     "tree_deepforest": "/api/v1/predict/tree/deepforest",  # DeepForest boxes, 10cm ortho
     "zeroshot": "/api/v1/predict/zeroshot",
+    "yolo": "/api/v1/predict/yolo"
 }
 
 DEFAULT_BUSY_RETRY_AFTER_SECONDS = 30
 
 logger = logging.getLogger(__name__)
-
 
 class MLServiceError(RuntimeError):
     """Base class for safe ML-service failures."""

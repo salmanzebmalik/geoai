@@ -391,6 +391,7 @@ const TREE_MODELS_BY_MAP_TYPE = {
   orthophoto: [
     { title: 'TCD-Segformer', value: 'tree' },
     { title: 'DeepForest Boxes', value: 'tree_deepforest' },
+    { title: 'YOLO11', value: 'yolo' },
   ],
   germany: [
     { title: 'Satlas', value: 'tree_satlas' },

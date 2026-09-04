@@ -13,6 +13,11 @@ def get_segformer_model(request: Request):
         raise HTTPException(503, "Segformer still loading")
     return model
 
+def get_yolo11_model(request: Request):
+    model = request.app.state.models.get("yolo11")
+    if model is None:
+        raise HTTPException(503, "YOLOv11 still loading")
+    return model
 
 def get_lang_sam_models(request: Request):
     return {

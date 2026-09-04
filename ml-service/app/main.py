@@ -11,7 +11,7 @@ from app.services.inference_gate import InferenceGate
 
 # Consts & inits
 logger = get_logger(__name__)
-MODEL_NAMES = ["segformer", "lang_sam_large", "lang_sam_tiny", "satlas_tree", "unet_tree", "deepforest"]
+MODEL_NAMES = ["segformer", "lang_sam_large", "lang_sam_tiny", "satlas_tree", "unet_tree", "deepforest", "yolo11"]
 OFFLINE = True
 
 def _load_all(app: FastAPI) -> None:
@@ -30,6 +30,7 @@ def _load_all(app: FastAPI) -> None:
     from app.models.satlas_tree_pipeline import SatlasTreePipeline
     from app.models.unet_tree_pipeline import UNetTreePipeline
     from app.models.deepforest_pipeline import DeepForestPipeline
+    from app.models.yolo11_pipeline import YOLO11Pipeline
 
     logger.info(f"imports done at {time.time() - t0:.1f}s")
 
@@ -48,6 +49,7 @@ def _load_all(app: FastAPI) -> None:
         "segformer":   lambda: TCDSegformer(offline=OFFLINE, patch_size=1024, overlap=128, batch_size=8),
         "satlas_tree": lambda: SatlasTreePipeline(patch_size=512, overlap=64),
         "unet_tree":   lambda: UNetTreePipeline(),
+        "yolo11":      lambda: YOLO11Pipeline(),
     }
 
     with ThreadPoolExecutor(max_workers=len(model_mapping), thread_name_prefix="load") as pool:
