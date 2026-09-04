@@ -23,7 +23,8 @@ ARTIFACT_SUFFIXES = {
 }
 
 MODEL_TYPES = ("tree", "tree_satlas", "tree_unet", "tree_deepforest", "zeroshot")
-SOURCE_TYPES = ("satellite", "ortho")
+MODEL_VARIANTS = ("sam2.1_hiera_large", "sam2.1_hiera_tiny")
+SOURCE_TYPES = ("satellite", "ortho", "sentinel")
 MODELS_BY_SOURCE = {
     "ortho": (
         "tree",
@@ -31,6 +32,10 @@ MODELS_BY_SOURCE = {
         "zeroshot",
     ),
     "satellite": (
+        "tree_satlas",
+        "tree_unet",
+    ),
+    "sentinel": (
         "tree_satlas",
         "tree_unet",
     ),
@@ -59,12 +64,24 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--version", action="version", version=__version__)
 
     commands = parser.add_subparsers(dest="command", required=True)
+    _add_estimate_command(commands)
     _add_fetch_image_command(commands)
     _add_predict_command(commands)
     _add_predict_export_command(commands)
     _add_results_commands(commands)
     _add_exports_commands(commands)
     return parser
+
+
+def _add_estimate_command(commands: argparse._SubParsersAction) -> None:
+    parser = commands.add_parser(
+        "estimate",
+        help="estimate raster size and check processing limits",
+    )
+    _add_bbox_arguments(parser)
+    _add_source_argument(parser, default="ortho")
+    parser.add_argument("--model-type", choices=MODEL_TYPES)
+    parser.set_defaults(handler=_estimate)
 
 
 def _add_fetch_image_command(commands: argparse._SubParsersAction) -> None:
@@ -77,6 +94,7 @@ def _add_fetch_image_command(commands: argparse._SubParsersAction) -> None:
         parser,
         default="satellite",
     )
+    _add_sentinel_arguments(parser)
     parser.set_defaults(handler=_fetch_image)
 
 
@@ -111,6 +129,15 @@ def _add_results_commands(commands: argparse._SubParsersAction) -> None:
     download.add_argument("query_id")
     download.add_argument("-o", "--output", type=Path)
     download.set_defaults(handler=_results_download)
+
+    delete = actions.add_parser("delete", help="delete one prediction and its files")
+    delete.add_argument("query_id")
+    delete.add_argument(
+        "--yes",
+        action="store_true",
+        help="skip the interactive confirmation",
+    )
+    delete.set_defaults(handler=_results_delete)
 
 
 def _add_exports_commands(commands: argparse._SubParsersAction) -> None:
@@ -180,6 +207,22 @@ def _add_prediction_arguments(parser: argparse.ArgumentParser) -> None:
         default=[],
         help="zero-shot search term; repeat for multiple terms",
     )
+    parser.add_argument(
+        "--model-variant",
+        choices=MODEL_VARIANTS,
+        help="LangSAM variant (zeroshot default: sam2.1_hiera_large)",
+    )
+    _add_sentinel_arguments(parser)
+
+
+def _add_sentinel_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--date-from", help="Sentinel start date (YYYY-MM-DD)")
+    parser.add_argument("--date-to", help="Sentinel end date (YYYY-MM-DD)")
+    parser.add_argument(
+        "--max-cloud-cover",
+        type=float,
+        help="maximum Sentinel cloud cover in percent",
+    )
 
 
 def _add_export_arguments(parser: argparse.ArgumentParser) -> None:
@@ -239,11 +282,26 @@ def _add_export_arguments(parser: argparse.ArgumentParser) -> None:
     )
 
 
-def _fetch_image(client: APIClient, args: argparse.Namespace) -> Any:
+def _estimate(client: APIClient, args: argparse.Namespace) -> Any:
+    if args.model_type is not None:
+        _validate_model_source(args.model_type, args.source_type)
     return client.post(
-        "fetch-image",
-        {"bbox": _bbox_payload(args.bbox), "source_type": args.source_type},
+        "estimate",
+        {
+            "bbox": _bbox_payload(args.bbox),
+            "source_type": args.source_type,
+            "model_type": args.model_type,
+        },
     )
+
+
+def _fetch_image(client: APIClient, args: argparse.Namespace) -> Any:
+    payload = {
+        "bbox": _bbox_payload(args.bbox),
+        "source_type": args.source_type,
+    }
+    payload.update(_sentinel_payload(args))
+    return client.post("fetch-image", payload)
 
 
 def _predict(client: APIClient, args: argparse.Namespace) -> Any:
@@ -267,6 +325,18 @@ def _results_show(client: APIClient, args: argparse.Namespace) -> Any:
 def _results_download(client: APIClient, args: argparse.Namespace) -> None:
     output = args.output or Path(f"prediction-{args.query_id}.geojson")
     _download(client, f"results/{args.query_id}/geojson", output)
+
+
+def _results_delete(client: APIClient, args: argparse.Namespace) -> Any:
+    if not args.yes:
+        answer = input(
+            f"Delete prediction {args.query_id} and all of its files? [y/N] "
+        )
+        if answer.strip().lower() not in {"y", "yes"}:
+            print("Deletion cancelled.")
+            return None
+    client.delete(f"results/{args.query_id}")
+    return {"query_id": args.query_id, "deleted": True}
 
 
 def _exports_list(client: APIClient, args: argparse.Namespace) -> Any:
@@ -320,16 +390,7 @@ def _bbox_payload(values: list[float]) -> dict[str, float]:
 
 
 def _prediction_payload(args: argparse.Namespace) -> dict[str, Any]:
-    allowed_models = MODELS_BY_SOURCE[args.source_type]
-
-    if args.model_type not in allowed_models:
-        allowed_text = ", ".join(allowed_models)
-
-        raise ValueError(
-            f"model type '{args.model_type}' is not compatible with "
-            f"source type '{args.source_type}'. Allowed models: "
-            f"{allowed_text}"
-        )
+    _validate_model_source(args.model_type, args.source_type)
         
     keywords = list(dict.fromkeys(term.strip() for term in args.keyword if term.strip()))
     
@@ -338,12 +399,55 @@ def _prediction_payload(args: argparse.Namespace) -> dict[str, Any]:
     
     if args.model_type != "zeroshot" and keywords:
         raise ValueError("--keyword can only be used with model type zeroshot")
-    
-    return {
+
+    if args.model_type != "zeroshot" and args.model_variant is not None:
+        raise ValueError("--model-variant can only be used with model type zeroshot")
+
+    payload = {
         "bbox": _bbox_payload(args.bbox),
         "model_type": args.model_type,
         "keywords": keywords,
         "source_type": args.source_type,
+    }
+    if args.model_type == "zeroshot":
+        payload["model_variant"] = (
+            args.model_variant or "sam2.1_hiera_large"
+        )
+    payload.update(_sentinel_payload(args))
+    return payload
+
+
+def _validate_model_source(model_type: str, source_type: str) -> None:
+    allowed_models = MODELS_BY_SOURCE[source_type]
+    if model_type not in allowed_models:
+        allowed_text = ", ".join(allowed_models)
+        raise ValueError(
+            f"model type '{model_type}' is not compatible with "
+            f"source type '{source_type}'. Allowed models: {allowed_text}"
+        )
+
+
+def _sentinel_payload(args: argparse.Namespace) -> dict[str, Any]:
+    values = {
+        "date_from": args.date_from,
+        "date_to": args.date_to,
+        "max_cloud_cover": args.max_cloud_cover,
+    }
+    supplied = any(value is not None for value in values.values())
+    if supplied and args.source_type != "sentinel":
+        raise ValueError(
+            "--date-from, --date-to and --max-cloud-cover require "
+            "source type sentinel"
+        )
+    if (
+        args.max_cloud_cover is not None
+        and not 0 <= args.max_cloud_cover <= 100
+    ):
+        raise ValueError("--max-cloud-cover must be between 0 and 100")
+    return {
+        key: value
+        for key, value in values.items()
+        if value is not None
     }
 
 

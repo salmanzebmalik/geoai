@@ -44,6 +44,10 @@ class RecordingClient:
         self.calls.append(("POST", path, payload))
         return {"ok": True}
 
+    def delete(self, path):
+        self.calls.append(("DELETE", path, None))
+        return None
+
 
 class CLICommandTests(unittest.TestCase):
     def setUp(self):
@@ -99,6 +103,28 @@ class CLICommandTests(unittest.TestCase):
 
         payload = self.client.calls[0][2]
         self.assertEqual(payload["keywords"], ["building", "car"])
+        self.assertEqual(payload["model_variant"], "sam2.1_hiera_large")
+
+    def test_zeroshot_prediction_selects_tiny_variant(self):
+        self.invoke(
+            [
+                "predict",
+                "--bbox",
+                "7.61",
+                "51.95",
+                "7.62",
+                "51.96",
+                "--model-type",
+                "zeroshot",
+                "--model-variant",
+                "sam2.1_hiera_tiny",
+                "--keyword",
+                "building",
+            ]
+        )
+
+        payload = self.client.calls[0][2]
+        self.assertEqual(payload["model_variant"], "sam2.1_hiera_tiny")
 
     def test_zeroshot_requires_a_keyword(self):
         args = self.parser.parse_args(
@@ -152,12 +178,94 @@ class CLICommandTests(unittest.TestCase):
         self.assertEqual(options["filters"]["geometry_types"], ["Polygon"])
         self.assertEqual(options["filters"]["labels"], ["tree"])
 
+    def test_predict_export_forwards_tiny_variant(self):
+        self.invoke(
+            [
+                "predict-export",
+                "--bbox",
+                "7.61",
+                "51.95",
+                "7.62",
+                "51.96",
+                "--model-type",
+                "zeroshot",
+                "--model-variant",
+                "sam2.1_hiera_tiny",
+                "--keyword",
+                "building",
+                "--mask-tiff",
+            ]
+        )
+
+        method, path, payload = self.client.calls[0]
+        self.assertEqual((method, path), ("POST", "export/predict"))
+        self.assertEqual(payload["model_variant"], "sam2.1_hiera_tiny")
+        self.assertTrue(payload["export"]["include_mask_tiff"])
+
     def test_export_list_filters_by_query(self):
         self.invoke(["exports", "list", "--query-id", "query-1"])
         self.assertEqual(
             self.client.calls[0],
             ("GET", "exports", {"query_id": "query-1"}),
         )
+
+    def test_sentinel_prediction_forwards_imagery_filters(self):
+        self.invoke(
+            [
+                "predict",
+                "--bbox",
+                "7.61",
+                "51.95",
+                "7.62",
+                "51.96",
+                "--source-type",
+                "sentinel",
+                "--model-type",
+                "tree_satlas",
+                "--date-from",
+                "2023-06-01",
+                "--date-to",
+                "2023-06-30",
+                "--max-cloud-cover",
+                "15",
+            ]
+        )
+
+        payload = self.client.calls[0][2]
+        self.assertEqual(payload["source_type"], "sentinel")
+        self.assertEqual(payload["date_from"], "2023-06-01")
+        self.assertEqual(payload["date_to"], "2023-06-30")
+        self.assertEqual(payload["max_cloud_cover"], 15.0)
+
+    def test_estimate_posts_model_and_bbox(self):
+        self.invoke(
+            [
+                "estimate",
+                "--bbox",
+                "7.61",
+                "51.95",
+                "7.62",
+                "51.96",
+                "--source-type",
+                "sentinel",
+                "--model-type",
+                "tree_unet",
+            ]
+        )
+
+        method, path, payload = self.client.calls[0]
+        self.assertEqual((method, path), ("POST", "estimate"))
+        self.assertEqual(payload["source_type"], "sentinel")
+        self.assertEqual(payload["model_type"], "tree_unet")
+
+    def test_result_delete_can_skip_confirmation(self):
+        result = self.invoke(["results", "delete", "query-1", "--yes"])
+
+        self.assertEqual(
+            self.client.calls[0],
+            ("DELETE", "results/query-1", None),
+        )
+        self.assertEqual(result, {"query_id": "query-1", "deleted": True})
 
     def test_prediction_defaults_are_compatible(self):
         self.invoke(

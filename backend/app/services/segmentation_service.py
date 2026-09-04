@@ -38,6 +38,7 @@ from app.services.satellite_image_service import (
     TiTilerUnavailableError,
     fetch_satellite_image_from_titiler,
 )
+from app.utils.model_metadata import stored_model_variant
 from pyproj import Geod
 from shapely.geometry import box as shp_box, mapping, shape
 from shapely.ops import unary_union
@@ -89,6 +90,7 @@ def build_result_url(query_id: UUID | str) -> str:
 def build_prediction_output_from_ml_result(
     query_id: UUID | str,
     ml_result: dict,
+    request: PredictionRequest | None = None,
 ) -> PredictionOutput:
     """
     Build the public response sent to the frontend.
@@ -99,6 +101,11 @@ def build_prediction_output_from_ml_result(
     return PredictionOutput(
         prediction_type=ml_result["prediction_type"],
         model_name=ml_result["model_name"],
+        model_variant=(
+            request.model_variant
+            if request is not None and request.model_type == "zeroshot"
+            else None
+        ),
         result_url=build_result_url(query_id),
         feature_count=ml_result["feature_count"],
         summary=ml_result.get("summary"),
@@ -125,6 +132,11 @@ def build_stored_prediction_metadata(
     if request is not None:
         metadata.update(
             model_type=request.model_type,
+            model_variant=(
+                request.model_variant
+                if request.model_type == "zeroshot"
+                else None
+            ),
             keywords=request.requested_keywords(),
             source_type=request.source_type,
         )
@@ -466,6 +478,7 @@ def create_prediction(
         prediction_output = build_prediction_output_from_ml_result(
             query_id=db_query.id,
             ml_result=ml_result,
+            request=request,
         )
 
         update_prediction_status(
@@ -650,6 +663,7 @@ def get_prediction_history(
             created_at=item.created_at,
             prediction_type=item.prediction_result.get("prediction_type"),
             model_name=item.prediction_result.get("model_name"),
+            model_variant=stored_model_variant(item.prediction_result),
             summary=item.prediction_result.get("summary"),
             keywords=item.prediction_result.get("keywords", []),
         )
@@ -703,6 +717,7 @@ def get_prediction_by_id(
             prediction = PredictionOutput(
                 prediction_type=stored_result["prediction_type"],
                 model_name=stored_result["model_name"],
+                model_variant=stored_model_variant(stored_result),
                 result_url=build_result_url(result.id),
                 feature_count=feature_count,
                 summary=stored_result.get("summary"),

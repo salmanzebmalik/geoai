@@ -71,6 +71,7 @@ from app.utils.raster_budget import (
     raster_fits_budget,
     validate_raster_budget,
 )
+from app.utils.model_metadata import stored_model_variant
 import logging
 
 
@@ -150,6 +151,8 @@ def build_export_response(manifest: dict) -> ExportResponse:
         query_id=manifest["query_id"],
         created_at=manifest["created_at"],
         model_type=prediction.get("model_type"),
+        model_name=prediction.get("model_name"),
+        model_variant=stored_model_variant(prediction),
         keywords=prediction.get("keywords", []),
         source_feature_count=manifest["source_feature_count"],
         exported_feature_count=manifest["exported_feature_count"],
@@ -173,6 +176,7 @@ def prediction_export_metadata(query: SegmentationQuery) -> dict:
     return {
         "model_type": stored.get("model_type"),
         "model_name": stored.get("model_name"),
+        "model_variant": stored_model_variant(stored),
         "prediction_type": stored.get("prediction_type"),
         "keywords": stored.get("keywords", []),
         "source_type": stored.get("source_type"),
