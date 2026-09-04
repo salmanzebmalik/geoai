@@ -1,11 +1,10 @@
-from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from app.core.config import settings
 from app.models.yolo11_pipeline import YOLO11Pipeline
+from app.services.storage_service import read_image_from_shared_storage
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -33,23 +32,14 @@ async def predict_yolo(payload: YoloPredictionRequest):
     and return a GeoJSON FeatureCollection.
     """
     try:
-        # Resolve full absolute path using shared storage root
-        full_image_path = Path(settings.shared_storage_path) / payload.input_image_path
-
-        if not full_image_path.exists():
-            logger.error(f"Image not found at path: {full_image_path}")
-            raise HTTPException(
-                status_code=404,
-                detail=f"Image file not found: {payload.input_image_path}",
-            )
-
         logger.info(
-            f"Processing YOLO11 request for query_id={payload.query_id} on {full_image_path}"
+            f"Processing YOLO11 request for query_id={payload.query_id} on {payload.input_image_path}"
         )
 
-        # Read spatial image file as bytes for the rasterio pipeline
-        with open(full_image_path, "rb") as f:
-            image_bytes = f.read()
+        image_bytes = read_image_from_shared_storage(
+            input_image_path=payload.input_image_path,
+            output_dir=payload.output_dir,
+        )
 
         geojson_results = pipeline.predict_boxes_geojson(image_bytes)
 
