@@ -26,7 +26,7 @@ class YOLO11Pipeline:
 
     def __init__(
         self,
-        model_path: str = "app/models/download_models/yolo11/best_yolo11v1.pt",
+        model_path: str = "app/models/yolo11/best_yolo11v1.pt",
         conf_min: float = 0.25,
         imgsz: int = 800,
         tile_size: int = 800,
