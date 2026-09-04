@@ -11,7 +11,7 @@ from app.services.inference_gate import InferenceGate
 
 # Consts & inits
 logger = get_logger(__name__)
-MODEL_NAMES = ["segformer", "lang_sam_large", "lang_sam_tiny", "satlas_tree", "unet_tree", "deepforest"]
+MODEL_NAMES = ["segformer", "lang_sam_large", "lang_sam_tiny", "satlas_tree", "unet_tree", "deepforest", "yolo11"]
 OFFLINE = True
 
 def _load_all(app: FastAPI) -> None:
