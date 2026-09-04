@@ -52,8 +52,31 @@ uv run geoai predict \
   --bbox 7.6179951 51.9651518 7.6233891 51.966658 \
   --source-type ortho \
   --model-type zeroshot \
+  --model-variant sam2.1_hiera_tiny \
   --keyword building \
   --keyword car
+```
+
+Both `sam2.1_hiera_large` (the default) and `sam2.1_hiera_tiny` are supported.
+Sentinel predictions can use the same imagery filters as the frontend:
+
+```bash
+uv run geoai predict \
+  --bbox 7.6179951 51.9651518 7.6233891 51.966658 \
+  --source-type sentinel \
+  --model-type tree_satlas \
+  --date-from 2023-06-01 \
+  --date-to 2023-06-30 \
+  --max-cloud-cover 15
+```
+
+Estimate the raster workload before starting a prediction:
+
+```bash
+uv run geoai estimate \
+  --bbox 7.6179951 51.9651518 7.6233891 51.966658 \
+  --source-type sentinel \
+  --model-type tree_satlas
 ```
 
 Inspect and download results:
@@ -62,6 +85,7 @@ Inspect and download results:
 uv run geoai results list
 uv run geoai results show QUERY_ID
 uv run geoai results download QUERY_ID -o prediction.geojson
+uv run geoai results delete QUERY_ID
 ```
 
 Create an export for an existing prediction:

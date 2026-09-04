@@ -32,6 +32,9 @@ class APIClient:
     def post(self, path: str, payload: dict[str, Any]) -> Any:
         return self.request("POST", path, payload=payload)
 
+    def delete(self, path: str) -> Any:
+        return self.request("DELETE", path)
+
     def request(
         self,
         method: str,

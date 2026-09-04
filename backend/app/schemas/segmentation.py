@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 SourceType = Literal["satellite", "ortho", "sentinel"]
 ModelType = Literal["tree", "tree_satlas", "tree_unet", "tree_deepforest", "zeroshot"]
+ModelVariant = Literal["sam2.1_hiera_large", "sam2.1_hiera_tiny"]
 MODELS_BY_SOURCE: dict[SourceType, tuple[ModelType, ...]] = {
     "ortho": (
         "tree",
@@ -43,7 +44,7 @@ class PredictionRequest(BaseModel):
     # Frontend can omit this and tree detection will run.
     model_type: ModelType = "tree"
 
-    model_variant: Literal["sam2.1_hiera_large", "sam2.1_hiera_tiny"] = "sam2.1_hiera_large"
+    model_variant: ModelVariant = "sam2.1_hiera_large"
 
     # Only used when model_type = "zeroshot".
     # Supply either one keyword or the keywords list below.
@@ -185,6 +186,7 @@ class GeoJSONFeatureCollection(BaseModel):
 class PredictionOutput(BaseModel):
     prediction_type: str
     model_name: str
+    model_variant: Optional[ModelVariant] = None
     result_url: str
     feature_count: int
     summary: Optional[str] = None
@@ -205,6 +207,7 @@ class PredictionHistoryItem(BaseModel):
     created_at: datetime
     prediction_type: Optional[str] = None
     model_name: Optional[str] = None
+    model_variant: Optional[ModelVariant] = None
     summary: Optional[str] = None
     keywords: List[str] = Field(default_factory=list)
 
@@ -306,6 +309,8 @@ class ExportResponse(BaseModel):
     query_id: UUID
     created_at: datetime
     model_type: Optional[ModelType] = None
+    model_name: Optional[str] = None
+    model_variant: Optional[ModelVariant] = None
     keywords: List[str] = Field(default_factory=list)
     source_feature_count: int
     exported_feature_count: int
