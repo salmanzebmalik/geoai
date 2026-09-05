@@ -6,7 +6,9 @@ from app.dependencies import (
     acquire_inference_slot,
     get_segformer_model,
     get_satlas_tree_model,
+    get_sentinel_satlas_tree_model,
     get_unet_tree_model,
+    get_sentinel_unet_tree_model,
     get_deepforest_model,
 )
 
@@ -92,14 +94,28 @@ def predict_tree_unet(
     )
 
 
+@router.post("/tree/unet/sentinel", response_model=PredictionResponse)
+def predict_tree_unet_sentinel(
+    request: TreePredictionRequest,
+    unet=Depends(get_sentinel_unet_tree_model),
+    _inference_slot=Depends(acquire_inference_slot),
+):
+    return _predict( request, "unet-resnet50-tree-sentinel-10m", lambda image_bytes: run_tree_detection(unet, image_bytes))
+
+
+@router.post("/tree/satlas/sentinel", response_model=PredictionResponse)
+def predict_tree_satlas_sentinel(
+    request: TreePredictionRequest,
+    satlas=Depends(get_sentinel_satlas_tree_model),
+    _inference_slot=Depends(acquire_inference_slot),
+):
+    return _predict( request, "satlas-tree-sentinel-ms-nir", lambda image_bytes: run_tree_detection(satlas, image_bytes))
+
+
 @router.post("/tree/deepforest", response_model=PredictionResponse)
 def predict_tree_deepforest(
     request: TreePredictionRequest,
     deepforest=Depends(get_deepforest_model),
     _inference_slot=Depends(acquire_inference_slot),
 ):
-    return _predict(
-        request,
-        "deepforest-tree",
-        lambda image_bytes: deepforest.predict_boxes_geojson(image_bytes),
-    )
+    return _predict( request, "deepforest-tree", lambda image_bytes: deepforest.predict_boxes_geojson(image_bytes))
