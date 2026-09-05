@@ -211,13 +211,8 @@ const vectorLayer = new VectorLayer({
 // Prediction result overlay
 const predictionSource = new VectorSource() // container for prediction polygons
 
-// Class name -> palette colour for the prediction currently on the map.
-// Built in displayPrediction() and read back by the style function below.
-// (Plain objects, not Map instances: `Map` is the OpenLayers import here.)
 let classColors = Object.create(null)
 
-// One Style object per colour: OpenLayers calls the style function for every
-// feature on every frame, so building them on the fly would be wasteful.
 const styleCache = Object.create(null)
 
 function styleForColor(color) {
@@ -231,8 +226,6 @@ function styleForColor(color) {
   return styleCache[color]
 }
 
-// Zero-shot features carry their keyword in `class`; the fixed tree models
-// don't tag their output at all and fall back to the default colour.
 function featureClassName(feature) {
   return feature.get('class') || feature.get('keyword') || null
 }
@@ -242,8 +235,6 @@ const predictionLayer = new VectorLayer({
   style: (feature) => {
     const name = featureClassName(feature)
 
-    // Returning no style hides the feature - that is how the legend toggles
-    // a class off without touching the source.
     if (name && mapStore.hiddenPredictionClasses.includes(name)) {
       return undefined
     }
@@ -257,14 +248,6 @@ predictionSource.on(['addfeature', 'clear'], () => {
 
 let draw = null
 
-// Collect the classes of a prediction, assign each one a palette colour and
-// hand the list to the store for the legend.
-//
-// Colours follow the order the keywords were entered in: the backend merges
-// the per-keyword results in whatever order it processed them, so ordering by
-// appearance in the GeoJSON would let a term change colour between runs.
-// Anything not covered by that order (the tree models, which label their
-// output "tree" without a keyword) is appended as it appears.
 function registerPredictionClasses(features) {
   const present = Object.create(null)
   const appearance = []
@@ -280,9 +263,6 @@ function registerPredictionClasses(features) {
   const entered = mapStore.predictionClassOrder
   const extra = appearance.filter((name) => !entered.includes(name))
 
-  // The colour comes from the position a keyword was typed in, not from its
-  // place among the classes that were actually found - otherwise a keyword
-  // that returns nothing would shift every colour after it.
   const colorIndex = (name) => {
     const typedAt = entered.indexOf(name)
 
@@ -312,11 +292,6 @@ function displayPrediction(geojson) {
     featureProjection: 'EPSG:3857',
   })
 
-  // A zero-shot run is one model pass per keyword, and the backend concatenates
-  // those result files - each of which numbers its features from zero. A
-  // VectorSource silently drops a feature whose id is already taken, so without
-  // renumbering only the first keyword's polygons reach the map. The ids carry
-  // no meaning for us; uniqueness is all that matters.
   features.forEach((feature, index) => feature.setId(`prediction-${index}`))
 
   registerPredictionClasses(features)
@@ -428,7 +403,6 @@ onUnmounted(() => {
   }
 })
 
-// Legend toggles a class -> re-run the style function for every polygon
 watch(
   () => mapStore.hiddenPredictionClasses,
   () => predictionLayer.changed(),
@@ -624,7 +598,6 @@ watch(() => mapStore.runTrigger, async () => {
         requestBody.keywords = keywords
       }
 
-      // The typed order decides the legend colours.
       mapStore.setPredictionClassOrder(keywords)
     } else {
       mapStore.setPredictionClassOrder([])

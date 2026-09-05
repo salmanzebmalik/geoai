@@ -4,9 +4,6 @@
     class="legend"
     :class="{ 'legend--shifted': mapStore.historyDrawerOpen }"
   >
-    <!-- Zero-shot runs tag every polygon with its keyword, so one prediction
-         can carry several classes; click a row to hide or show that class.
-         Long lists stay collapsed so the legend does not cover the map. -->
     <template v-if="classes.length">
       <div class="legend-classes">
         <button
@@ -45,14 +42,11 @@
       </button>
     </template>
 
-    <!-- The fixed tree models don't label their output. -->
     <div v-else class="legend-row">
       <span class="swatch swatch--default" />
       <span class="label">Detected objects</span>
     </div>
 
-    <!-- Only the detection model counts actual objects; the segmentation
-         models return polygons/clusters, which are not countable objects. -->
     <div v-if="treeCount !== null" class="legend-row">
       <span class="label">Number of detected trees: <span class="count">{{ treeCount }}</span></span>
     </div>
@@ -68,8 +62,6 @@ const mapStore = useMapStore()
 
 const classes = computed(() => mapStore.predictionClasses)
 
-// A prediction can carry up to 20 classes; show the first few and let the user
-// unfold the rest instead of running the legend down the whole map.
 const COLLAPSED_COUNT = 5
 const expanded = ref(false)
 
@@ -83,7 +75,6 @@ const visibleClasses = computed(() =>
     : classes.value,
 )
 
-// A new prediction starts collapsed again.
 watch(classes, () => {
   expanded.value = false
 })
@@ -108,8 +99,6 @@ const treeCount = computed(() => {
   flex-direction: column;
   gap: 4px;
   padding: 8px 12px;
-  /* Light panel like the other overlays; the shadow separates it from bright
-     imagery, where a flat white box would blend into roofs and roads. */
   background-color: rgba(255, 255, 255, 0.94);
   border-radius: 8px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
@@ -144,7 +133,6 @@ const treeCount = computed(() => {
   text-decoration: underline;
 }
 
-/* Hidden class: keep the row readable but clearly switched off. */
 .legend-row--off {
   opacity: 0.55;
 }
@@ -161,7 +149,6 @@ const treeCount = computed(() => {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  /* Even unfolded, 20 classes must not push the legend off screen. */
   max-height: 45vh;
   overflow-y: auto;
 }
@@ -185,8 +172,6 @@ const treeCount = computed(() => {
   border-radius: 3px;
   border: 1.5px solid transparent;
   border-style: solid;
-  /* Hairline ring: the paler palette entries would otherwise wash out
-     against the light panel. */
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15);
 }
 

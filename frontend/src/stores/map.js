@@ -34,16 +34,9 @@ export const useMapStore = defineStore('map', () => {
   // Prediction and export state
   const hasPrediction = ref(false)
 
-  // Classes of the currently shown prediction: [{ name, color }].
-  // Zero-shot runs tag every feature with its keyword, so one prediction can
-  // carry several classes; `hiddenPredictionClasses` holds the ones the user
-  // switched off in the legend.
   const predictionClasses = ref([])
   const hiddenPredictionClasses = ref([])
 
-  // Keywords of the prediction being displayed, in the order they were entered.
-  // Colours follow this order, so the same term keeps its colour no matter in
-  // which order the backend happened to merge the classes into the GeoJSON.
   const predictionClassOrder = ref([])
   const viewedPrediction = ref(null)
   const viewedQueryId = ref(null)
@@ -125,15 +118,12 @@ export const useMapStore = defineStore('map', () => {
     }
   }
 
-  // Has to be set before the GeoJSON reaches the map, since the map colours
-  // the classes while reading the features.
   function setPredictionClassOrder(keywords) {
     predictionClassOrder.value = Array.isArray(keywords) ? keywords : []
   }
 
   function setPredictionClasses(classes) {
     predictionClasses.value = classes
-    // A new prediction starts with every class visible.
     hiddenPredictionClasses.value = []
   }
 

@@ -236,7 +236,6 @@ def _blend_overlay(
     hex_color: str,
     opacity: float,
 ) -> None:
-    """Blend one flat colour into the selected pixels of `rgb`, in place."""
     color = _scaled_rgb(hex_color, rgb.dtype)[:, None]
     overlay = rgb[:, pixels].astype(np.float64)
     overlay *= 1 - opacity
@@ -309,10 +308,6 @@ def _write_rasters(
         if options.include_annotated_tiff:
             rgb = _read_rgb(source)
 
-            # The mask already holds one value per class, so each class can be
-            # painted in its own colour - the frontend sends the colours the
-            # legend shows. Classes without an entry, and single-class exports,
-            # keep overlay_color.
             for label, value in label_values.items():
                 pixels = mask == value
                 if not pixels.any():

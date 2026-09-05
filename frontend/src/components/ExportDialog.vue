@@ -10,9 +10,6 @@
       </v-card-subtitle>
 
       <v-card-text class="export-content">
-        <!-- Classes ------------------------------------------------------ -->
-        <!-- Independent of the legend: what is hidden on the map only seeds
-             the initial selection, everything stays switchable here. -->
         <section v-if="hasClasses" class="export-section">
           <div class="section-head">
             <span class="section-title">Classes</span>
@@ -54,15 +51,11 @@
           </v-alert>
         </section>
 
-        <!-- Overlay ------------------------------------------------------- -->
         <section class="export-section">
           <div class="section-head">
             <span class="section-title">Overlay</span>
           </div>
 
-          <!-- A single detected class means one colour to choose. With several
-               classes the export paints each one in its legend colour, so a
-               picker would have nothing to set. -->
           <v-text-field
             v-if="singleClassPrediction"
             v-model="form.overlay_color"
@@ -93,7 +86,6 @@
           {{ error }}
         </v-alert>
 
-        <!-- Result -------------------------------------------------------- -->
         <section v-if="mapStore.currentExport" class="export-section">
           <div class="section-head">
             <span class="section-title">Result</span>
@@ -110,7 +102,6 @@
           </div>
         </section>
 
-        <!-- History ------------------------------------------------------- -->
         <section v-if="history.length" class="export-section">
           <div class="section-head">
             <span class="section-title">Recent exports</span>
@@ -165,9 +156,6 @@ const form = reactive({
   overlay_opacity: 0.45,
 })
 
-// The classes in the store belong to the prediction on the map, which is not
-// necessarily the one being exported - the history drawer can export a
-// prediction without displaying it. Only offer the selection when they match.
 const exportsDisplayedPrediction = computed(
   () => Boolean(mapStore.currentQueryId)
     && mapStore.viewedQueryId === mapStore.currentQueryId,
@@ -181,16 +169,12 @@ const allClassNames = computed(() =>
   mapStore.predictionClasses.map((entry) => entry.name),
 )
 
-// Names picked for this export. Seeded from the legend, but every class can be
-// switched here regardless of what the map shows.
 const selectedClasses = ref([])
 
 function isSelected(name) {
   return selectedClasses.value.includes(name)
 }
 
-// Start from what the map shows; if the legend hides everything, start from all
-// classes rather than from an empty, unusable selection.
 function resetClassSelection() {
   const visible = mapStore.predictionClasses
     .map((entry) => entry.name)
@@ -199,23 +183,16 @@ function resetClassSelection() {
   selectedClasses.value = visible.length ? visible : [...allClassNames.value]
 }
 
-// A new prediction brings new classes, so the old selection is meaningless.
 watch(() => mapStore.predictionClasses, resetClassSelection)
 
 const exportedClasses = computed(() =>
   mapStore.predictionClasses.filter((entry) => isSelected(entry.name)),
 )
 
-// With more than one class the annotated image is painted per class, so there
-// is nothing for a single colour picker to do.
 const usesClassColors = computed(() => exportedClasses.value.length > 1)
 
-// The picker follows what the prediction detected, not the current selection -
-// deselecting down to one class should not make a colour control appear.
 const singleClassPrediction = computed(() => allClassNames.value.length <= 1)
 
-// The backend names its models after checkpoints; these are the names the rest
-// of the UI uses.
 const MODEL_LABELS = {
   zeroshot: 'Zero-Shot',
   tree: 'TCD-Segformer',
@@ -236,8 +213,6 @@ function formatTimestamp(value) {
 }
 
 
-// Only a real subset needs a filter; sending every label is the same as
-// sending none, and an empty list would read as "no filter" on the backend.
 const classFilter = computed(() =>
   hasClasses.value
     && selectedClasses.value.length
@@ -277,7 +252,6 @@ async function loadHistory() {
     )
     if (response.ok) history.value = await response.json()
   } catch {
-    // History is supplementary; export creation remains available.
   }
 }
 
@@ -300,7 +274,6 @@ async function createExport() {
       options.filters = { labels: classFilter.value }
     }
 
-    // Hand the backend the exact colours the legend shows.
     if (usesClassColors.value) {
       options.label_colors = Object.fromEntries(
         exportedClasses.value.map((entry) => [entry.name, entry.color]),
@@ -341,8 +314,6 @@ function download(artifact) {
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15);
 }
 
-/* Each step of the dialog is its own block, separated by a hairline rule
-   instead of being one long column of controls. */
 .export-section {
   padding: 14px 0;
   border-bottom: 1px solid rgba(0, 0, 0, 0.08);
@@ -383,7 +354,6 @@ function download(artifact) {
   max-width: 220px;
 }
 
-/* Excluded classes stay readable but clearly inactive. */
 .class-chip--off {
   opacity: 0.5;
 }

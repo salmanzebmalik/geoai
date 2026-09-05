@@ -355,8 +355,6 @@ async function viewPrediction(item) {
 
     const geojson = await geojsonResponse.json()
 
-    // The stored keywords keep the order they were entered in, which is what
-    // the map colours the classes by. Has to be set before the GeoJSON.
     mapStore.setPredictionClassOrder(item.keywords ?? [])
     mapStore.setViewedPrediction(geojson, item.query_id, result.prediction)
     mapStore.historyDrawerOpen = false
