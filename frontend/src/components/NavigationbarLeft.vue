@@ -280,7 +280,7 @@
             color="success"
             variant="tonal"
             :disabled="!mapStore.currentQueryId"
-          >Export options</v-btn>
+          >Export Prediction</v-btn>
       </v-list>
   </v-navigation-drawer>
 </template>

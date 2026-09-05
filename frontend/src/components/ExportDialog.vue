@@ -3,7 +3,7 @@
     <v-card class="export-dialog-card" rounded="lg" elevation="16">
       <v-card-title class="export-title">
         <v-icon icon="mdi-tray-arrow-down" size="small" />
-        Export annotations
+        Export Prediction
       </v-card-title>
       <v-card-subtitle class="export-subtitle">
         Prediction {{ mapStore.currentQueryId }}
@@ -11,7 +11,11 @@
 
       <v-card-text class="export-content">
         <div class="export-controls">
+          <!-- One class means one colour to choose. With several classes the
+               export uses the legend's colours, so a single picker would only
+               be misleading. -->
           <v-text-field
+            v-if="!usesClassColors"
             v-model="form.overlay_color"
             label="Overlay color"
             type="color"
@@ -19,6 +23,23 @@
             density="comfortable"
             hide-details
           />
+
+          <div v-else class="class-colors">
+            <div class="control-label">Overlay colors</div>
+            <div class="class-color-list">
+              <span
+                v-for="entry in exportedClasses"
+                :key="entry.name"
+                class="class-color"
+              >
+                <span
+                  class="class-color-swatch"
+                  :style="{ backgroundColor: entry.color }"
+                />
+                {{ entry.name }}
+              </span>
+            </div>
+          </div>
 
           <div class="opacity-control">
             <div class="control-label">Opacity</div>
@@ -155,6 +176,21 @@ const exportsDisplayedPrediction = computed(
     && mapStore.viewedQueryId === mapStore.currentQueryId,
 )
 
+// Classes that end up in the export: everything on the map, minus what the
+// legend hides while the filter switch is on.
+const exportedClasses = computed(() => {
+  if (!exportsDisplayedPrediction.value) return []
+
+  return mapStore.predictionClasses.filter(
+    (entry) => !(limitToVisible.value && canLimitToVisible.value)
+      || !mapStore.hiddenPredictionClasses.includes(entry.name),
+  )
+})
+
+// With more than one class the annotated image is painted per class, so there
+// is nothing for a single colour picker to do.
+const usesClassColors = computed(() => exportedClasses.value.length > 1)
+
 const canLimitToVisible = computed(
   () => exportsDisplayedPrediction.value
     && hiddenClassNames.value.length > 0
@@ -217,6 +253,13 @@ async function createExport() {
     if (canLimitToVisible.value && limitToVisible.value) {
       options.filters = { labels: visibleClassNames.value }
     }
+
+    // Hand the backend the exact colours the legend shows.
+    if (usesClassColors.value) {
+      options.label_colors = Object.fromEntries(
+        exportedClasses.value.map((entry) => [entry.name, entry.color]),
+      )
+    }
     const response = await fetch('/api/segmentation/exports', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -241,6 +284,32 @@ function download(artifact) {
 <style scoped>
 .export-dialog-card {
   padding: 8px;
+}
+
+.class-colors {
+  min-width: 0;
+}
+
+.class-color-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin-top: 6px;
+}
+
+.class-color {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.87);
+}
+
+.class-color-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15);
 }
 
 .class-filter {

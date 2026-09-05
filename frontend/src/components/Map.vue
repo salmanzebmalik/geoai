@@ -311,6 +311,14 @@ function displayPrediction(geojson) {
     dataProjection: 'EPSG:4326',
     featureProjection: 'EPSG:3857',
   })
+
+  // A zero-shot run is one model pass per keyword, and the backend concatenates
+  // those result files - each of which numbers its features from zero. A
+  // VectorSource silently drops a feature whose id is already taken, so without
+  // renumbering only the first keyword's polygons reach the map. The ids carry
+  // no meaning for us; uniqueness is all that matters.
+  features.forEach((feature, index) => feature.setId(`prediction-${index}`))
+
   registerPredictionClasses(features)
   predictionSource.addFeatures(features)
 
