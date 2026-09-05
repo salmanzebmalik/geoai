@@ -7,7 +7,7 @@ import rasterio
 from PIL import Image
 
 from app.utils.logger import get_logger
-from app.utils.tiling import read_rgb
+from app.utils.tiling import ndvi_mask, read_rgb
 logger = get_logger(__name__)
 
 
@@ -18,12 +18,13 @@ class SentinelUNetTreePipeline:
     Sentinel-2's native GSD"""
 
     def __init__(self, weights_path: str | None = None, input_size: tuple = (64, 64),
-                 threshold: float = 0.5):
+                 threshold: float = 0.5, ndvi_threshold: float = 0.2):
         import segmentation_models_pytorch as smp  # lazy: keeps smp optional
 
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.input_size = input_size
         self.threshold = threshold
+        self.ndvi_threshold = ndvi_threshold
 
         self.model = smp.Unet(encoder_name="resnet50", encoder_weights=None,
                               in_channels=3, classes=1, activation=None)
@@ -54,5 +55,14 @@ class SentinelUNetTreePipeline:
             Image.fromarray((prob * 255).astype(np.uint8)).resize((w, h), Image.NEAREST)
         ) / 255.0
         mask = (prob > self.threshold).astype(np.uint8)
+
+        # drop anything the index says is not vegetation (water, roofs, roads,
+        # bare soil); skipped when the crop has no NIR band
+        vegetation = ndvi_mask(image_bytes, threshold=self.ndvi_threshold)
+        if vegetation is not None:
+            before = int(mask.sum())
+            mask = np.logical_and(mask, vegetation).astype(np.uint8)
+            logger.info(f"unet-sentinel | ndvi>={self.ndvi_threshold} | {before} -> {int(mask.sum())} px")
+
         logger.info(f"unet-sentinel | {h}x{w} | {time.time() - t0:.1f}s")
         return mask

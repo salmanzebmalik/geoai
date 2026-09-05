@@ -2,32 +2,34 @@ from pathlib import Path
 
 import numpy as np
 import torch
-from app.utils.tiling import tiled_mask
+from app.utils.tiling import ndvi_mask, tiled_mask
 from app.utils.logger import get_logger
 logger = get_logger(__name__)
 
-SATLAS_BACKBONE = "Sentinel2_Resnet50_SI_MS"
-MS_BAND_INDICES = (1, 2, 3, 4, 5, 6, 7, 8, 9)  # B02,B03,B04,B05,B06,B07,B08,B11,B12
+# Switching to Sentinel2_Resnet50_SI_MS only makes sense once that fetch also requests the other six bands
+SATLAS_BACKBONE = "Sentinel2_Resnet50_SI_RGB" # uses rgb backbone
 
 
 class SentinelSatlasTreePipeline:
-    """Tree segmentation for 10m Sentinel-2 imagery, using SatlasPretrain's
-    multi-spectral (includes B08->NIR) backbone instead of the RGB one
-    SatlasTreePipeline uses"""
+    """Tree segmentation for 10m Sentinel-2 imagery. Same Satlas backbone as
+    SatlasTreePipeline, fine-tuned on restor/tcd at 10m instead of 5m
+    (see sentinel_satlas_tree_10m.ipynb) to match Sentinel-2's native GSD."""
+
     def __init__(self, weights_path: str | None = None, patch_size: int = 512, overlap: int = 64,
-                 batch_size: int = 1):
+                 batch_size: int = 1, ndvi_threshold: float = 0.2):
         import satlaspretrain_models as spm  # lazy
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.patch_size = patch_size
         self.overlap = overlap
         self.batch_size = batch_size
+        self.ndvi_threshold = ndvi_threshold
         self.model = spm.Weights().get_pretrained_model(SATLAS_BACKBONE, fpn=True, head=spm.Head.SEGMENT, num_categories=2, device=self.device)
 
         if weights_path is None:
             weights_path = Path(__file__).parent / "local_satlas_tree_sentinel" / "satlas_tree_sentinel.pt"
         weights_path = Path(weights_path)
         if not weights_path.exists():
-            raise FileNotFoundError(f"Satlas Sentinel tree weights not found at {weights_path}. Train the Satlas MS/NIR fine-tune notebook first.")
+            raise FileNotFoundError(f"Satlas Sentinel tree weights not found at {weights_path}. Train with sentinel_satlas_tree_10m.ipynb.")
 
         self.model.load_state_dict(torch.load(weights_path, map_location=self.device, mmap=True, weights_only=True))
         self.model.to(self.device).eval()
@@ -44,6 +46,15 @@ class SentinelSatlasTreePipeline:
         return (pred.argmax(1) == 1).cpu().numpy()
 
     def get_full_mask_from_bytes(self, image_bytes: bytes) -> np.ndarray:
-        return tiled_mask(image_bytes, self.patch_size, self.overlap,
-                          self._predict, label="satlas-sentinel", batch_size=self.batch_size,
-                          band_indices=MS_BAND_INDICES)
+        mask = tiled_mask(image_bytes, self.patch_size, self.overlap,
+                          self._predict, label="satlas-sentinel", batch_size=self.batch_size)
+
+        # drop anything the index says is not vegetation (water, roofs, roads,
+        # bare soil); skipped when the crop has no NIR band
+        vegetation = ndvi_mask(image_bytes, threshold=self.ndvi_threshold)
+        if vegetation is not None:
+            before = int(mask.sum())
+            mask = np.logical_and(mask, vegetation).astype(np.uint8)
+            logger.info(f"satlas-sentinel | ndvi>={self.ndvi_threshold} | {before} -> {int(mask.sum())} px")
+
+        return mask

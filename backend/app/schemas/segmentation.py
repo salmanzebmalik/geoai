@@ -6,7 +6,10 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 SourceType = Literal["satellite", "ortho", "sentinel"]
-ModelType = Literal["tree", "tree_satlas", "tree_unet", "tree_deepforest", "zeroshot", "yolo"]
+ModelType = Literal[
+    "tree", "tree_satlas", "tree_unet", "tree_satlas_sentinel", "tree_unet_sentinel",
+    "tree_deepforest", "zeroshot", "yolo",
+]
 ModelVariant = Literal["sam2.1_hiera_large", "sam2.1_hiera_tiny"]
 MODELS_BY_SOURCE: dict[SourceType, tuple[ModelType, ...]] = {
     "ortho": (
@@ -23,8 +26,8 @@ MODELS_BY_SOURCE: dict[SourceType, tuple[ModelType, ...]] = {
     # apply. Required: upstream's validators do MODELS_BY_SOURCE[source_type],
     # which raises KeyError for a source with no entry.
     "sentinel": (
-        "tree_satlas",
-        "tree_unet",
+        "tree_satlas_sentinel",
+        "tree_unet_sentinel",
     ),
 }
 VectorFormat = Literal["geojson", "gpkg", "flatgeobuf", "shapefile"]

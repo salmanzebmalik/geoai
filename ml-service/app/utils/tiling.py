@@ -23,6 +23,20 @@ def read_bands(src, band_indices: list[int], window=None) -> np.ndarray:
     return np.ascontiguousarray(img)
 
 
+def ndvi_mask(image_bytes: bytes, red_index: int = 1, nir_index: int = 4, threshold: float = 0.2) -> np.ndarray | None:
+    """(nir - red) / (nir + red) >= threshold -> 1
+    """
+    with rasterio.MemoryFile(image_bytes) as mem, mem.open() as src:
+        if src.count < nir_index:
+            return None
+        red = src.read(red_index).astype(np.float32)
+        nir = src.read(nir_index).astype(np.float32)
+
+    total = nir + red
+    ndvi = np.divide(nir - red, total, out=np.zeros_like(total), where=total > 0)
+    return ndvi >= threshold
+
+
 def tiled_mask(image_bytes: bytes, patch_size: int, overlap: int,
                predict, label: str = "", batch_size: int = 1,
                band_indices: list[int] = (1, 2, 3)) -> np.ndarray:
