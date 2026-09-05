@@ -10,36 +10,69 @@
       </v-card-subtitle>
 
       <v-card-text class="export-content">
-        <div class="export-controls">
-          <!-- One class means one colour to choose. With several classes the
-               export uses the legend's colours, so a single picker would only
-               be misleading. -->
+        <!-- Classes ------------------------------------------------------ -->
+        <!-- Independent of the legend: what is hidden on the map only seeds
+             the initial selection, everything stays switchable here. -->
+        <section v-if="hasClasses" class="export-section">
+          <div class="section-head">
+            <span class="section-title">Classes</span>
+            <span class="section-count">
+              {{ selectedClasses.length }} of {{ allClassNames.length }}
+            </span>
+          </div>
+
+          <v-chip-group
+            v-model="selectedClasses"
+            multiple
+            filter
+            class="class-chips"
+          >
+            <v-chip
+              v-for="entry in mapStore.predictionClasses"
+              :key="entry.name"
+              :value="entry.name"
+              variant="outlined"
+              size="small"
+              :ripple="false"
+            >
+              <span
+                class="class-color-swatch"
+                :style="{ backgroundColor: entry.color }"
+              />
+              {{ entry.name }}
+            </v-chip>
+          </v-chip-group>
+
+          <v-alert
+            v-if="!selectedClasses.length"
+            type="warning"
+            variant="tonal"
+            density="compact"
+            class="mt-2"
+          >
+            Select at least one class to export.
+          </v-alert>
+        </section>
+
+        <!-- Overlay ------------------------------------------------------- -->
+        <section class="export-section">
+          <div class="section-head">
+            <span class="section-title">Overlay</span>
+          </div>
+
+          <!-- A single detected class means one colour to choose. With several
+               classes the export paints each one in its legend colour, so a
+               picker would have nothing to set. -->
           <v-text-field
-            v-if="!usesClassColors"
+            v-if="singleClassPrediction"
             v-model="form.overlay_color"
             label="Overlay color"
             type="color"
             variant="outlined"
             density="comfortable"
             hide-details
+            class="overlay-color"
           />
-
-          <div v-else class="class-colors">
-            <div class="control-label">Overlay colors</div>
-            <div class="class-color-list">
-              <span
-                v-for="entry in exportedClasses"
-                :key="entry.name"
-                class="class-color"
-              >
-                <span
-                  class="class-color-swatch"
-                  :style="{ backgroundColor: entry.color }"
-                />
-                {{ entry.name }}
-              </span>
-            </div>
-          </div>
 
           <div class="opacity-control">
             <div class="control-label">Opacity</div>
@@ -54,41 +87,16 @@
               hide-details
             />
           </div>
-        </div>
-
-        <!-- Classes switched off in the legend are dropped from the export,
-             so the file matches what is on the map. -->
-        <div v-if="canLimitToVisible" class="class-filter">
-          <v-switch
-            v-model="limitToVisible"
-            color="success"
-            density="compact"
-            hide-details
-            :label="`Only export classes visible on the map (${visibleClassNames.length} of ${mapStore.predictionClasses.length})`"
-          />
-          <div class="class-filter-hint">
-            Hidden: {{ hiddenClassNames.join(', ') }}
-          </div>
-        </div>
-
-        <v-alert
-          v-if="allClassesHidden"
-          type="info"
-          variant="tonal"
-          density="compact"
-          class="mt-4"
-        >
-          Every class is hidden on the map, so the export contains all of them.
-        </v-alert>
+        </section>
 
         <v-alert v-if="error" type="error" variant="tonal" class="mt-4">
           {{ error }}
         </v-alert>
 
-        <div v-if="mapStore.currentExport" class="mt-5">
-          <div class="section-title">
-            Exported {{ mapStore.currentExport.exported_feature_count }} of
-            {{ mapStore.currentExport.source_feature_count }} features
+        <!-- Result -------------------------------------------------------- -->
+        <section v-if="mapStore.currentExport" class="export-section">
+          <div class="section-head">
+            <span class="section-title">Result</span>
           </div>
           <div class="artifact-list">
             <v-btn
@@ -100,16 +108,19 @@
               @click="download(artifact)"
             >{{ artifact.name }}</v-btn>
           </div>
-        </div>
+        </section>
 
-        <div v-if="history.length" class="mt-5">
-          <div class="section-title">Recent exports</div>
-          <v-list density="compact">
+        <!-- History ------------------------------------------------------- -->
+        <section v-if="history.length" class="export-section">
+          <div class="section-head">
+            <span class="section-title">Recent exports</span>
+          </div>
+          <v-list density="compact" class="history-list">
             <v-list-item
               v-for="item in history.slice(0, 5)"
               :key="item.export_id"
-              :title="`${item.exported_feature_count} features · ${item.output_crs}`"
-              :subtitle="new Date(item.created_at).toLocaleString()"
+              :title="modelLabel(item)"
+              :subtitle="formatTimestamp(item.created_at)"
             >
               <template #append>
                 <v-btn
@@ -122,7 +133,7 @@
               </template>
             </v-list-item>
           </v-list>
-        </div>
+        </section>
       </v-card-text>
 
       <v-card-actions class="export-actions">
@@ -132,6 +143,7 @@
           color="success"
           prepend-icon="mdi-export"
           :loading="mapStore.isExporting"
+          :disabled="!canExport"
           @click="createExport"
         >Create export</v-btn>
       </v-card-actions>
@@ -153,62 +165,96 @@ const form = reactive({
   overlay_opacity: 0.45,
 })
 
-// Whether to narrow the export to the classes still visible in the legend.
-const limitToVisible = ref(true)
-
-const visibleClassNames = computed(() =>
-  mapStore.predictionClasses
-    .map((entry) => entry.name)
-    .filter((name) => !mapStore.hiddenPredictionClasses.includes(name)),
-)
-
-const hiddenClassNames = computed(() =>
-  mapStore.predictionClasses
-    .map((entry) => entry.name)
-    .filter((name) => mapStore.hiddenPredictionClasses.includes(name)),
-)
-
 // The classes in the store belong to the prediction on the map, which is not
 // necessarily the one being exported - the history drawer can export a
-// prediction without displaying it. Only offer the filter when they match.
+// prediction without displaying it. Only offer the selection when they match.
 const exportsDisplayedPrediction = computed(
   () => Boolean(mapStore.currentQueryId)
     && mapStore.viewedQueryId === mapStore.currentQueryId,
 )
 
-// Classes that end up in the export: everything on the map, minus what the
-// legend hides while the filter switch is on.
-const exportedClasses = computed(() => {
-  if (!exportsDisplayedPrediction.value) return []
+const hasClasses = computed(
+  () => exportsDisplayedPrediction.value && mapStore.predictionClasses.length > 0,
+)
 
-  return mapStore.predictionClasses.filter(
-    (entry) => !(limitToVisible.value && canLimitToVisible.value)
-      || !mapStore.hiddenPredictionClasses.includes(entry.name),
-  )
-})
+const allClassNames = computed(() =>
+  mapStore.predictionClasses.map((entry) => entry.name),
+)
+
+// Names picked for this export. Seeded from the legend, but every class can be
+// switched here regardless of what the map shows.
+const selectedClasses = ref([])
+
+function isSelected(name) {
+  return selectedClasses.value.includes(name)
+}
+
+// Start from what the map shows; if the legend hides everything, start from all
+// classes rather than from an empty, unusable selection.
+function resetClassSelection() {
+  const visible = mapStore.predictionClasses
+    .map((entry) => entry.name)
+    .filter((name) => !mapStore.hiddenPredictionClasses.includes(name))
+
+  selectedClasses.value = visible.length ? visible : [...allClassNames.value]
+}
+
+// A new prediction brings new classes, so the old selection is meaningless.
+watch(() => mapStore.predictionClasses, resetClassSelection)
+
+const exportedClasses = computed(() =>
+  mapStore.predictionClasses.filter((entry) => isSelected(entry.name)),
+)
 
 // With more than one class the annotated image is painted per class, so there
 // is nothing for a single colour picker to do.
 const usesClassColors = computed(() => exportedClasses.value.length > 1)
 
-const canLimitToVisible = computed(
-  () => exportsDisplayedPrediction.value
-    && hiddenClassNames.value.length > 0
-    && visibleClassNames.value.length > 0,
+// The picker follows what the prediction detected, not the current selection -
+// deselecting down to one class should not make a colour control appear.
+const singleClassPrediction = computed(() => allClassNames.value.length <= 1)
+
+// The backend names its models after checkpoints; these are the names the rest
+// of the UI uses.
+const MODEL_LABELS = {
+  zeroshot: 'Zero-Shot',
+  tree: 'TCD-Segformer',
+  tree_deepforest: 'DeepForest',
+  tree_satlas: 'Satlas',
+  tree_unet: 'UNet',
+  tree_satlas_sentinel: 'Satlas (Sentinel)',
+  tree_unet_sentinel: 'UNet (Sentinel)',
+  yolo: 'YOLO11',
+}
+
+function modelLabel(item) {
+  return MODEL_LABELS[item?.model_type] ?? item?.model_type ?? 'Export'
+}
+
+function formatTimestamp(value) {
+  return new Date(value).toLocaleString()
+}
+
+
+// Only a real subset needs a filter; sending every label is the same as
+// sending none, and an empty list would read as "no filter" on the backend.
+const classFilter = computed(() =>
+  hasClasses.value
+    && selectedClasses.value.length
+    && selectedClasses.value.length < allClassNames.value.length
+      ? selectedClasses.value
+      : null,
 )
 
-// Every class hidden would send an empty label list, which the backend reads
-// as "no filter" - so say plainly that the export covers everything.
-const allClassesHidden = computed(
-  () => exportsDisplayedPrediction.value
-    && mapStore.predictionClasses.length > 0
-    && visibleClassNames.value.length === 0,
+const canExport = computed(
+  () => Boolean(mapStore.currentQueryId)
+    && (!hasClasses.value || selectedClasses.value.length > 0),
 )
 
 watch(() => mapStore.exportDialogTrigger, () => {
   open.value = true
   error.value = null
-  limitToVisible.value = true
+  resetClassSelection()
   loadHistory()
 })
 
@@ -250,8 +296,8 @@ async function createExport() {
       include_zip: true,
     }
 
-    if (canLimitToVisible.value && limitToVisible.value) {
-      options.filters = { labels: visibleClassNames.value }
+    if (classFilter.value) {
+      options.filters = { labels: classFilter.value }
     }
 
     // Hand the backend the exact colours the legend shows.
@@ -286,40 +332,72 @@ function download(artifact) {
   padding: 8px;
 }
 
-.class-colors {
-  min-width: 0;
-}
-
-.class-color-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 14px;
-  margin-top: 6px;
-}
-
-.class-color {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  color: rgba(0, 0, 0, 0.87);
-}
-
 .class-color-swatch {
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
+  margin-right: 7px;
+  flex: none;
   border-radius: 3px;
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15);
 }
 
-.class-filter {
-  margin-top: 8px;
+/* Each step of the dialog is its own block, separated by a hairline rule
+   instead of being one long column of controls. */
+.export-section {
+  padding: 14px 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
 }
 
-.class-filter-hint {
-  font-size: 12px;
+.export-section:first-child {
+  padding-top: 6px;
+}
+
+.export-section:last-child {
+  border-bottom: 0;
+  padding-bottom: 4px;
+}
+
+.section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.section-count {
+  font-size: 0.78rem;
   color: rgba(0, 0, 0, 0.6);
-  margin-left: 4px;
+}
+
+.section-hint {
+  font-size: 0.78rem;
+  color: rgba(0, 0, 0, 0.6);
+  margin-bottom: 10px;
+}
+
+.class-chips {
+  margin-left: -2px;
+}
+
+.overlay-color {
+  max-width: 220px;
+}
+
+/* Excluded classes stay readable but clearly inactive. */
+.class-chip--off {
+  opacity: 0.5;
+}
+
+.class-chip--off .class-color-swatch {
+  background-color: transparent !important;
+}
+
+.class-actions {
+  margin-left: -8px;
+}
+
+.history-list {
+  background: transparent;
 }
 
 .export-title {
@@ -332,24 +410,15 @@ function download(artifact) {
 }
 
 .export-subtitle {
-  padding: 0 20px 14px;
+  padding: 0 20px 2px;
 }
 
 .export-content {
-  padding: 16px 20px;
-}
-
-.export-controls {
-  display: flex;
-  flex-direction: column;
-  gap: 22px;
-  padding: 16px;
-  background: rgba(72, 72, 72, 0.035);
-  border: 1px solid rgba(69, 67, 67, 0.08);
-  border-radius: 10px;
+  padding: 0 20px 16px;
 }
 
 .opacity-control {
+  margin-top: 14px;
   padding: 0 4px 4px;
 }
 
@@ -365,7 +434,6 @@ function download(artifact) {
 .section-title {
   font-size: 0.9rem;
   font-weight: 600;
-  margin-bottom: 8px;
 }
 
 .artifact-list {
