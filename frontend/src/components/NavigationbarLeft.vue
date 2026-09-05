@@ -403,7 +403,8 @@ const TREE_MODELS_BY_MAP_TYPE = {
   // checkpoint is missing, Segformer because it is trained at ~10 cm and
   // Sentinel is 10 m.
   sentinel: [
-    { title: 'Satlas', value: 'tree_satlas' },
+    { title: 'Satlas', value: 'tree_satlas_sentinel' },
+    { title: 'UNet', value: 'tree_unet_sentinel' },
   ],
 }
 

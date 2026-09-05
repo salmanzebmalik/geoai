@@ -40,6 +40,20 @@ def get_unet_tree_model(request: Request):
     return model
 
 
+def get_sentinel_unet_tree_model(request: Request):
+    model = request.app.state.models.get("sentinel_unet_tree")
+    if model is None:
+        raise HTTPException(status_code=503, detail="UNet Sentinel tree model not trained yet (run sentinel_tree_crown_10m.ipynb)")
+    return model
+
+
+def get_sentinel_satlas_tree_model(request: Request):
+    model = request.app.state.models.get("sentinel_satlas_tree")
+    if model is None:
+        raise HTTPException(status_code=503, detail="Satlas Sentinel (MS/NIR) tree model not trained yet")
+    return model
+
+
 def get_deepforest_model(request: Request):
     model = request.app.state.models.get("deepforest")
     if model is None:

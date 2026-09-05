@@ -5,12 +5,17 @@ from app.core.config import settings
 from app.utils.http import get_http_session
 import logging
 
-ModelType = Literal["tree", "tree_satlas", "tree_unet", "tree_deepforest", "zeroshot", "yolo"]
+ModelType = Literal[
+    "tree", "tree_satlas", "tree_unet", "tree_satlas_sentinel", "tree_unet_sentinel",
+    "tree_deepforest", "zeroshot", "yolo",
+]
 
 ML_ENDPOINTS = {
     "tree": "/api/v1/predict/tree",                      # TCD-Segformer, 10cm ortho
     "tree_satlas": "/api/v1/predict/tree/satlas",        # Satlas, 5m satellite
     "tree_unet": "/api/v1/predict/tree/unet",            # UNet, 5m satellite
+    "tree_satlas_sentinel": "/api/v1/predict/tree/satlas/sentinel",  # Satlas, 10m sentinel
+    "tree_unet_sentinel": "/api/v1/predict/tree/unet/sentinel",      # UNet, 10m sentinel
     "tree_deepforest": "/api/v1/predict/tree/deepforest",  # DeepForest boxes, 10cm ortho
     "zeroshot": "/api/v1/predict/zeroshot",
     "yolo": "/api/v1/predict/yolo"

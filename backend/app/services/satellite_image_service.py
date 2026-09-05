@@ -184,7 +184,8 @@ def build_titiler_request(
         params = {
             # raw 16-bit L2A bands, so the true-colour trio plus the same
             # reflectance stretch the tile layers use
-            "assets": ["B04", "B03", "B02"],
+
+            "assets": ["B04", "B03", "B02", "B08"], # b08 included for ndvi
             "rescale": "0,3000",
             # take the first VALID pixel down the cloud-sorted stack; with real
             # valid-data footprints this lets a partial granule fall through to

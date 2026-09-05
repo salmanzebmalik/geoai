@@ -11,15 +11,36 @@ logger = get_logger(__name__)
 
 def read_rgb(src, window=None) -> np.ndarray:
     """Bands 1-3 as (H, W, 3) uint8."""
-    img = np.moveaxis(src.read([1, 2, 3], window=window), 0, -1)
+    return read_bands(src, [1, 2, 3], window=window)
+
+
+def read_bands(src, band_indices: list[int], window=None) -> np.ndarray:
+    """`band_indices` (in the order the model expects them stacked) as
+    (H, W, len(band_indices)) uint8"""
+    img = np.moveaxis(src.read(band_indices, window=window), 0, -1)
     if img.dtype == np.uint16:
         img = (img >> 8).astype(np.uint8)
     return np.ascontiguousarray(img)
 
 
+def ndvi_mask(image_bytes: bytes, red_index: int = 1, nir_index: int = 4, threshold: float = 0.2) -> np.ndarray | None:
+    """(nir - red) / (nir + red) >= threshold -> 1
+    """
+    with rasterio.MemoryFile(image_bytes) as mem, mem.open() as src:
+        if src.count < nir_index:
+            return None
+        red = src.read(red_index).astype(np.float32)
+        nir = src.read(nir_index).astype(np.float32)
+
+    total = nir + red
+    ndvi = np.divide(nir - red, total, out=np.zeros_like(total), where=total > 0)
+    return ndvi >= threshold
+
+
 def tiled_mask(image_bytes: bytes, patch_size: int, overlap: int,
-               predict, label: str = "", batch_size: int = 1) -> np.ndarray:
-    """predict(list of (th, tw, 3) uint8 patches) """
+               predict, label: str = "", batch_size: int = 1,
+               band_indices: list[int] = (1, 2, 3)) -> np.ndarray:
+    """predict(list of (th, tw, len(band_indices)) uint8 patches) """
     stride = patch_size - overlap
     t0 = time.time()
 
@@ -39,7 +60,7 @@ def tiled_mask(image_bytes: bytes, patch_size: int, overlap: int,
             for start in range(0, len(coords), batch_size):
                 chunk = coords[start:start + batch_size]
                 try:
-                    read = [(xy, read_rgb(src, Window(xy[0], xy[1], tw, th))) for xy in chunk]
+                    read = [(xy, read_bands(src, list(band_indices), Window(xy[0], xy[1], tw, th))) for xy in chunk]
                     kept = [(xy, patch) for xy, patch in read if patch.any()]
                     skipped += len(read) - len(kept)
                     if not kept:
