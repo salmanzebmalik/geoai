@@ -355,6 +355,7 @@ async function viewPrediction(item) {
 
     const geojson = await geojsonResponse.json()
 
+    mapStore.setPredictionClassOrder(item.keywords ?? [])
     mapStore.setViewedPrediction(geojson, item.query_id, result.prediction)
     mapStore.historyDrawerOpen = false
   } catch (err) {

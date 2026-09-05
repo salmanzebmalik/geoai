@@ -230,6 +230,22 @@ def _scaled_rgb(value: str, dtype: np.dtype) -> np.ndarray:
     return rgb.astype(dtype)
 
 
+def _blend_overlay(
+    rgb: np.ndarray,
+    pixels: np.ndarray,
+    hex_color: str,
+    opacity: float,
+) -> None:
+    color = _scaled_rgb(hex_color, rgb.dtype)[:, None]
+    overlay = rgb[:, pixels].astype(np.float64)
+    overlay *= 1 - opacity
+    overlay += color.astype(np.float64) * opacity
+    if np.issubdtype(rgb.dtype, np.integer):
+        limits = np.iinfo(rgb.dtype)
+        overlay = np.clip(overlay, limits.min, limits.max)
+    rgb[:, pixels] = overlay.astype(rgb.dtype)
+
+
 def _read_rgb(source: rasterio.io.DatasetReader) -> np.ndarray:
     if source.count == 1:
         band = source.read(1)
@@ -291,16 +307,18 @@ def _write_rasters(
 
         if options.include_annotated_tiff:
             rgb = _read_rgb(source)
-            color = _scaled_rgb(options.overlay_color, rgb.dtype)[:, None]
-            pixels = mask > 0
-            if pixels.any():
-                overlay = rgb[:, pixels].astype(np.float64)
-                overlay *= 1 - options.overlay_opacity
-                overlay += color.astype(np.float64) * options.overlay_opacity
-                if np.issubdtype(rgb.dtype, np.integer):
-                    limits = np.iinfo(rgb.dtype)
-                    overlay = np.clip(overlay, limits.min, limits.max)
-                rgb[:, pixels] = overlay.astype(rgb.dtype)
+
+            for label, value in label_values.items():
+                pixels = mask == value
+                if not pixels.any():
+                    continue
+
+                _blend_overlay(
+                    rgb,
+                    pixels,
+                    options.label_colors.get(label, options.overlay_color),
+                    options.overlay_opacity,
+                )
 
             annotated_path = export_dir / "annotations_with_image.tiff"
             image_profile = source.profile.copy()

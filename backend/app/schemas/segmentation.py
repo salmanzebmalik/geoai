@@ -244,6 +244,7 @@ class ExportOptions(BaseModel):
     include_metadata: bool = True
     include_zip: bool = True
     overlay_color: str = "#ff0000"
+    label_colors: Dict[str, str] = Field(default_factory=dict)
     overlay_opacity: float = Field(default=0.45, ge=0, le=1)
     output_crs: str = "EPSG:4326"
     vector_formats: List[VectorFormat] = Field(
@@ -251,17 +252,30 @@ class ExportOptions(BaseModel):
     )
     filters: ExportFilterOptions = Field(default_factory=ExportFilterOptions)
 
-    @field_validator("overlay_color")
-    @classmethod
-    def validate_overlay_color(cls, value: str) -> str:
+    @staticmethod
+    def _normalized_hex(value: str, field: str) -> str:
         value = value.strip().lower()
         if len(value) != 7 or not value.startswith("#"):
-            raise ValueError("overlay_color must use #RRGGBB notation")
+            raise ValueError(f"{field} must use #RRGGBB notation")
         try:
             int(value[1:], 16)
         except ValueError as error:
-            raise ValueError("overlay_color must use #RRGGBB notation") from error
+            raise ValueError(f"{field} must use #RRGGBB notation") from error
         return value
+
+    @field_validator("overlay_color")
+    @classmethod
+    def validate_overlay_color(cls, value: str) -> str:
+        return cls._normalized_hex(value, "overlay_color")
+
+    @field_validator("label_colors")
+    @classmethod
+    def validate_label_colors(cls, value: Dict[str, str]) -> Dict[str, str]:
+        return {
+            label.strip(): cls._normalized_hex(color, "label_colors")
+            for label, color in value.items()
+            if label.strip()
+        }
 
     @field_validator("output_crs")
     @classmethod

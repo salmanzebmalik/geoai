@@ -1,23 +1,70 @@
 <template>
   <v-dialog v-model="open" max-width="680" scrollable>
-    <v-card class="export-dialog-card" theme="dark" rounded="lg" elevation="16">
+    <v-card class="export-dialog-card" rounded="lg" elevation="16">
       <v-card-title class="export-title">
         <v-icon icon="mdi-tray-arrow-down" size="small" />
-        Export annotations
+        Export Prediction
       </v-card-title>
       <v-card-subtitle class="export-subtitle">
         Prediction {{ mapStore.currentQueryId }}
       </v-card-subtitle>
 
       <v-card-text class="export-content">
-        <div class="export-controls">
+        <section v-if="hasClasses" class="export-section">
+          <div class="section-head">
+            <span class="section-title">Classes</span>
+            <span class="section-count">
+              {{ selectedClasses.length }} of {{ allClassNames.length }}
+            </span>
+          </div>
+
+          <v-chip-group
+            v-model="selectedClasses"
+            multiple
+            filter
+            class="class-chips"
+          >
+            <v-chip
+              v-for="entry in mapStore.predictionClasses"
+              :key="entry.name"
+              :value="entry.name"
+              variant="outlined"
+              size="small"
+              :ripple="false"
+            >
+              <span
+                class="class-color-swatch"
+                :style="{ backgroundColor: entry.color }"
+              />
+              {{ entry.name }}
+            </v-chip>
+          </v-chip-group>
+
+          <v-alert
+            v-if="!selectedClasses.length"
+            type="warning"
+            variant="tonal"
+            density="compact"
+            class="mt-2"
+          >
+            Select at least one class to export.
+          </v-alert>
+        </section>
+
+        <section class="export-section">
+          <div class="section-head">
+            <span class="section-title">Overlay</span>
+          </div>
+
           <v-text-field
+            v-if="singleClassPrediction"
             v-model="form.overlay_color"
             label="Overlay color"
             type="color"
             variant="outlined"
             density="comfortable"
             hide-details
+            class="overlay-color"
           />
 
           <div class="opacity-control">
@@ -33,16 +80,15 @@
               hide-details
             />
           </div>
-        </div>
+        </section>
 
         <v-alert v-if="error" type="error" variant="tonal" class="mt-4">
           {{ error }}
         </v-alert>
 
-        <div v-if="mapStore.currentExport" class="mt-5">
-          <div class="section-title">
-            Exported {{ mapStore.currentExport.exported_feature_count }} of
-            {{ mapStore.currentExport.source_feature_count }} features
+        <section v-if="mapStore.currentExport" class="export-section">
+          <div class="section-head">
+            <span class="section-title">Result</span>
           </div>
           <div class="artifact-list">
             <v-btn
@@ -54,21 +100,23 @@
               @click="download(artifact)"
             >{{ artifact.name }}</v-btn>
           </div>
-        </div>
+        </section>
 
-        <div v-if="history.length" class="mt-5">
-          <div class="section-title">Recent exports</div>
-          <v-list density="compact">
+        <section v-if="history.length" class="export-section">
+          <div class="section-head">
+            <span class="section-title">Recent exports</span>
+          </div>
+          <v-list density="compact" class="history-list">
             <v-list-item
               v-for="item in history.slice(0, 5)"
               :key="item.export_id"
-              :title="`${item.exported_feature_count} features · ${item.output_crs}`"
-              :subtitle="new Date(item.created_at).toLocaleString()"
+              :title="modelLabel(item)"
+              :subtitle="formatTimestamp(item.created_at)"
             >
               <template #append>
                 <v-btn
                   v-if="item.artifacts.find((artifact) => artifact.name === 'zip')"
-                  icon="mdi-folder-zip"
+                  icon="mdi-download"
                   size="small"
                   variant="text"
                   @click="download(item.artifacts.find((artifact) => artifact.name === 'zip'))"
@@ -76,7 +124,7 @@
               </template>
             </v-list-item>
           </v-list>
-        </div>
+        </section>
       </v-card-text>
 
       <v-card-actions class="export-actions">
@@ -86,6 +134,7 @@
           color="success"
           prepend-icon="mdi-export"
           :loading="mapStore.isExporting"
+          :disabled="!canExport"
           @click="createExport"
         >Create export</v-btn>
       </v-card-actions>
@@ -94,7 +143,7 @@
 </template>
 
 <script setup>
-import { reactive, ref, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { useMapStore } from '@/stores/map'
 
 const mapStore = useMapStore()
@@ -107,9 +156,80 @@ const form = reactive({
   overlay_opacity: 0.45,
 })
 
+const exportsDisplayedPrediction = computed(
+  () => Boolean(mapStore.currentQueryId)
+    && mapStore.viewedQueryId === mapStore.currentQueryId,
+)
+
+const hasClasses = computed(
+  () => exportsDisplayedPrediction.value && mapStore.predictionClasses.length > 0,
+)
+
+const allClassNames = computed(() =>
+  mapStore.predictionClasses.map((entry) => entry.name),
+)
+
+const selectedClasses = ref([])
+
+function isSelected(name) {
+  return selectedClasses.value.includes(name)
+}
+
+function resetClassSelection() {
+  const visible = mapStore.predictionClasses
+    .map((entry) => entry.name)
+    .filter((name) => !mapStore.hiddenPredictionClasses.includes(name))
+
+  selectedClasses.value = visible.length ? visible : [...allClassNames.value]
+}
+
+watch(() => mapStore.predictionClasses, resetClassSelection)
+
+const exportedClasses = computed(() =>
+  mapStore.predictionClasses.filter((entry) => isSelected(entry.name)),
+)
+
+const usesClassColors = computed(() => exportedClasses.value.length > 1)
+
+const singleClassPrediction = computed(() => allClassNames.value.length <= 1)
+
+const MODEL_LABELS = {
+  zeroshot: 'Zero-Shot',
+  tree: 'TCD-Segformer',
+  tree_deepforest: 'DeepForest',
+  tree_satlas: 'Satlas',
+  tree_unet: 'UNet',
+  tree_satlas_sentinel: 'Satlas (Sentinel)',
+  tree_unet_sentinel: 'UNet (Sentinel)',
+  yolo: 'YOLO11',
+}
+
+function modelLabel(item) {
+  return MODEL_LABELS[item?.model_type] ?? item?.model_type ?? 'Export'
+}
+
+function formatTimestamp(value) {
+  return new Date(value).toLocaleString()
+}
+
+
+const classFilter = computed(() =>
+  hasClasses.value
+    && selectedClasses.value.length
+    && selectedClasses.value.length < allClassNames.value.length
+      ? selectedClasses.value
+      : null,
+)
+
+const canExport = computed(
+  () => Boolean(mapStore.currentQueryId)
+    && (!hasClasses.value || selectedClasses.value.length > 0),
+)
+
 watch(() => mapStore.exportDialogTrigger, () => {
   open.value = true
   error.value = null
+  resetClassSelection()
   loadHistory()
 })
 
@@ -132,7 +252,6 @@ async function loadHistory() {
     )
     if (response.ok) history.value = await response.json()
   } catch {
-    // History is supplementary; export creation remains available.
   }
 }
 
@@ -149,6 +268,16 @@ async function createExport() {
       include_mask_tiff: true,
       include_metadata: true,
       include_zip: true,
+    }
+
+    if (classFilter.value) {
+      options.filters = { labels: classFilter.value }
+    }
+
+    if (usesClassColors.value) {
+      options.label_colors = Object.fromEntries(
+        exportedClasses.value.map((entry) => [entry.name, entry.color]),
+      )
     }
     const response = await fetch('/api/segmentation/exports', {
       method: 'POST',
@@ -174,11 +303,71 @@ function download(artifact) {
 <style scoped>
 .export-dialog-card {
   padding: 8px;
-  color: #f2f7f3;
-  background:
-    linear-gradient(145deg, rgba(36, 66, 45, 0.38), transparent 45%),
-    #111c15;
-  border: 1px solid rgba(126, 190, 143, 0.18);
+}
+
+.class-color-swatch {
+  width: 12px;
+  height: 12px;
+  margin-right: 7px;
+  flex: none;
+  border-radius: 3px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15);
+}
+
+.export-section {
+  padding: 14px 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.export-section:first-child {
+  padding-top: 6px;
+}
+
+.export-section:last-child {
+  border-bottom: 0;
+  padding-bottom: 4px;
+}
+
+.section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.section-count {
+  font-size: 0.78rem;
+  color: rgba(0, 0, 0, 0.6);
+}
+
+.section-hint {
+  font-size: 0.78rem;
+  color: rgba(0, 0, 0, 0.6);
+  margin-bottom: 10px;
+}
+
+.class-chips {
+  margin-left: -2px;
+}
+
+.overlay-color {
+  max-width: 220px;
+}
+
+.class-chip--off {
+  opacity: 0.5;
+}
+
+.class-chip--off .class-color-swatch {
+  background-color: transparent !important;
+}
+
+.class-actions {
+  margin-left: -8px;
+}
+
+.history-list {
+  background: transparent;
 }
 
 .export-title {
@@ -191,31 +380,20 @@ function download(artifact) {
 }
 
 .export-subtitle {
-  padding: 0 20px 14px;
-  color: rgba(226, 239, 229, 0.68);
+  padding: 0 20px 2px;
 }
 
 .export-content {
-  padding: 16px 20px;
-}
-
-.export-controls {
-  display: flex;
-  flex-direction: column;
-  gap: 22px;
-  padding: 16px;
-  background: rgba(255, 255, 255, 0.035);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 10px;
+  padding: 0 20px 16px;
 }
 
 .opacity-control {
+  margin-top: 14px;
   padding: 0 4px 4px;
 }
 
 .control-label {
   margin-bottom: 8px;
-  color: rgba(242, 247, 243, 0.78);
   font-size: 0.82rem;
 }
 
@@ -226,7 +404,6 @@ function download(artifact) {
 .section-title {
   font-size: 0.9rem;
   font-weight: 600;
-  margin-bottom: 8px;
 }
 
 .artifact-list {
