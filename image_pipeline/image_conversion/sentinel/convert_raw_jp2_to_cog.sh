@@ -1,52 +1,6 @@
 #!/usr/bin/env bash
-# Convert Sentinel-2 RGB to 8-bit COGs -- CORRECTED RECIPE.
-#
-# ONE RULE: the value 0 means "no data", and nothing else. Everything follows.
-#
-#   gdalwarp   ... -srcnodata 0 -dstnodata 0     (fill stays exactly 0)
-#   gdal_translate ... -a_nodata 0               (declare it)
-#              ... -co OVERVIEWS=IGNORE_EXISTING (build the pyramid fresh)
-#              ... -co COMPRESS=ZSTD             (lossless; 0 stays 0)
-#
-# WHY EACH PIECE MATTERS -- all three earlier bugs came from breaking one of them:
-#
-# 1. -srcnodata 0 tells gdalwarp that 0 is nodata in the source .jp2 (the
-#    Sentinel-2 L2A convention: valid reflectance starts at 1), so bilinear
-#    resampling stops bleeding the source's black border into real pixels.
-#
-# 2. Lossless compression keeps 0 exactly 0. Under JPEG q90, DCT ringing lifted
-#    the fill to 1-10 DN -- a 204x increase over lossless on identical data --
-#    so nothing downstream could tell fill from dark ground. That was the
-#    original black-edge bug.
-#
-# 3. -a_nodata 0 + OVERVIEWS=IGNORE_EXISTING fixes the zoomed-out images.
-#    GDAL's AVERAGE resampling skips nodata but is NOT alpha-aware, so the
-#    previous alpha-band build averaged fill into real data at every scene edge
-#    and drew a thin dark diagonal line -- visible only when zoomed out, because
-#    only the overviews were affected. IGNORE_EXISTING is required because a
-#    warped VRT otherwise exposes the .jp2 pyramid and the resampling flag
-#    silently does nothing.
-#
-# Measured against the previous alpha-band build, same scene:
-#   dark edge pixels at /2,/4,/8,/16 : 2781,989,779,411  ->  0,0,0,0
-#   overview accuracy vs truth       : 10.52 DN RMSE     ->  8.85 DN
-#   fill pixels correctly transparent: 94588/94625       ->  93506/93506
-#   valid pixels wrongly all-zero    : 37                ->  0
-#   file size                        : 181 MB            ->  162 MB (3 bands)
-#
-# NO ALPHA BAND. 3 bands, not 4. Transparency comes from nodata, which viewers
-# honour automatically -- a pixel is transparent when all three bands are 0.
-# Do NOT also pass a nodata query parameter at render time; it is redundant.
-#
-# SAFETY: writes to a NEW output tree. The existing 40 GB of COGs under
-# sentinel_rgb_cogs/ and the live pgstac collection are untouched, so this is
-# fully reversible.
-#
-# Usage:
-#   ./run_convert_masked_tmux.sh              # tmux session 'cog_convert'
-#   ./convertjp2tocog_masked.sh               # foreground
-#   ./convertjp2tocog_masked.sh --dry-run     # list work, convert nothing
-#   PARALLEL=4 ./convertjp2tocog_masked.sh    # fewer concurrent scenes
+# Convert Sentinel-2 RGB to 8-bit COGs
+
 set -uo pipefail
 
 TILE_LIST="${TILE_LIST:-/home/ubuntu/work/saved_data/collections/germany_tiles.txt}"
