@@ -117,10 +117,18 @@
 
           <div class="bbox-info" v-if="mapStore.bbox">
             <div class="bbox-coords">
-              <span>N {{ mapStore.bbox.max_lat.toFixed(5) }}</span>
-              <span>S {{ mapStore.bbox.min_lat.toFixed(5) }}</span>
-              <span>E {{ mapStore.bbox.max_lon.toFixed(5) }}</span>
-              <span>W {{ mapStore.bbox.min_lon.toFixed(5) }}</span>
+              <span class="bbox-coord">
+                <span class="bbox-dir">N</span>{{ mapStore.bbox.max_lat.toFixed(5) }}
+              </span>
+              <span class="bbox-coord">
+                <span class="bbox-dir">S</span>{{ mapStore.bbox.min_lat.toFixed(5) }}
+              </span>
+              <span class="bbox-coord">
+                <span class="bbox-dir">E</span>{{ mapStore.bbox.max_lon.toFixed(5) }}
+              </span>
+              <span class="bbox-coord">
+                <span class="bbox-dir">W</span>{{ mapStore.bbox.min_lon.toFixed(5) }}
+              </span>
             </div>
             <div class="bbox-area">
               <span class="area">{{ formatArea(mapStore.areaSqm) }}</span>
@@ -760,32 +768,49 @@ function onTaskChange() {
 
 .bbox-info {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
   width: 90%;
   margin: 8px 16px;
   padding: 10px 12px;
   background-color: rgba(139, 195, 74, 0.1);
   border: 1px solid rgba(139, 195, 74, 0.2);
   border-radius: 8px;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .bbox-coords {
   display: grid;
   grid-template-columns: auto auto;
-  column-gap: 8px;
-  row-gap: 2px;
-  color: rgba(255, 255, 255, 0.85);
+  column-gap: 14px;
+  row-gap: 4px;
+  color: #ffffff;
+}
+
+.bbox-coord {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 13px;
+  /* Equal-width digits so the four values line up in the grid */
+  font-variant-numeric: tabular-nums;
+}
+
+.bbox-dir {
+  min-width: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #a5d6a7;
 }
 
 .bbox-area {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 2px;
-  flex-shrink: 0;
+  align-items: baseline;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(139, 195, 74, 0.2);
 }
 
 .area {
@@ -794,8 +819,8 @@ function onTaskChange() {
 }
 
 .area-fields {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.5);
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.7);
   white-space: nowrap;
 }
 
