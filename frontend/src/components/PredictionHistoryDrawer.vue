@@ -1,4 +1,5 @@
 <template>
+  <!-- History toggle button -->
   <v-btn
     class="history-toggle"
     :class="{ 'history-toggle--shifted': mapStore.historyDrawerOpen }"
@@ -10,6 +11,7 @@
     <span class="history-toggle-label">History</span>
   </v-btn>
 
+  <!-- Prediction history drawer -->
   <v-navigation-drawer
     v-model="mapStore.historyDrawerOpen"
     location="end"
@@ -29,6 +31,7 @@
 
     <v-divider />
 
+    <!-- Show error message if there was an error fetching the history -->
     <div v-if="error" class="drawer-message error-message">{{ error }}</div>
     <div v-else-if="!loading && history.length === 0" class="drawer-message">
       No predictions yet.
@@ -61,19 +64,23 @@
             </span>
           </template>
 
+          <!-- Action buttons for each history item -->
           <template #append>
+            <!-- Open details -->
             <v-btn
               icon="mdi-information-outline"
               variant="text"
               size="small"
               @click.stop="toggleDetails(item)"
             />
+            <!-- Export prediction -->
             <v-btn
               icon="mdi-tray-arrow-down"
               variant="text"
               size="small"
               @click.stop="exportPrediction(item)"
             />
+            <!-- Delete prediction -->
             <v-btn
               icon="mdi-delete-outline"
               color="error"
@@ -94,6 +101,7 @@
           </template>
         </v-list-item>
 
+        <!-- Inline details panel for each history item -->
         <v-expand-transition>
           <div v-if="expandedId === item.query_id" class="details-panel">
             <div class="detail-row">
@@ -130,10 +138,13 @@
       </template>
     </v-list>
 
+    <!--Number of showed past predictions-->
     <div v-if="history.length" class="drawer-note">
       10 most recent predictions
     </div>
   </v-navigation-drawer>
+
+  <!--Overlay dialog for confirming deletion of a prediction-->
   <v-dialog
     v-model="deleteDialogOpen"
     max-width="440"
@@ -198,6 +209,7 @@
     </v-card>
   </v-dialog>
 
+  <!-- Snackbar for showing a message after a successful deletion -->
   <v-snackbar
     v-model="deleteSnackbarVisible"
     color="success"
@@ -220,15 +232,16 @@ const mapStore = useMapStore() // Pinia store
 const history = ref([])
 const loading = ref(false)
 const error = ref(null)
-const viewingId = ref(null)
-const expandedId = ref(null)
+const viewingId = ref(null) // query id of prediction currently being viewed on the map
+const expandedId = ref(null) // query id of prediction whose details panel is currently expanded
 const deleteDialogOpen = ref(false)
 const pendingDelete = ref(null)
-const deletingId = ref(null)
+const deletingId = ref(null) 
 const deleteError = ref(null)
-const deleteSnackbarVisible = ref(false)
+const deleteSnackbarVisible = ref(false) // snackbar for showing a message after a successful deletion
 const deleteSnackbarMessage = ref('')
 
+// toggle the history drawer open/closed
 function toggleDrawer() {
   mapStore.historyDrawerOpen = !mapStore.historyDrawerOpen
 
@@ -237,6 +250,7 @@ function toggleDrawer() {
   }
 }
 
+// fetches the list of past predictions from the backend
 async function loadHistory() {
   loading.value = true
   error.value = null
@@ -301,6 +315,7 @@ function toggleDetails(item) {
   expandedId.value = expandedId.value === item.query_id ? null : item.query_id
 }
 
+// compute the area of a bounding box in square meters
 function computeBboxArea(bbox) {
   if (!bbox) return null
 
@@ -313,9 +328,10 @@ function computeBboxArea(bbox) {
   ]
 
   const polygon = new Polygon([ring])
-  return getArea(polygon, { projection: 'EPSG:4326' })
+  return getArea(polygon, { projection: 'EPSG:4326' }) 
 }
 
+// format area in square meters or square kilometers
 function formatArea(sqm) {
   if (sqm == null) return ''
   return sqm > 1_000_000
@@ -376,6 +392,7 @@ async function viewPrediction(item) {
   }
 }
 
+// open the delete confirmation dialog for a specific past prediction
 function openDeleteDialog(item) {
   if (deletingId.value) return
 
@@ -384,6 +401,7 @@ function openDeleteDialog(item) {
   deleteDialogOpen.value = true
 }
 
+// close the delete confirmation dialog and reset its state
 function closeDeleteDialog() {
   if (deletingId.value) return
 
@@ -392,6 +410,7 @@ function closeDeleteDialog() {
   deleteError.value = null
 }
 
+// read the `detail` field from a JSON error response
 async function readErrorDetail(response) {
   try {
     const body = await response.json()
@@ -404,6 +423,7 @@ async function readErrorDetail(response) {
   }
 }
 
+// remove a deleted prediction from the history and store
 function applyDeletedPrediction(queryId) {
   history.value = history.value.filter(
     (item) => item.query_id !== queryId,
@@ -413,15 +433,16 @@ function applyDeletedPrediction(queryId) {
     expandedId.value = null
   }
 
-  mapStore.clearPredictionForQuery(queryId)
+  mapStore.clearPredictionForQuery(queryId) // remove the deleted prediction from the store
 }
 
+// permanently delete a prediction from the history and storage
 async function confirmDelete() {
   if (!pendingDelete.value || deletingId.value) {
     return
   }
 
-  const queryId = pendingDelete.value.query_id
+  const queryId = pendingDelete.value.query_id // store the queryId being deleted so we can show a loading state on the correct item
 
   deletingId.value = queryId
   deleteError.value = null
@@ -443,18 +464,19 @@ async function confirmDelete() {
       )
     }
 
-    const alreadyDeleted = response.status === 404
+    const alreadyDeleted = response.status === 404 // prediction was already deleted
 
     if (!response.ok && !alreadyDeleted) {
       const detail = await readErrorDetail(response)
 
-      if (response.status === 409) {
+      if (response.status === 409) { // conflict error
         throw new Error(
           detail ||
           'This prediction is still being processed.',
         )
       }
 
+      // fallback error message if the server didn't provide a specific detail
       throw new Error(
         detail ||
         'The prediction could not be deleted. ' +
@@ -462,9 +484,10 @@ async function confirmDelete() {
       )
     }
 
-    applyDeletedPrediction(queryId)
+    applyDeletedPrediction(queryId) // remove the deleted prediction from the history and store
 
-    deleteDialogOpen.value = false
+    // reset dialog state and show snackbar
+    deleteDialogOpen.value = false 
     pendingDelete.value = null
 
     deleteSnackbarMessage.value = alreadyDeleted
@@ -482,9 +505,7 @@ async function confirmDelete() {
   }
 }
 
-// Format task label
-// Models that draw boxes rather than pixel masks. Everything else under
-// tree_detection produces a segmentation mask.
+// list of models that return countable objects/boxes rather than polygons
 const OBJECT_DETECTION_MODELS = ['deepforest-tree', 'yolo11']
 
 // Only DeepForest counts actual trees; it draws one box per tree. The
@@ -501,8 +522,7 @@ function treeCount(item) {
   return match ? Number(match[1]) : null
 }
 
-// Name the task, not the checkpoint: prediction_type alone cannot tell
-// segmentation from object detection, since both arrive as "tree_detection".
+// format the label for a prediction history item
 function formatLabel(item) {
   const model = item.model_name ?? ''
 
@@ -524,14 +544,14 @@ function formatLabel(item) {
     .replace(/\b\w/g, (char) => char.toUpperCase()) // capitalize first letter of each word
 }
 
+// format date string for display in the history drawer
 function formatDate(isoString) {
   return new Date(isoString).toLocaleString()
 }
 </script>
 
 <style scoped>
-/* Pull-out tab on the right edge, flush with the screen and rounded only on
-   the side that faces the map. */
+
 .history-toggle {
   position: fixed;
   top: 84px;
@@ -545,7 +565,6 @@ function formatDate(isoString) {
   transition: right 0.2s ease;
 }
 
-/* Drawer is 340px wide; the tab rides along its edge. */
 .history-toggle--shifted {
   right: 340px;
 }
