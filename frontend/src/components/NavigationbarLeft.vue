@@ -147,11 +147,6 @@
                 mapStore.rasterEstimateError,
             }"
           >
-            <div class="raster-estimate-title">
-              <v-icon size="15">mdi-image-size-select-large</v-icon>
-              <span>Estimated raster</span>
-            </div>
-
             <div
               v-if="mapStore.isEstimatingRaster"
               class="raster-estimate-loading"
@@ -165,51 +160,74 @@
             </div>
 
             <template v-else-if="mapStore.rasterEstimate">
-              <span class="raster-estimate-size">
-                {{
-                  formatPixelCount(
-                    mapStore.rasterEstimate.width_pixels,
-                  )
-                }}
-                ×
-                {{
-                  formatPixelCount(
-                    mapStore.rasterEstimate.height_pixels,
-                  )
-                }}
-                pixels
-                ({{ formatMegapixels(mapStore.rasterEstimate.megapixels) }} MP)
-              </span>
+              <div class="raster-estimate-head">
+                <span
+                  class="raster-estimate-status"
+                  :class="{
+                    'raster-estimate-status--blocked':
+                      !mapStore.rasterEstimate.allowed,
+                  }"
+                >
+                  <v-icon size="15">
+                    {{
+                      mapStore.rasterEstimate.allowed
+                        ? 'mdi-check-circle-outline'
+                        : 'mdi-alert-circle-outline'
+                    }}
+                  </v-icon>
+                  {{
+                    mapStore.rasterEstimate.allowed
+                      ? 'Within processing limit'
+                      : 'Not within processing limit'
+                  }}
+                </span>
 
-              <span
-                class="raster-estimate-status"
-                :class="{
-                  'raster-estimate-status--blocked':
-                    !mapStore.rasterEstimate.allowed,
-                }"
-              >
-                {{
-                  mapStore.rasterEstimate.allowed
-                    ? 'Within current processing limit'
-                    : 'Area exceeds current processing limit'
-                }}
-              </span>
+                <v-icon
+                  :icon="rasterDetailsOpen
+                    ? 'mdi-chevron-up'
+                    : 'mdi-information-outline'"
+                  size="20"
+                  class="raster-estimate-toggle"
+                  :title="rasterDetailsOpen ? 'Hide details' : 'Show details'"
+                  @click="rasterDetailsOpen = !rasterDetailsOpen"
+                />
+              </div>
 
-              <span class="raster-estimate-limit">
-                Limit:
-                {{
-                  formatMegapixels(
-                    mapStore.rasterEstimate.max_total_pixels / 1_000_000,
-                  )
-                }}
-                MP total /
-                {{
-                  formatPixelCount(
-                    mapStore.rasterEstimate.max_side_pixels,
-                  )
-                }}
-                px per side
-              </span>
+              <v-expand-transition>
+                <div v-if="rasterDetailsOpen" class="raster-estimate-details">
+                  <span class="raster-estimate-size">
+                    {{
+                      formatPixelCount(
+                        mapStore.rasterEstimate.width_pixels,
+                      )
+                    }}
+                    ×
+                    {{
+                      formatPixelCount(
+                        mapStore.rasterEstimate.height_pixels,
+                      )
+                    }}
+                    pixels
+                    ({{ formatMegapixels(mapStore.rasterEstimate.megapixels) }} MP)
+                  </span>
+
+                  <span class="raster-estimate-limit">
+                    Limit:
+                    {{
+                      formatMegapixels(
+                        mapStore.rasterEstimate.max_total_pixels / 1_000_000,
+                      )
+                    }}
+                    MP total /
+                    {{
+                      formatPixelCount(
+                        mapStore.rasterEstimate.max_side_pixels,
+                      )
+                    }}
+                    px per side
+                  </span>
+                </div>
+              </v-expand-transition>
             </template>
 
             <span
@@ -340,6 +358,8 @@ const supportsPredictionMap = computed(() =>
 
 // Mirrors the `keywords` limit in backend/app/schemas/segmentation.py; the
 // backend deduplicates too, so the same terms are counted here.
+const rasterDetailsOpen = ref(false)
+
 const MAX_KEYWORDS = 20
 
 const keywordTerms = computed(() => [
@@ -831,12 +851,12 @@ function onTaskChange() {
   gap: 4px;
   width: 90%;
   margin: 8px 16px;
-  padding: 9px 11px;
+  padding: 6px 11px;
   border: 1px solid rgba(139, 195, 74, 0.28);
   border-radius: 8px;
   background: rgba(139, 195, 74, 0.08);
   color: rgba(255, 255, 255, 0.82);
-  font-size: 11px;
+  font-size: 13px;
   line-height: 1.35;
   overflow-wrap: anywhere;
 }
@@ -847,16 +867,35 @@ function onTaskChange() {
   background: rgba(239, 83, 80, 0.1);
 }
 
-.raster-estimate-title,
 .raster-estimate-loading {
   display: flex;
   align-items: center;
   gap: 6px;
 }
 
-.raster-estimate-title {
-  color: rgba(255, 255, 255, 0.65);
-  font-weight: 600;
+.raster-estimate-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.raster-estimate-toggle {
+  cursor: pointer;
+  opacity: 0.8;
+}
+
+.raster-estimate-toggle:hover {
+  opacity: 1;
+}
+
+.raster-estimate-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 6px;
+  margin-top: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 .raster-estimate-size {
@@ -864,6 +903,10 @@ function onTaskChange() {
 }
 
 .raster-estimate-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
   color: #a5d6a7;
 }
 
