@@ -91,7 +91,7 @@
             <v-btn
               @click="mapStore.triggerDrawing()"
               class="select-button"
-              prepend-icon="mdi-select"
+              prepend-icon="mdi-vector-square"
             >Select Area</v-btn>
 
             <v-btn
