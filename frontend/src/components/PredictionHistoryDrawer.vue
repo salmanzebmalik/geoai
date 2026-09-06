@@ -129,6 +129,10 @@
         </v-expand-transition>
       </template>
     </v-list>
+
+    <div v-if="history.length" class="drawer-note">
+      10 most recent predictions
+    </div>
   </v-navigation-drawer>
   <v-dialog
     v-model="deleteDialogOpen"
@@ -556,6 +560,13 @@ function formatDate(isoString) {
   font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.08em;
+}
+
+.drawer-note {
+  padding: 4px 16px 16px;
+  font-size: 14px;
+  color: rgba(0, 0, 0, 0.6);
+  text-align: center;
 }
 
 .drawer-header {
