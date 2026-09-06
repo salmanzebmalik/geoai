@@ -1,11 +1,14 @@
 <template>
   <v-btn
-    icon="mdi-history"
     class="history-toggle"
     :class="{ 'history-toggle--shifted': mapStore.historyDrawerOpen }"
     color="success"
+    :title="mapStore.historyDrawerOpen ? 'Close history' : 'Open prediction history'"
     @click="toggleDrawer"
-  />
+  >
+    <v-icon icon="mdi-history" size="20" />
+    <span class="history-toggle-label">History</span>
+  </v-btn>
 
   <v-navigation-drawer
     v-model="mapStore.historyDrawerOpen"
@@ -523,16 +526,36 @@ function formatDate(isoString) {
 </script>
 
 <style scoped>
+/* Pull-out tab on the right edge, flush with the screen and rounded only on
+   the side that faces the map. */
 .history-toggle {
   position: fixed;
   top: 84px;
-  right: 16px;
+  right: 0;
   z-index: 1005;
+  min-width: 0;
+  width: 34px;
+  height: 116px;
+  padding: 0;
+  border-radius: 8px 0 0 8px;
   transition: right 0.2s ease;
 }
 
+/* Drawer is 340px wide; the tab rides along its edge. */
 .history-toggle--shifted {
-  right: 356px;
+  right: 340px;
+}
+
+.history-toggle :deep(.v-btn__content) {
+  flex-direction: column;
+  gap: 8px;
+}
+
+.history-toggle-label {
+  writing-mode: vertical-rl;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
 }
 
 .drawer-header {
