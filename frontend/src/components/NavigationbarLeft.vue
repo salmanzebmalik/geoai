@@ -6,6 +6,7 @@
           <v-icon size="18" class="mr-2">mdi-layers</v-icon>
           <p class="picker-label">MAP</p>
         </div>
+        
         <v-select
           v-model="mapStore.mapType"
           :items="mapTypeOptions"
@@ -25,11 +26,14 @@
           </template>
         </v-select>
 
+        <!-- Sentinel-specific controls -->
         <div class="sentinel-controls" v-if="mapStore.mapType === 'sentinel'">
           <div class="sentinel-label">
             <v-icon size="16" class="mr-2">mdi-cloud</v-icon>
             <p>Max. cloud coverage</p>
           </div>
+          
+          <!-- Cloud coverage slider -->
           <div class="cloud-slider-row">
             <v-slider
               v-model="mapStore.sentinelMaxCloudCover"
@@ -46,10 +50,12 @@
             <span class="cloud-value">{{ mapStore.sentinelMaxCloudCover }}%</span>
           </div>
 
+          <!-- Sentinel date range picker -->
           <div class="sentinel-label">
             <v-icon size="16" class="mr-2">mdi-calendar-range</v-icon>
             <span>Date range</span>
           </div>
+
           <v-date-picker
             v-model="sentinelDateRange"
             multiple="range"
@@ -80,6 +86,7 @@
 
       <v-divider/>
     
+      <!-- Prediction workflow -->
       <v-list class="procedure" lines="one">
         <!-- Area selection -->
           <v-list-item
@@ -91,7 +98,7 @@
             <v-btn
               @click="mapStore.triggerDrawing()"
               class="select-button"
-              prepend-icon="mdi-select"
+              prepend-icon="mdi-vector-square"
             >Select Area</v-btn>
 
             <v-btn
@@ -102,14 +109,34 @@
             >
               <v-icon icon="mdi-pencil" />
             </v-btn>
+
+            <v-btn
+              v-if="mapStore.bbox"
+              @click="mapStore.clearBbox()"
+              class="input-coords-button"
+              aria-label="Clear selected area"
+              title="Clear selected area"
+              variant="tonal"
+            >
+              <v-icon icon="mdi-close" />
+            </v-btn>
           </div>
 
+          <!-- Area information -->
           <div class="bbox-info" v-if="mapStore.bbox">
             <div class="bbox-coords">
-              <span>N {{ mapStore.bbox.max_lat.toFixed(5) }}</span>
-              <span>S {{ mapStore.bbox.min_lat.toFixed(5) }}</span>
-              <span>E {{ mapStore.bbox.max_lon.toFixed(5) }}</span>
-              <span>W {{ mapStore.bbox.min_lon.toFixed(5) }}</span>
+              <span class="bbox-coord">
+                <span class="bbox-dir">N</span>{{ mapStore.bbox.max_lat.toFixed(5) }}
+              </span>
+              <span class="bbox-coord">
+                <span class="bbox-dir">S</span>{{ mapStore.bbox.min_lat.toFixed(5) }}
+              </span>
+              <span class="bbox-coord">
+                <span class="bbox-dir">E</span>{{ mapStore.bbox.max_lon.toFixed(5) }}
+              </span>
+              <span class="bbox-coord">
+                <span class="bbox-dir">W</span>{{ mapStore.bbox.min_lon.toFixed(5) }}
+              </span>
             </div>
             <div class="bbox-area">
               <span class="area">{{ formatArea(mapStore.areaSqm) }}</span>
@@ -117,6 +144,7 @@
             </div>
           </div>
 
+          <!--Raster estimate box-->
           <div
             v-if="mapStore.bbox && supportsPredictionMap"
             class="raster-estimate"
@@ -128,11 +156,6 @@
                 mapStore.rasterEstimateError,
             }"
           >
-            <div class="raster-estimate-title">
-              <v-icon size="15">mdi-image-size-select-large</v-icon>
-              <span>Estimated raster</span>
-            </div>
-
             <div
               v-if="mapStore.isEstimatingRaster"
               class="raster-estimate-loading"
@@ -146,51 +169,74 @@
             </div>
 
             <template v-else-if="mapStore.rasterEstimate">
-              <span class="raster-estimate-size">
-                {{
-                  formatPixelCount(
-                    mapStore.rasterEstimate.width_pixels,
-                  )
-                }}
-                ×
-                {{
-                  formatPixelCount(
-                    mapStore.rasterEstimate.height_pixels,
-                  )
-                }}
-                pixels
-                ({{ formatMegapixels(mapStore.rasterEstimate.megapixels) }} MP)
-              </span>
+              <div class="raster-estimate-head">
+                <span
+                  class="raster-estimate-status"
+                  :class="{
+                    'raster-estimate-status--blocked':
+                      !mapStore.rasterEstimate.allowed,
+                  }"
+                >
+                  <v-icon size="15">
+                    {{
+                      mapStore.rasterEstimate.allowed
+                        ? 'mdi-check-circle-outline'
+                        : 'mdi-alert-circle-outline'
+                    }}
+                  </v-icon>
+                  {{
+                    mapStore.rasterEstimate.allowed
+                      ? 'Within processing limit'
+                      : 'Not within processing limit'
+                  }}
+                </span>
 
-              <span
-                class="raster-estimate-status"
-                :class="{
-                  'raster-estimate-status--blocked':
-                    !mapStore.rasterEstimate.allowed,
-                }"
-              >
-                {{
-                  mapStore.rasterEstimate.allowed
-                    ? 'Within current processing limit'
-                    : 'Area exceeds current processing limit'
-                }}
-              </span>
+                <v-icon
+                  :icon="rasterDetailsOpen
+                    ? 'mdi-chevron-up'
+                    : 'mdi-information-outline'"
+                  size="20"
+                  class="raster-estimate-toggle"
+                  :title="rasterDetailsOpen ? 'Hide details' : 'Show details'"
+                  @click="rasterDetailsOpen = !rasterDetailsOpen"
+                />
+              </div>
 
-              <span class="raster-estimate-limit">
-                Limit:
-                {{
-                  formatMegapixels(
-                    mapStore.rasterEstimate.max_total_pixels / 1_000_000,
-                  )
-                }}
-                MP total /
-                {{
-                  formatPixelCount(
-                    mapStore.rasterEstimate.max_side_pixels,
-                  )
-                }}
-                px per side
-              </span>
+              <v-expand-transition>
+                <div v-if="rasterDetailsOpen" class="raster-estimate-details">
+                  <span class="raster-estimate-size">
+                    {{
+                      formatPixelCount(
+                        mapStore.rasterEstimate.width_pixels,
+                      )
+                    }}
+                    ×
+                    {{
+                      formatPixelCount(
+                        mapStore.rasterEstimate.height_pixels,
+                      )
+                    }}
+                    pixels
+                    ({{ formatMegapixels(mapStore.rasterEstimate.megapixels) }} MP)
+                  </span>
+
+                  <span class="raster-estimate-limit">
+                    Limit:
+                    {{
+                      formatMegapixels(
+                        mapStore.rasterEstimate.max_total_pixels / 1_000_000,
+                      )
+                    }}
+                    MP total /
+                    {{
+                      formatPixelCount(
+                        mapStore.rasterEstimate.max_side_pixels,
+                      )
+                    }}
+                    px per side
+                  </span>
+                </div>
+              </v-expand-transition>
             </template>
 
             <span
@@ -219,7 +265,23 @@
           ></v-select>
 
           <template v-if="mapStore.selectedTask === 'Zero-Shot'">
-          <v-list-item prepend-icon="mdi-plus" title="Keywords" />
+          <v-list-item prepend-icon="mdi-plus" title="Keywords">
+            <template #append>
+              <v-tooltip location="bottom" max-width="260">
+                <template #activator="{ props }">
+                  <v-icon
+                    v-bind="props"
+                    icon="mdi-information-outline"
+                    size="small"
+                    class="keyword-info"
+                  />
+                </template>
+                Separate keywords with commas, e.g.
+                "buildings, pools, cars". At most {{ MAX_KEYWORDS }} keywords
+                per prediction.
+              </v-tooltip>
+            </template>
+          </v-list-item>
           <v-text-field
             v-model="mapStore.keyword"
             placeholder="buildings, pools, cars"
@@ -299,14 +361,16 @@ import orthophotoThumb from '@/assets/map-orthophoto.jpg'
 import sentinelThumb from '@/assets/map-sentinel.jpg'
 
 const mapStore = useMapStore()
+// map types that can run a prediction, mirrors getPredictionSourceType() in Map.vue
 const supportsPredictionMap = computed(() =>
-  ['orthophoto', 'germany'].includes(mapStore.mapType)
+  ['orthophoto', 'germany', 'sentinel'].includes(mapStore.mapType)
 )
 
-// Mirrors the `keywords` limit in backend/app/schemas/segmentation.py; the
-// backend deduplicates too, so the same terms are counted here.
-const MAX_KEYWORDS = 20
+const rasterDetailsOpen = ref(false) // whether the raster estimate details are expanded
 
+const MAX_KEYWORDS = 20 // maximum number of keywords allowed for zero-shot prediction (backend)
+
+// compute individual keywords from keyword string
 const keywordTerms = computed(() => [
   ...new Set(
     mapStore.keyword
@@ -316,48 +380,31 @@ const keywordTerms = computed(() => [
   ),
 ])
 
+// whether number of keywords exceeds maximum allowed
 const tooManyKeywords = computed(
   () => mapStore.selectedTask === 'Zero-Shot'
     && keywordTerms.value.length > MAX_KEYWORDS,
 )
 
+// start prediction run
 function startRun() {
   if (tooManyKeywords.value) return
 
   mapStore.triggerRun()
 }
 
-const runDisabled = computed(() => {
-  const zeroShotKeywordMissing =
-    mapStore.selectedTask === 'Zero-Shot'
-    && !mapStore.keyword.trim()
-
-  return (
-    !supportsPredictionMap.value
-    || !mapStore.bbox
-    || !mapStore.selectedTask
-    || zeroShotKeywordMissing
-    || mapStore.isEstimatingRaster
-    || Boolean(mapStore.rasterEstimateError)
-    || !mapStore.rasterEstimate
-    || !mapStore.rasterEstimate.allowed
-  )
-})
-
+// format pixel count with thousands separator
 function formatPixelCount(value) {
   return Number(value).toLocaleString()
 }
 
+// format megapixels to 2 decimal places
 function formatMegapixels(value) {
   return Number(value).toFixed(2)
 }
 
-// Some element in this densely interactive sidebar (menus/overlays call
-// stopPropagation() on their own click handling) can swallow a mouseup before
-// it bubbles up to window, which is where v-slider listens to end a drag -
-// leaving the cloud-cover slider's thumb stuck following the cursor. A
-// capture-phase listener always fires before that interference, so redispatch
-// the release straight at window to make sure the slider actually sees it.
+// the sidebar can swallow a mouseup and leave the slider thumb stuck to the
+// cursor, so catch the release early and redispatch it straight at window
 function releaseStuckDrag(e) {
   if (!e.isTrusted) return // ignore the synthetic event this handler itself dispatches
   window.dispatchEvent(new MouseEvent('mouseup', {
@@ -369,9 +416,12 @@ function releaseStuckDrag(e) {
   }))
 }
 
+// mounted/unmounted listeners to catch mouseup events outside the sidebar
 onMounted(() => window.addEventListener('mouseup', releaseStuckDrag, { capture: true }))
 onUnmounted(() => window.removeEventListener('mouseup', releaseStuckDrag, { capture: true }))
 
+
+// map type options for the map picker
 const mapTypeOptions = [
   {
     title: 'NRW',
@@ -399,6 +449,7 @@ const mapTypeOptions = [
   },
 ]
 
+// available tasks for the selected map type
 const TASK_OPTIONS_BY_MAP_TYPE = {
   orthophoto: [
     { title: 'Tree Detection', value: 'Tree Detection' },
@@ -413,9 +464,10 @@ const TASK_OPTIONS_BY_MAP_TYPE = {
   ],
 }
 
+// get available tasks for the selected map type
 const availableTasks = computed(() => TASK_OPTIONS_BY_MAP_TYPE[mapStore.mapType] ?? [])
 
-// only the models that match the current dataset's resolution are displayed 
+// only the models that match the current dataset's resolution are displayed
 const TREE_MODELS_BY_MAP_TYPE = {
   orthophoto: [
     { title: 'TCD-Segformer', value: 'tree' },
@@ -427,27 +479,27 @@ const TREE_MODELS_BY_MAP_TYPE = {
     { title: 'UNet', value: 'tree_unet' },
   ],
   osm: [],
-  // Satlas only, matching MODELS_BY_SOURCE["sentinel"] in the backend -- the
-  // API rejects anything else for this source. UNet is omitted because its
-  // checkpoint is missing, Segformer because it is trained at ~10 cm and
-  // Sentinel is 10 m.
+  // 10 m like satellite, so the same two models; mirrors MODELS_BY_SOURCE in the backend
   sentinel: [
     { title: 'Satlas', value: 'tree_satlas_sentinel' },
     { title: 'UNet', value: 'tree_unet_sentinel' },
   ],
 }
 
+// Zero-Shot models (tiny weights vs. previous large weights)
 const ZEROSHOT_MODEL_OPTIONS = [
   { title: 'LangSAM (Large)', value: 'sam2.1_hiera_large' },
   { title: 'LangSAM (Tiny)', value: 'sam2.1_hiera_tiny' },
 ]
 
+// model options for the selected task
 const modelOptions = computed(() =>
   mapStore.selectedTask === 'Zero-Shot'
     ? ZEROSHOT_MODEL_OPTIONS
     : TREE_MODELS_BY_MAP_TYPE[mapStore.mapType] ?? []
 )
 
+// get/set model selection based on the selected task
 const modelSelection = computed({
   get: () =>
     mapStore.selectedTask === 'Zero-Shot'
@@ -492,6 +544,7 @@ watch(sentinelDateRange, (range) => {
   mapStore.triggerSentinelRefresh()
 })
 
+// update model type based on selected task
 watch(() => mapStore.mapType, () => {
   if (!availableTasks.value.some((t) => t.value === mapStore.selectedTask)) {
     mapStore.selectedTask = availableTasks.value[0]?.value ?? null
@@ -499,6 +552,7 @@ watch(() => mapStore.mapType, () => {
   onTaskChange()
 })
 
+// format area in sqm to m2 or km2
 function formatArea(sqm) {
   if (sqm == null) return ''
   return sqm > 1_000_000
@@ -506,8 +560,9 @@ function formatArea(sqm) {
     : `${Math.round(sqm)} m²`
 }
 
-const SOCCER_FIELD_SQM = 7140
+const SOCCER_FIELD_SQM = 7140 // average area of a soccer field in square meters
 
+// format area in sqm to number of soccer fields
 function formatSoccerFields(sqm) {
   if (sqm == null) return ''
   return (sqm / SOCCER_FIELD_SQM).toFixed(0)
@@ -555,6 +610,10 @@ function onTaskChange() {
 
 .map-type-select :deep(.v-field) {
   color: white;
+}
+
+.map-type-select :deep(.v-field__input) {
+  font-size: 15px;
 }
 
 .map-type-select :deep(.v-field__outline) {
@@ -615,17 +674,14 @@ function onTaskChange() {
 .sentinel-date-picker :deep(.v-date-picker-month__day-btn) {
   --v-btn-size: 12px;
   --v-btn-height: 26px;
-  /* Override circle size to force that the button stays a circle instead of the oval due to other resizing. */
   width: 26px !important;
   height: 26px !important;
 }
 
-/* Override between-dates days circle color  */
 .sentinel-date-picker :deep(.v-date-picker-month__day--selected .v-btn) {
   background-color: #a5d6a78c;
 }
 
-/* Shrink the day-cell grid itself */
 .sentinel-date-picker :deep(.v-date-picker-month) {
   padding: 0 4px 8px;
 }
@@ -639,14 +695,12 @@ function onTaskChange() {
   height: 28px;
 }
 
-/* Override the year dropdown to 2 and not 3 columns */
 .sentinel-date-picker :deep(.v-date-picker-years__content) {
   grid-template-columns: repeat(2, 1fr);
   gap: 8px 12px;
   padding-inline: 8px;
 }
 
-/* Override year selection hight because we only ever need 4 rows. */
 .sentinel-date-picker :deep(.v-date-picker-years) {
   height: auto;
   max-height: 220px;
@@ -666,13 +720,13 @@ function onTaskChange() {
 }
 
 .map-item-title {
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 500;
   margin-left: 8px;
 }
 
 .map-item-subtitle {
-  font-size: 11px;
+  font-size: 12px;
   opacity: 0.7;
   white-space: normal;
   margin-left: 8px;
@@ -697,6 +751,15 @@ function onTaskChange() {
   padding: 0 14px;
 }
 
+.keyword-info {
+  opacity: 0.7;
+  cursor: help;
+}
+
+.keyword-info:hover {
+  opacity: 1;
+}
+
 .ml-task-dropdown {
   width: 90%;
   margin: 0 16px;
@@ -708,7 +771,7 @@ function onTaskChange() {
 }
 
 .run-btn.v-btn--disabled {
-  opacity: 40%;
+  opacity: 30%;
   background-color: grey;
 }
 
@@ -720,32 +783,48 @@ function onTaskChange() {
 
 .bbox-info {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
   width: 90%;
   margin: 8px 16px;
   padding: 10px 12px;
   background-color: rgba(139, 195, 74, 0.1);
   border: 1px solid rgba(139, 195, 74, 0.2);
   border-radius: 8px;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .bbox-coords {
   display: grid;
   grid-template-columns: auto auto;
-  column-gap: 8px;
-  row-gap: 2px;
-  color: rgba(255, 255, 255, 0.85);
+  column-gap: 14px;
+  row-gap: 4px;
+  color: #ffffff;
+}
+
+.bbox-coord {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.bbox-dir {
+  min-width: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #a5d6a7;
 }
 
 .bbox-area {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 2px;
-  flex-shrink: 0;
+  align-items: baseline;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(139, 195, 74, 0.2);
 }
 
 .area {
@@ -754,8 +833,8 @@ function onTaskChange() {
 }
 
 .area-fields {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.5);
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.7);
   white-space: nowrap;
 }
 
@@ -766,12 +845,12 @@ function onTaskChange() {
   gap: 4px;
   width: 90%;
   margin: 8px 16px;
-  padding: 9px 11px;
+  padding: 6px 11px;
   border: 1px solid rgba(139, 195, 74, 0.28);
   border-radius: 8px;
   background: rgba(139, 195, 74, 0.08);
   color: rgba(255, 255, 255, 0.82);
-  font-size: 11px;
+  font-size: 13px;
   line-height: 1.35;
   overflow-wrap: anywhere;
 }
@@ -782,16 +861,35 @@ function onTaskChange() {
   background: rgba(239, 83, 80, 0.1);
 }
 
-.raster-estimate-title,
 .raster-estimate-loading {
   display: flex;
   align-items: center;
   gap: 6px;
 }
 
-.raster-estimate-title {
-  color: rgba(255, 255, 255, 0.65);
-  font-weight: 600;
+.raster-estimate-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.raster-estimate-toggle {
+  cursor: pointer;
+  opacity: 0.8;
+}
+
+.raster-estimate-toggle:hover {
+  opacity: 1;
+}
+
+.raster-estimate-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 6px;
+  margin-top: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 .raster-estimate-size {
@@ -799,6 +897,10 @@ function onTaskChange() {
 }
 
 .raster-estimate-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
   color: #a5d6a7;
 }
 

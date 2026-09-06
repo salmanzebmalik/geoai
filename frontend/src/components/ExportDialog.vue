@@ -56,29 +56,42 @@
             <span class="section-title">Overlay</span>
           </div>
 
-          <v-text-field
-            v-if="singleClassPrediction"
-            v-model="form.overlay_color"
-            label="Overlay color"
-            type="color"
-            variant="outlined"
-            density="comfortable"
-            hide-details
-            class="overlay-color"
-          />
+          <div class="overlay-controls">
+            <div v-if="singleClassPrediction" class="overlay-color">
+              <div class="control-label">Overlay color</div>
+              
+              <v-menu :close-on-content-click="false" location="bottom start">
+                <template #activator="{ props }">
+                  <button v-bind="props" type="button" class="color-button">
+                    <span
+                      class="color-button-swatch"
+                      :style="{ backgroundColor: overlayColor }"
+                    />
+                    <span class="color-button-value">{{ form.overlay_color }}</span>
+                    <v-icon icon="mdi-menu-down" size="18" />
+                  </button>
+                </template>
 
-          <div class="opacity-control">
-            <div class="control-label">Opacity</div>
-            <v-slider
-              v-model="form.overlay_opacity"
-              :min="0"
-              :max="1"
-              :step="0.05"
-              thumb-label
-              color="success"
-              track-color="grey-darken-1"
-              hide-details
-            />
+                <v-color-picker
+                  v-model="overlayColor"
+                  :modes="['hex']"
+                />
+              </v-menu>
+            </div>
+
+            <div class="opacity-control">
+              <div class="control-label">Opacity</div>
+              <v-slider
+                v-model="form.overlay_opacity"
+                :min="0"
+                :max="1"
+                :step="0.05"
+                thumb-label
+                color="success"
+                track-color="grey-darken-1"
+                hide-details
+              />
+            </div>
           </div>
         </section>
 
@@ -88,8 +101,9 @@
 
         <section v-if="mapStore.currentExport" class="export-section">
           <div class="section-head">
-            <span class="section-title">Result</span>
+            <span class="section-title">Last Result</span>
           </div>
+          
           <div class="artifact-list">
             <v-btn
               v-for="artifact in mapStore.currentExport.artifacts"
@@ -106,6 +120,7 @@
           <div class="section-head">
             <span class="section-title">Recent exports</span>
           </div>
+          
           <v-list density="compact" class="history-list">
             <v-list-item
               v-for="item in history.slice(0, 5)"
@@ -147,34 +162,40 @@ import { computed, reactive, ref, watch } from 'vue'
 import { useMapStore } from '@/stores/map'
 
 const mapStore = useMapStore()
-const open = ref(false)
-const error = ref(null)
-const history = ref([])
+const open = ref(false) 
+const error = ref(null) // Error message for the export dialog
+const history = ref([]) // List of recent exports for the current prediction
 
+// initial form values for overlay color and opacity
 const form = reactive({
   overlay_color: '#ff0000',
-  overlay_opacity: 0.45,
+  overlay_opacity: 0.50,
 })
 
+// identify currently displayed prediction
 const exportsDisplayedPrediction = computed(
   () => Boolean(mapStore.currentQueryId)
     && mapStore.viewedQueryId === mapStore.currentQueryId,
 )
 
+// determine if the current prediction has any classes
 const hasClasses = computed(
   () => exportsDisplayedPrediction.value && mapStore.predictionClasses.length > 0,
 )
 
+// list of all class names for the current prediction
 const allClassNames = computed(() =>
   mapStore.predictionClasses.map((entry) => entry.name),
 )
 
-const selectedClasses = ref([])
+const selectedClasses = ref([]) // list of currently selected classes for export
 
+// check if a class is currently selected for export
 function isSelected(name) {
   return selectedClasses.value.includes(name)
 }
 
+// reset the selected classes to all visible classes
 function resetClassSelection() {
   const visible = mapStore.predictionClasses
     .map((entry) => entry.name)
@@ -183,16 +204,21 @@ function resetClassSelection() {
   selectedClasses.value = visible.length ? visible : [...allClassNames.value]
 }
 
+// reset the selected classes whenever the prediction classes change
 watch(() => mapStore.predictionClasses, resetClassSelection)
 
+// list of classes that will be exported
 const exportedClasses = computed(() =>
   mapStore.predictionClasses.filter((entry) => isSelected(entry.name)),
 )
 
+// check if the export includes multiple classes
 const usesClassColors = computed(() => exportedClasses.value.length > 1)
 
+// check if the current prediction has only one class -> if so, user can select overlay color
 const singleClassPrediction = computed(() => allClassNames.value.length <= 1)
 
+// model types to labels
 const MODEL_LABELS = {
   zeroshot: 'Zero-Shot',
   tree: 'TCD-Segformer',
@@ -204,6 +230,7 @@ const MODEL_LABELS = {
   yolo: 'YOLO11',
 }
 
+// get the label for a model type
 function modelLabel(item) {
   return MODEL_LABELS[item?.model_type] ?? item?.model_type ?? 'Export'
 }
@@ -212,7 +239,7 @@ function formatTimestamp(value) {
   return new Date(value).toLocaleString()
 }
 
-
+// determine the class filter for the export request
 const classFilter = computed(() =>
   hasClasses.value
     && selectedClasses.value.length
@@ -221,11 +248,21 @@ const classFilter = computed(() =>
       : null,
 )
 
+// computed property for the overlay color, with getter and setter
+const overlayColor = computed({
+  get: () => form.overlay_color,
+  set: (value) => {
+    form.overlay_color = String(value ?? '').slice(0, 7).toLowerCase()
+  },
+})
+
+// determine if the export button should be enabled
 const canExport = computed(
   () => Boolean(mapStore.currentQueryId)
     && (!hasClasses.value || selectedClasses.value.length > 0),
 )
 
+// watch for changes in the export dialog trigger and open the dialog when triggered
 watch(() => mapStore.exportDialogTrigger, () => {
   open.value = true
   error.value = null
@@ -233,6 +270,7 @@ watch(() => mapStore.exportDialogTrigger, () => {
   loadHistory()
 })
 
+// watch for changes in the current prediction -> closes the dialog if the prediction changes
 watch(
   () => mapStore.currentQueryId,
   (queryId) => {
@@ -244,6 +282,7 @@ watch(
   },
 )
 
+// load the export history for the current prediction
 async function loadHistory() {
   if (!mapStore.currentQueryId) return
   try {
@@ -255,6 +294,7 @@ async function loadHistory() {
   }
 }
 
+// create a new export for the current prediction
 async function createExport() {
   mapStore.isExporting = true
   error.value = null
@@ -262,7 +302,7 @@ async function createExport() {
     const options = {
       ...form,
       vector_formats: ['geojson'],
-      output_crs: 'EPSG:4326',
+      output_crs: 'EPSG:4326', 
       include_geojson: true,
       include_annotated_tiff: true,
       include_mask_tiff: true,
@@ -270,33 +310,41 @@ async function createExport() {
       include_zip: true,
     }
 
+    // add class filter if any classes are selected
     if (classFilter.value) {
       options.filters = { labels: classFilter.value }
     }
 
+    // add label colors if multiple classes are selected (user cannot select color)
     if (usesClassColors.value) {
       options.label_colors = Object.fromEntries(
         exportedClasses.value.map((entry) => [entry.name, entry.color]),
       )
     }
+
+    // send the export request to the server
     const response = await fetch('/api/segmentation/exports', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ query_id: mapStore.currentQueryId, options }),
     })
+
     const result = await response.json()
-    if (!response.ok) throw new Error(result.detail || 'Export failed')
-    mapStore.setCurrentExport(result)
-    await loadHistory()
+    
+    if (!response.ok) throw new Error(result.detail || 'Export failed') // handle error response
+    
+    mapStore.setCurrentExport(result) // update the current export in the store
+    
+    await loadHistory() // reload the export history after creating a new export
   } catch (err) {
-    error.value = err.message
+    error.value = err.message // set the error message to display in the dialog
   } finally {
-    mapStore.isExporting = false
+    mapStore.isExporting = false 
   }
 }
 
 function download(artifact) {
-  window.open(artifact.download_url, '_blank', 'noopener')
+  window.open(artifact.download_url, '_blank', 'noopener') // download the artifact in a new tab
 }
 </script>
 
@@ -311,7 +359,6 @@ function download(artifact) {
   margin-right: 7px;
   flex: none;
   border-radius: 3px;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15);
 }
 
 .export-section {
@@ -350,8 +397,49 @@ function download(artifact) {
   margin-left: -2px;
 }
 
-.overlay-color {
-  max-width: 220px;
+.overlay-controls {
+  display: flex;
+  align-items: stretch;
+  gap: 20px;
+  margin-top: 18px;
+}
+
+.overlay-color,
+.opacity-control {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.color-button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid rgba(0, 0, 0, 0.3);
+  border-radius: 6px;
+  background: #ffffff;
+  cursor: pointer;
+  font: inherit;
+  color: rgba(0, 0, 0, 0.87);
+}
+
+.color-button:hover {
+  border-color: rgba(0, 0, 0, 0.6);
+}
+
+.color-button-swatch {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  border-radius: 4px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15);
+}
+
+.color-button-value {
+  flex: 1;
+  text-align: left;
+  font-variant-numeric: tabular-nums;
 }
 
 .class-chip--off {
@@ -388,12 +476,14 @@ function download(artifact) {
 }
 
 .opacity-control {
-  margin-top: 14px;
-  padding: 0 4px 4px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 0 4px;
 }
 
 .control-label {
-  margin-bottom: 8px;
+  margin-bottom: 4px;
   font-size: 0.82rem;
 }
 
@@ -404,6 +494,7 @@ function download(artifact) {
 .section-title {
   font-size: 0.9rem;
   font-weight: 600;
+  margin-bottom: 4px;
 }
 
 .artifact-list {

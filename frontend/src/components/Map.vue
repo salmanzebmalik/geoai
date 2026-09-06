@@ -52,6 +52,7 @@ function getPredictionSourceType(mapType) {
   }
 }
 
+// extract error message from API response
 function getApiErrorMessage(payload, fallback) {
   const detail = payload?.detail
 
@@ -59,13 +60,14 @@ function getApiErrorMessage(payload, fallback) {
     return detail
   }
 
+  // array of error objects
   if (Array.isArray(detail)) {
     const messages = detail
       .map((item) => item?.msg)
       .filter(Boolean)
 
     if (messages.length) {
-      return messages.join(' ')
+      return messages.join(' ') // join multiple messages into one string
     }
   }
 
@@ -211,10 +213,11 @@ const vectorLayer = new VectorLayer({
 // Prediction result overlay
 const predictionSource = new VectorSource() // container for prediction polygons
 
-let classColors = Object.create(null)
+let classColors = Object.create(null) 
 
 const styleCache = Object.create(null)
 
+// map class name to OpenLayers style object
 function styleForColor(color) {
   if (!styleCache[color]) {
     styleCache[color] = new Style({
@@ -226,10 +229,12 @@ function styleForColor(color) {
   return styleCache[color]
 }
 
+// get the class name for a feature, from 'class' or 'keyword' property
 function featureClassName(feature) {
   return feature.get('class') || feature.get('keyword') || null
 }
 
+// prediction layer for the currently viewed prediction result
 const predictionLayer = new VectorLayer({
   source: predictionSource,
   style: (feature) => {
@@ -248,10 +253,12 @@ predictionSource.on(['addfeature', 'clear'], () => {
 
 let draw = null
 
+// register the classes present in current prediction result
 function registerPredictionClasses(features) {
   const present = Object.create(null)
   const appearance = []
 
+  // collect the classes that appear in the features
   for (const feature of features) {
     const name = featureClassName(feature)
     if (!name || present[name]) continue
@@ -260,19 +267,21 @@ function registerPredictionClasses(features) {
     appearance.push(name)
   }
 
+  // order the classes by the user-entered order
   const entered = mapStore.predictionClassOrder
-  const extra = appearance.filter((name) => !entered.includes(name))
+  const extra = appearance.filter((name) => !entered.includes(name)) // classes that appear but were not entered by the user
 
+  // compute a color index for each class -> based on the user-entered order and order of appearance in the result
   const colorIndex = (name) => {
     const typedAt = entered.indexOf(name)
 
-    return typedAt === -1
-      ? entered.length + extra.indexOf(name)
-      : typedAt
+    // if the class was not typed by the user, use its order of appearance in the result
+    return typedAt === -1 ? entered.length + extra.indexOf(name) : typedAt
   }
 
   classColors = Object.create(null)
 
+  // compute the classes to show in the legend, with their colors
   const classes = [...entered.filter((name) => present[name]), ...extra]
     .map((name) => {
       const color = colorForClassIndex(colorIndex(name))
@@ -281,12 +290,13 @@ function registerPredictionClasses(features) {
       return { name, color }
     })
 
-  mapStore.setPredictionClasses(classes)
+  mapStore.setPredictionClasses(classes) // update legend with the classes and their colors
 }
 
 // Display prediction result on the map and zoom
 function displayPrediction(geojson) {
   predictionSource.clear()
+
   const features = new GeoJSON().readFeatures(geojson, {
     dataProjection: 'EPSG:4326',
     featureProjection: 'EPSG:3857',
@@ -294,8 +304,8 @@ function displayPrediction(geojson) {
 
   features.forEach((feature, index) => feature.setId(`prediction-${index}`))
 
-  registerPredictionClasses(features)
-  predictionSource.addFeatures(features)
+  registerPredictionClasses(features) // update legend with the classes and their colors
+  predictionSource.addFeatures(features) // add the features to the prediction layer
 
   // zoom in
   const extent = predictionSource.getExtent()
@@ -304,6 +314,7 @@ function displayPrediction(geojson) {
   }
 }
 
+// start drawing a bounding box on the map
 function startDrawing() {
   vectorSource.clear()
   if (draw) map.removeInteraction(draw)
@@ -341,7 +352,7 @@ function startDrawing() {
   map.addInteraction(draw) // activate drawing interaction
 }
 
-// Draw the box for a manually-entered bbox (mapStore.bbox already holds min/max lon/lat)
+// draw the box for a manually-entered bbox (mapStore.bbox already holds min/max lon/lat)
 function drawManualBbox() {
   const bbox = mapStore.bbox
   if (!bbox) return
@@ -409,16 +420,31 @@ watch(
   { deep: true },
 )
 
-// Nav bar changes mapType -> swap visible map layer
+// Nav-bar changes mapType => swap visible map layer
 watch(() => mapStore.mapType, (type) => {
   showMapLayer(type)
   if (type === 'sentinel') refreshSentinelLayer() // (re-)register the STAC search for the current filters
 })
 
-// Nav bar date range / cloud cover filter changed -> re-register the STAC search
+// Nav-bar date range / cloud cover filter changed -> re-register the STAC search
 watch(() => mapStore.sentinelRefreshTrigger, () => {
   if (mapStore.mapType === 'sentinel') refreshSentinelLayer()
 })
+
+// Bbox cleared in the nav bar -> drop the rectangle and any active draw tool
+watch(
+  () => mapStore.bbox,
+  (bbox) => {
+    if (bbox) return
+
+    vectorSource.clear()
+
+    if (draw) {
+      map.removeInteraction(draw)
+      draw = null
+    }
+  },
+)
 
 // Nav bar "Select Area" -> start drawing
 watch(() => mapStore.startDrawingTrigger, () => startDrawing())
@@ -454,7 +480,7 @@ watch(
     mapStore.clearRasterEstimate()
 
     const bbox = mapStore.bbox
-    const sourceType = getPredictionSourceType(mapStore.mapType)
+    const sourceType = getPredictionSourceType(mapStore.mapType) // 'ortho', 'satellite' or 'sentinel'
 
     if (!bbox || !sourceType) {
       return
@@ -490,9 +516,10 @@ watch(
       try {
         result = await response.json()
       } catch {
-        // The error below will provide a user-facing fallback.
+        // error below will provide a user-facing fallback.
       }
 
+      // if response is not ok, set the error message
       if (!response.ok) {
         mapStore.rasterEstimateError = getApiErrorMessage(
           result,
@@ -584,6 +611,7 @@ watch(() => mapStore.runTrigger, async () => {
       requestBody.max_cloud_cover = mapStore.sentinelMaxCloudCover
     }
 
+    // zero-shot prediction
     if (requestBody.model_type === 'zeroshot') {
       requestBody.model_variant = mapStore.modelVariant || 'sam2.1_hiera_large'
 
@@ -592,6 +620,7 @@ watch(() => mapStore.runTrigger, async () => {
         .map((term) => term.trim())
         .filter(Boolean)
 
+      // if only one keyword, send it as 'keyword', otherwise send as 'keywords' array
       if (keywords.length === 1) {
         requestBody.keyword = keywords[0]
       } else {
@@ -603,7 +632,7 @@ watch(() => mapStore.runTrigger, async () => {
       mapStore.setPredictionClassOrder([])
     }
 
-    // Send prediction request to backend
+    // send prediction request to backend
     let response
     try {
       response = await fetch('/api/segmentation/predict', {
@@ -624,9 +653,10 @@ watch(() => mapStore.runTrigger, async () => {
     try {
       result = await response.json()
     } catch {
-      // Nginx or another upstream service might return an HTML error page.
+      // Nginx or another upstream service might return an HTML error page
     }
 
+    // error handling
     if (!response.ok) {
       if (response.status === 429) {
         const retryAfter = Number.parseInt(
@@ -708,6 +738,7 @@ watch(() => mapStore.runTrigger, async () => {
       return
     }
 
+    // display the prediction result on the map and update the store
     displayPrediction(geojson)
     mapStore.setCurrentPrediction(result.query_id, geojson, result.prediction)
   } finally {

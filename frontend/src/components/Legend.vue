@@ -2,53 +2,56 @@
   <div
     v-if="mapStore.hasPrediction"
     class="legend"
-    :class="{ 'legend--shifted': mapStore.historyDrawerOpen }"
+    :style="{ right: legendRight }"
   >
     <template v-if="classes.length">
-      <div class="legend-classes">
+      <div class="legend_classes">
         <button
           v-for="entry in visibleClasses"
           :key="entry.name"
           type="button"
-          class="legend-row legend-row--toggle"
-          :class="{ 'legend-row--off': isHidden(entry.name) }"
+          class="legend_row"
+          :class="{ 'legend_row_hidden': isHidden(entry.name) }"
           :title="isHidden(entry.name) ? 'Show this class' : 'Hide this class'"
           @click="mapStore.togglePredictionClass(entry.name)"
         >
           <span
-            class="swatch"
-            :style="{
-              backgroundColor: fillColor(entry.color, 0.5),
-              borderColor: entry.color,
-            }"
+            class="color_swatch"
+            :style="swatchStyle(entry.color)"
           />
-          <span class="label">{{ entry.name }}</span>
+          <span class="class_label">{{ entry.name }}</span>
         </button>
       </div>
 
       <button
         v-if="isCollapsible"
         type="button"
-        class="legend-row legend-row--toggle legend-more"
+        class="legend_row legend_show_more"
         @click="expanded = !expanded"
       >
         <v-icon
           size="14"
           :icon="expanded ? 'mdi-chevron-up' : 'mdi-chevron-down'"
         />
-        <span class="label">
+        <span class="class_label">
           {{ expanded ? 'Show less' : `${classes.length - COLLAPSED_COUNT} more` }}
         </span>
       </button>
     </template>
 
-    <div v-else class="legend-row">
-      <span class="swatch swatch--default" />
-      <span class="label">Detected objects</span>
+    <div v-else class="legend_row">
+      <span
+        class="color_swatch"
+        :style="swatchStyle()"
+      />
+      <span class="class_label">Detected objects</span>
     </div>
 
-    <div v-if="treeCount !== null" class="legend-row">
-      <span class="label">Number of detected trees: <span class="count">{{ treeCount }}</span></span>
+    <div v-if="treeCount !== null" class="legend_row">
+      <span class="class_label">
+        Number of detected trees: 
+        <span class="count">{{ treeCount }}</span>
+      </span>
     </div>
   </div>
 </template>
@@ -56,19 +59,31 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useMapStore } from '@/stores/map'
-import { fillColor } from '@/utils/predictionColors'
+import { DEFAULT_CLASS_COLOR, fillColor } from '@/utils/predictionColors'
 
 const mapStore = useMapStore()
 
-const classes = computed(() => mapStore.predictionClasses)
+const classes = computed(() => mapStore.predictionClasses) // prediction classes from the currently viewed prediction layer
 
-const COLLAPSED_COUNT = 5
+// history width to compute position of legend
+const HISTORY_TAB_WIDTH = 34
+const HISTORY_DRAWER_WIDTH = 340
+const GAP_FROM_HISTORY = 42
+
+// compute right position of legend
+const legendRight = computed(() => {
+  const tabRight = mapStore.historyDrawerOpen ? HISTORY_DRAWER_WIDTH : 0
+  return `${tabRight + HISTORY_TAB_WIDTH + GAP_FROM_HISTORY}px`
+})
+
+const COLLAPSED_COUNT = 5 // max number of classes before collapsing the legend
 const expanded = ref(false)
 
 const isCollapsible = computed(
   () => classes.value.length > COLLAPSED_COUNT,
 )
 
+// compute the classes to show in the legend
 const visibleClasses = computed(() =>
   isCollapsible.value && !expanded.value
     ? classes.value.slice(0, COLLAPSED_COUNT)
@@ -76,13 +91,23 @@ const visibleClasses = computed(() =>
 )
 
 watch(classes, () => {
-  expanded.value = false
+  expanded.value = false // reset expanded state when classes change
 })
 
+// get color swatch style for a given class color
+function swatchStyle(color = DEFAULT_CLASS_COLOR) {
+  return {
+    backgroundColor: fillColor(color, 0.5),
+    borderColor: color,
+  }
+}
+
+// check if a class is hidden/disabled
 function isHidden(name) {
   return mapStore.hiddenPredictionClasses.includes(name)
 }
 
+// number of detected trees (deepforest)
 const treeCount = computed(() => {
   if (mapStore.viewedPredictionMeta?.model_name !== 'deepforest-tree') return null
   return mapStore.viewedPredictionMeta?.feature_count ?? null
@@ -93,7 +118,6 @@ const treeCount = computed(() => {
 .legend {
   position: fixed;
   top: 84px;
-  right: 76px;
   z-index: 1005;
   display: flex;
   flex-direction: column;
@@ -108,44 +132,40 @@ const treeCount = computed(() => {
   transition: right 0.2s ease;
 }
 
-.legend--shifted {
-  right: 416px;
-}
-
-.legend-row {
+.legend_row {
   display: flex;
   align-items: center;
   gap: 8px;
   height: 24px;
-}
-
-.legend-row--toggle {
   padding: 0;
   border: 0;
   background: none;
   color: inherit;
   font: inherit;
-  cursor: pointer;
   text-align: left;
 }
 
-.legend-row--toggle:hover .label {
+button.legend_row {
+  cursor: pointer;
+}
+
+button.legend_row:hover .class_label {
   text-decoration: underline;
 }
 
-.legend-row--off {
+.legend_row_hidden {
   opacity: 0.55;
 }
 
-.legend-row--off .label {
+.legend_row_hidden .class_label {
   text-decoration: line-through;
 }
 
-.legend-row--off .swatch {
+.legend_row_hidden .color_swatch {
   background-color: transparent !important;
 }
 
-.legend-classes {
+.legend_classes {
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -153,11 +173,11 @@ const treeCount = computed(() => {
   overflow-y: auto;
 }
 
-.legend-more {
+.legend_show_more {
   opacity: 0.8;
 }
 
-.legend-more .label {
+.legend_show_more .class_label {
   font-style: italic;
 }
 
@@ -165,18 +185,11 @@ const treeCount = computed(() => {
   font-weight: 700;
 }
 
-.swatch {
+.color_swatch {
   width: 14px;
   height: 14px;
   flex: none;
   border-radius: 3px;
   border: 1.5px solid transparent;
-  border-style: solid;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15);
-}
-
-.swatch--default {
-  background-color: rgba(0, 200, 100, 0.5);
-  border-color: #00c864;
 }
 </style>

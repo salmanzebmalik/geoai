@@ -1,3 +1,4 @@
+// color palette for multiple keywords in case of zero-shot
 const CLASS_PALETTE = [
   '#00c864',
   '#ff8c1a',
@@ -21,12 +22,14 @@ const CLASS_PALETTE = [
   '#324fae',
 ]
 
-export const DEFAULT_CLASS_COLOR = CLASS_PALETTE[0]
+export const DEFAULT_CLASS_COLOR = CLASS_PALETTE[0] // green as default
 
+// palette color for a class, by the order its keyword was typed
 export function colorForClassIndex(index) {
   return CLASS_PALETTE[index % CLASS_PALETTE.length]
 }
 
+// same color but translucent, to fill the polygons
 export function fillColor(hex, alpha = 0.25) {
   const value = hex.replace('#', '')
   const red = Number.parseInt(value.slice(0, 2), 16)
