@@ -226,9 +226,13 @@
             variant="solo"
             density="compact"
             class="ml-task-dropdown"
-            hide-details
+            :hide-details="!tooManyKeywords"
+            :error="tooManyKeywords"
+            :error-messages="tooManyKeywords
+              ? `${keywordTerms.length} keywords entered, at most ${MAX_KEYWORDS} are allowed`
+              : []"
             prepend-inner-icon="mdi-magnify"
-            @keyup.enter="mapStore.triggerRun()"
+            @keyup.enter="startRun"
           />
         </template>
 
@@ -256,7 +260,7 @@
           ></v-list-item>
           
           <v-btn
-            @click="mapStore.triggerRun()"
+            @click="startRun"
             prepend-icon="mdi-rocket-launch"
             class="run-btn"
             color="success"
@@ -265,7 +269,8 @@
               mapStore.mapType === 'osm' ||
               !mapStore.bbox ||
               !mapStore.selectedTask ||
-              (mapStore.selectedTask === 'Zero-Shot' && !mapStore.keyword.trim())
+              (mapStore.selectedTask === 'Zero-Shot' && !mapStore.keyword.trim()) ||
+              tooManyKeywords
             "
           >Run</v-btn>
 
@@ -297,6 +302,30 @@ const mapStore = useMapStore()
 const supportsPredictionMap = computed(() =>
   ['orthophoto', 'germany'].includes(mapStore.mapType)
 )
+
+// Mirrors the `keywords` limit in backend/app/schemas/segmentation.py; the
+// backend deduplicates too, so the same terms are counted here.
+const MAX_KEYWORDS = 20
+
+const keywordTerms = computed(() => [
+  ...new Set(
+    mapStore.keyword
+      .split(',')
+      .map((term) => term.trim())
+      .filter(Boolean),
+  ),
+])
+
+const tooManyKeywords = computed(
+  () => mapStore.selectedTask === 'Zero-Shot'
+    && keywordTerms.value.length > MAX_KEYWORDS,
+)
+
+function startRun() {
+  if (tooManyKeywords.value) return
+
+  mapStore.triggerRun()
+}
 
 const runDisabled = computed(() => {
   const zeroShotKeywordMissing =
