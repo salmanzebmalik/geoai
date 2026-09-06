@@ -230,7 +230,7 @@
                     class="keyword-info"
                   />
                 </template>
-                Separate keywords with commas, for example
+                Separate keywords with commas, e.g.
                 "buildings, pools, cars". At most {{ MAX_KEYWORDS }} keywords
                 per prediction.
               </v-tooltip>
