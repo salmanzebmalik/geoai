@@ -59,6 +59,7 @@
           <div class="overlay-controls">
             <div v-if="singleClassPrediction" class="overlay-color">
               <div class="control-label">Overlay color</div>
+              
               <v-menu :close-on-content-click="false" location="bottom start">
                 <template #activator="{ props }">
                   <button v-bind="props" type="button" class="color-button">
@@ -102,6 +103,7 @@
           <div class="section-head">
             <span class="section-title">Last Result</span>
           </div>
+          
           <div class="artifact-list">
             <v-btn
               v-for="artifact in mapStore.currentExport.artifacts"
@@ -118,6 +120,7 @@
           <div class="section-head">
             <span class="section-title">Recent exports</span>
           </div>
+          
           <v-list density="compact" class="history-list">
             <v-list-item
               v-for="item in history.slice(0, 5)"
@@ -159,34 +162,40 @@ import { computed, reactive, ref, watch } from 'vue'
 import { useMapStore } from '@/stores/map'
 
 const mapStore = useMapStore()
-const open = ref(false)
-const error = ref(null)
-const history = ref([])
+const open = ref(false) 
+const error = ref(null) // Error message for the export dialog
+const history = ref([]) // List of recent exports for the current prediction
 
+// initial form values for overlay color and opacity
 const form = reactive({
   overlay_color: '#ff0000',
   overlay_opacity: 0.50,
 })
 
+// identify currently displayed prediction
 const exportsDisplayedPrediction = computed(
   () => Boolean(mapStore.currentQueryId)
     && mapStore.viewedQueryId === mapStore.currentQueryId,
 )
 
+// determine if the current prediction has any classes
 const hasClasses = computed(
   () => exportsDisplayedPrediction.value && mapStore.predictionClasses.length > 0,
 )
 
+// list of all class names for the current prediction
 const allClassNames = computed(() =>
   mapStore.predictionClasses.map((entry) => entry.name),
 )
 
-const selectedClasses = ref([])
+const selectedClasses = ref([]) // list of currently selected classes for export
 
+// check if a class is currently selected for export
 function isSelected(name) {
   return selectedClasses.value.includes(name)
 }
 
+// reset the selected classes to all visible classes
 function resetClassSelection() {
   const visible = mapStore.predictionClasses
     .map((entry) => entry.name)
@@ -195,16 +204,21 @@ function resetClassSelection() {
   selectedClasses.value = visible.length ? visible : [...allClassNames.value]
 }
 
+// reset the selected classes whenever the prediction classes change
 watch(() => mapStore.predictionClasses, resetClassSelection)
 
+// list of classes that will be exported
 const exportedClasses = computed(() =>
   mapStore.predictionClasses.filter((entry) => isSelected(entry.name)),
 )
 
+// check if the export includes multiple classes
 const usesClassColors = computed(() => exportedClasses.value.length > 1)
 
+// check if the current prediction has only one class -> if so, user can select overlay color
 const singleClassPrediction = computed(() => allClassNames.value.length <= 1)
 
+// model types to labels
 const MODEL_LABELS = {
   zeroshot: 'Zero-Shot',
   tree: 'TCD-Segformer',
@@ -216,6 +230,7 @@ const MODEL_LABELS = {
   yolo: 'YOLO11',
 }
 
+// get the label for a model type
 function modelLabel(item) {
   return MODEL_LABELS[item?.model_type] ?? item?.model_type ?? 'Export'
 }
@@ -224,7 +239,7 @@ function formatTimestamp(value) {
   return new Date(value).toLocaleString()
 }
 
-
+// determine the class filter for the export request
 const classFilter = computed(() =>
   hasClasses.value
     && selectedClasses.value.length
@@ -233,8 +248,7 @@ const classFilter = computed(() =>
       : null,
 )
 
-// The backend validates strict #RRGGBB, so trim anything longer the picker
-// might hand back.
+// computed property for the overlay color, with getter and setter
 const overlayColor = computed({
   get: () => form.overlay_color,
   set: (value) => {
@@ -242,11 +256,13 @@ const overlayColor = computed({
   },
 })
 
+// determine if the export button should be enabled
 const canExport = computed(
   () => Boolean(mapStore.currentQueryId)
     && (!hasClasses.value || selectedClasses.value.length > 0),
 )
 
+// watch for changes in the export dialog trigger and open the dialog when triggered
 watch(() => mapStore.exportDialogTrigger, () => {
   open.value = true
   error.value = null
@@ -254,6 +270,7 @@ watch(() => mapStore.exportDialogTrigger, () => {
   loadHistory()
 })
 
+// watch for changes in the current prediction -> closes the dialog if the prediction changes
 watch(
   () => mapStore.currentQueryId,
   (queryId) => {
@@ -265,6 +282,7 @@ watch(
   },
 )
 
+// load the export history for the current prediction
 async function loadHistory() {
   if (!mapStore.currentQueryId) return
   try {
@@ -276,6 +294,7 @@ async function loadHistory() {
   }
 }
 
+// create a new export for the current prediction
 async function createExport() {
   mapStore.isExporting = true
   error.value = null
@@ -283,7 +302,7 @@ async function createExport() {
     const options = {
       ...form,
       vector_formats: ['geojson'],
-      output_crs: 'EPSG:4326',
+      output_crs: 'EPSG:4326', 
       include_geojson: true,
       include_annotated_tiff: true,
       include_mask_tiff: true,
@@ -291,33 +310,41 @@ async function createExport() {
       include_zip: true,
     }
 
+    // add class filter if any classes are selected
     if (classFilter.value) {
       options.filters = { labels: classFilter.value }
     }
 
+    // add label colors if multiple classes are selected (user cannot select color)
     if (usesClassColors.value) {
       options.label_colors = Object.fromEntries(
         exportedClasses.value.map((entry) => [entry.name, entry.color]),
       )
     }
+
+    // send the export request to the server
     const response = await fetch('/api/segmentation/exports', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ query_id: mapStore.currentQueryId, options }),
     })
+
     const result = await response.json()
-    if (!response.ok) throw new Error(result.detail || 'Export failed')
-    mapStore.setCurrentExport(result)
-    await loadHistory()
+    
+    if (!response.ok) throw new Error(result.detail || 'Export failed') // handle error response
+    
+    mapStore.setCurrentExport(result) // update the current export in the store
+    
+    await loadHistory() // reload the export history after creating a new export
   } catch (err) {
-    error.value = err.message
+    error.value = err.message // set the error message to display in the dialog
   } finally {
-    mapStore.isExporting = false
+    mapStore.isExporting = false 
   }
 }
 
 function download(artifact) {
-  window.open(artifact.download_url, '_blank', 'noopener')
+  window.open(artifact.download_url, '_blank', 'noopener') // download the artifact in a new tab
 }
 </script>
 
@@ -332,7 +359,6 @@ function download(artifact) {
   margin-right: 7px;
   flex: none;
   border-radius: 3px;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15);
 }
 
 .export-section {
@@ -373,10 +399,8 @@ function download(artifact) {
 
 .overlay-controls {
   display: flex;
-  /* Stretch so both halves end up the same height */
   align-items: stretch;
   gap: 20px;
-  /* Breathing room between the section heading and its controls */
   margin-top: 18px;
 }
 
