@@ -733,7 +733,7 @@ function onTaskChange() {
 }
 
 .run-btn.v-btn--disabled {
-  opacity: 40%;
+  opacity: 30%;
   background-color: grey;
 }
 
