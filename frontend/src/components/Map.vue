@@ -652,9 +652,7 @@ watch(() => mapStore.runTrigger, async () => {
         )
       } else {
         mapStore.setError(
-          typeof result?.detail === 'string'
-            ? result.detail
-            : 'Prediction failed.'
+          getApiErrorMessage(result, 'Prediction failed.')
         )
       }
 
