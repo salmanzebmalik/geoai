@@ -584,6 +584,10 @@ function onTaskChange() {
   color: white;
 }
 
+.map-type-select :deep(.v-field__input) {
+  font-size: 15px;
+}
+
 .map-type-select :deep(.v-field__outline) {
   --v-field-border-opacity: 0.3;
 }
@@ -693,13 +697,13 @@ function onTaskChange() {
 }
 
 .map-item-title {
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 500;
   margin-left: 8px;
 }
 
 .map-item-subtitle {
-  font-size: 11px;
+  font-size: 12px;
   opacity: 0.7;
   white-space: normal;
   margin-left: 8px;
