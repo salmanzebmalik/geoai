@@ -66,12 +66,13 @@ import { useMapStore } from '@/stores/map'
 
 const mapStore = useMapStore()
 
+// bbox coordinates
 const north = ref(null)
 const south = ref(null)
 const east = ref(null)
 const west = ref(null)
 
-// Prefill fields with the current bbox whenever the overlay opens
+// fill fields with the current bbox
 watch(() => mapStore.coordinateInputOpen, (open) => {
   if (!open) return
   const bbox = mapStore.bbox
@@ -81,10 +82,12 @@ watch(() => mapStore.coordinateInputOpen, (open) => {
   west.value = bbox ? bbox.min_lon : null
 })
 
+// check if a value is a number
 function isNumber(v) {
   return typeof v === 'number' && !Number.isNaN(v)
 }
 
+// validate coordinates
 const errorText = computed(() => {
   if (![north.value, south.value, east.value, west.value].every(isNumber)) {
     return null // stay quiet until all four fields are filled
@@ -104,18 +107,16 @@ function cancel() {
   mapStore.coordinateInputOpen = false
 }
 
+// apply the new bbox to the map store
 function apply() {
   if (!isValid.value) return
 
-  // Only N/S/E/W bounds are taken as input, so the box is always axis-aligned;
-  // the remaining two corners (NE/SW) are derived, never entered directly.
   mapStore.bbox = {
     min_lon: west.value, max_lon: east.value,
     min_lat: south.value, max_lat: north.value,
   }
 
-  // Map.vue owns the map/geometry logic - this just tells it to redraw + recompute area
-  mapStore.triggerManualBboxUpdate()
+  mapStore.triggerManualBboxUpdate() // trigger the map to update its bbox
 
   mapStore.coordinateInputOpen = false
 }
