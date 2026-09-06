@@ -101,6 +101,10 @@
               <span class="detail-label">Model</span>
               <v-chip size="small" variant="tonal" color="secondary">{{ item.model_name || 'Unknown' }}</v-chip>
             </div>
+            <div v-if="treeCount(item) !== null" class="detail-row">
+              <span class="detail-label">Trees</span>
+              <span class="detail-value">{{ treeCount(item) }}</span>
+            </div>
             <div v-if="isZeroShot(item)" class="detail-row">
               <span class="detail-label">Keyword</span>
               <v-chip size="small" variant="tonal" color="success">{{ resolveKeyword(item) || 'Unknown' }}</v-chip>
@@ -475,6 +479,20 @@ async function confirmDelete() {
 // Models that draw boxes rather than pixel masks. Everything else under
 // tree_detection produces a segmentation mask.
 const OBJECT_DETECTION_MODELS = ['deepforest-tree', 'yolo11']
+
+// Only DeepForest counts actual trees; it draws one box per tree. The
+// segmentation models return polygons/clusters, which are not countable
+// objects. Older entries predate `feature_count` in the history payload; their
+// count is still in the summary text ("Found 102 tree polygons/clusters").
+function treeCount(item) {
+  if (item.model_name !== 'deepforest-tree') return null
+
+  if (typeof item.feature_count === 'number') return item.feature_count
+
+  const match = item.summary?.match(/^Found\s+(\d+)\b/i)
+
+  return match ? Number(match[1]) : null
+}
 
 // Name the task, not the checkpoint: prediction_type alone cannot tell
 // segmentation from object detection, since both arrive as "tree_detection".
