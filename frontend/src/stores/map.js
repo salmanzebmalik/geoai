@@ -51,7 +51,7 @@ export const useMapStore = defineStore('map', () => {
   const startDrawingTrigger = ref(0)
   const runTrigger = ref(0)
   const exportDialogTrigger = ref(0)
- const errorMessage = ref(null)
+  const errorMessage = ref(null)
   const errorTitle = ref('Something went wrong')
   const errorKind = ref('error')
 
@@ -87,15 +87,13 @@ export const useMapStore = defineStore('map', () => {
     exportDialogTrigger.value++
   }
 
-  // Picking another task or model means the next run produces something else,
-  // so the export offer from the previous prediction no longer applies.
+  // drop the old download offer when task or model changes
   watch([selectedTask, modelType, modelVariant], () => {
     currentExport.value = null
   })
 
-  // An export belongs to one prediction. As soon as another one becomes the
-  // current prediction, the stored export result is stale and must not show up
-  // as a download offer for the new one.
+  
+  // set new export prediction id
   function setCurrentQueryId(queryId) {
     if (queryId !== currentQueryId.value) {
       currentExport.value = null
@@ -104,6 +102,8 @@ export const useMapStore = defineStore('map', () => {
     currentQueryId.value = queryId
   }
 
+  // show a prediction on the map and make it the export target if it has an id
+  // (view past prediction and then Export in NavBar)
   function setViewedPrediction(
     geojson,
     queryId = null,
@@ -118,6 +118,8 @@ export const useMapStore = defineStore('map', () => {
     }
   }
 
+  // make a prediction the export target and show it
+  // (export past prediction via button or after clicking Run)
   function setCurrentPrediction(
     queryId,
     geojson = null,
@@ -135,10 +137,12 @@ export const useMapStore = defineStore('map', () => {
     }
   }
 
+  // the typed keyword order decides the class colors
   function setPredictionClassOrder(keywords) {
     predictionClassOrder.value = Array.isArray(keywords) ? keywords : []
   }
 
+  // new set of classes starts out fully visible
   function setPredictionClasses(classes) {
     predictionClasses.value = classes
     hiddenPredictionClasses.value = []
@@ -156,6 +160,7 @@ export const useMapStore = defineStore('map', () => {
     predictionClassOrder.value = []
   }
 
+  // clearing after a prediction gets deleted
   function clearPredictionForQuery(queryId) {
     if (viewedQueryId.value === queryId) {
       viewedPrediction.value = null
@@ -187,18 +192,21 @@ export const useMapStore = defineStore('map', () => {
     errorKind.value = 'error'
   }
   
+  // clear bbox and raster estimate
   function clearBbox() {
     bbox.value = null
     areaSqm.value = null
     clearRasterEstimate()
   }
 
+  // clear raster estimate
   function clearRasterEstimate() {
     rasterEstimate.value = null
     rasterEstimateError.value = null
     isEstimatingRaster.value = false
   }
 
+  // everything listed here becomes the store's public api, the rest stays private
   return {
     mapType, setMapType, mapCenter, mapZoom,
     bbox, areaSqm, clearBbox,
