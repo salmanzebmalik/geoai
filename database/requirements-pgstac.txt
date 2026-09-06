@@ -1,0 +1,12 @@
+# pgstac schema management + STAC catalogue building.
+# Install into a plain venv:  python -m venv venv && venv/bin/pip install -r requirements-pgstac.txt
+#
+# PostgreSQL and PostGIS are NOT pip packages -- see db_setup.md step 2.
+
+pypgstac[psycopg]==0.9.11
+
+# STAC item construction (build_cog_stac_v2.py / build_jp2_stac_de.py)
+pystac==1.15.1
+rio-stac==0.12.0
+rasterio==1.5.0
+shapely==2.1.2
