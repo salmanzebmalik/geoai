@@ -170,6 +170,12 @@ export const useMapStore = defineStore('map', () => {
     errorKind.value = 'error'
   }
   
+  function clearBbox() {
+    bbox.value = null
+    areaSqm.value = null
+    clearRasterEstimate()
+  }
+
   function clearRasterEstimate() {
     rasterEstimate.value = null
     rasterEstimateError.value = null
@@ -178,7 +184,7 @@ export const useMapStore = defineStore('map', () => {
 
   return {
     mapType, setMapType, mapCenter, mapZoom,
-    bbox, areaSqm,
+    bbox, areaSqm, clearBbox,
     rasterEstimate, rasterEstimateError, isEstimatingRaster,
     clearRasterEstimate,
     selectedTask, modelType, modelVariant, keyword, setModelType, setKeyword,

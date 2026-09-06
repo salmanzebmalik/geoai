@@ -420,6 +420,21 @@ watch(() => mapStore.sentinelRefreshTrigger, () => {
   if (mapStore.mapType === 'sentinel') refreshSentinelLayer()
 })
 
+// Bbox cleared in the nav bar -> drop the rectangle and any active draw tool
+watch(
+  () => mapStore.bbox,
+  (bbox) => {
+    if (bbox) return
+
+    vectorSource.clear()
+
+    if (draw) {
+      map.removeInteraction(draw)
+      draw = null
+    }
+  },
+)
+
 // Nav bar "Select Area" -> start drawing
 watch(() => mapStore.startDrawingTrigger, () => startDrawing())
 

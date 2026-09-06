@@ -102,6 +102,17 @@
             >
               <v-icon icon="mdi-pencil" />
             </v-btn>
+
+            <v-btn
+              v-if="mapStore.bbox"
+              @click="mapStore.clearBbox()"
+              class="input-coords-button"
+              aria-label="Clear selected area"
+              title="Clear selected area"
+              variant="tonal"
+            >
+              <v-icon icon="mdi-close" />
+            </v-btn>
           </div>
 
           <div class="bbox-info" v-if="mapStore.bbox">
