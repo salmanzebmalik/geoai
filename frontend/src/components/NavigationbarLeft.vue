@@ -219,7 +219,23 @@
           ></v-select>
 
           <template v-if="mapStore.selectedTask === 'Zero-Shot'">
-          <v-list-item prepend-icon="mdi-plus" title="Keywords" />
+          <v-list-item prepend-icon="mdi-plus" title="Keywords">
+            <template #append>
+              <v-tooltip location="bottom" max-width="260">
+                <template #activator="{ props }">
+                  <v-icon
+                    v-bind="props"
+                    icon="mdi-information-outline"
+                    size="small"
+                    class="keyword-info"
+                  />
+                </template>
+                Separate keywords with commas, for example
+                "buildings, pools, cars". At most {{ MAX_KEYWORDS }} keywords
+                per prediction.
+              </v-tooltip>
+            </template>
+          </v-list-item>
           <v-text-field
             v-model="mapStore.keyword"
             placeholder="buildings, pools, cars"
@@ -695,6 +711,15 @@ function onTaskChange() {
   flex-shrink: 0;
   min-width: 0;
   padding: 0 14px;
+}
+
+.keyword-info {
+  opacity: 0.7;
+  cursor: help;
+}
+
+.keyword-info:hover {
+  opacity: 1;
 }
 
 .ml-task-dropdown {
