@@ -472,8 +472,28 @@ async function confirmDelete() {
 }
 
 // Format task label
+// Models that draw boxes rather than pixel masks. Everything else under
+// tree_detection produces a segmentation mask.
+const OBJECT_DETECTION_MODELS = ['deepforest-tree', 'yolo11']
+
+// Name the task, not the checkpoint: prediction_type alone cannot tell
+// segmentation from object detection, since both arrive as "tree_detection".
 function formatLabel(item) {
+  const model = item.model_name ?? ''
+
+  if (isZeroShot(item)) return 'Segment Anything'
+
+  if (
+    item.prediction_type === 'object_detection'
+    || OBJECT_DETECTION_MODELS.includes(model)
+  ) {
+    return 'Tree Object Detection'
+  }
+
+  if (item.prediction_type === 'tree_detection') return 'Tree Segmentation'
+
   if (!item.prediction_type) return 'Prediction'
+
   return item.prediction_type
     .replace(/_/g, ' ') // replace underscores with spaces
     .replace(/\b\w/g, (char) => char.toUpperCase()) // capitalize first letter of each word
