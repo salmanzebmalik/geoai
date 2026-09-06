@@ -56,29 +56,41 @@
             <span class="section-title">Overlay</span>
           </div>
 
-          <v-text-field
-            v-if="singleClassPrediction"
-            v-model="form.overlay_color"
-            label="Overlay color"
-            type="color"
-            variant="outlined"
-            density="comfortable"
-            hide-details
-            class="overlay-color"
-          />
+          <div class="overlay-controls">
+            <div v-if="singleClassPrediction" class="overlay-color">
+              <div class="control-label">Overlay color</div>
+              <v-menu :close-on-content-click="false" location="bottom start">
+                <template #activator="{ props }">
+                  <button v-bind="props" type="button" class="color-button">
+                    <span
+                      class="color-button-swatch"
+                      :style="{ backgroundColor: overlayColor }"
+                    />
+                    <span class="color-button-value">{{ form.overlay_color }}</span>
+                    <v-icon icon="mdi-menu-down" size="18" />
+                  </button>
+                </template>
 
-          <div class="opacity-control">
-            <div class="control-label">Opacity</div>
-            <v-slider
-              v-model="form.overlay_opacity"
-              :min="0"
-              :max="1"
-              :step="0.05"
-              thumb-label
-              color="success"
-              track-color="grey-darken-1"
-              hide-details
-            />
+                <v-color-picker
+                  v-model="overlayColor"
+                  :modes="['hex']"
+                />
+              </v-menu>
+            </div>
+
+            <div class="opacity-control">
+              <div class="control-label">Opacity</div>
+              <v-slider
+                v-model="form.overlay_opacity"
+                :min="0"
+                :max="1"
+                :step="0.05"
+                thumb-label
+                color="success"
+                track-color="grey-darken-1"
+                hide-details
+              />
+            </div>
           </div>
         </section>
 
@@ -88,7 +100,7 @@
 
         <section v-if="mapStore.currentExport" class="export-section">
           <div class="section-head">
-            <span class="section-title">Result</span>
+            <span class="section-title">Last Result</span>
           </div>
           <div class="artifact-list">
             <v-btn
@@ -153,7 +165,7 @@ const history = ref([])
 
 const form = reactive({
   overlay_color: '#ff0000',
-  overlay_opacity: 0.45,
+  overlay_opacity: 0.50,
 })
 
 const exportsDisplayedPrediction = computed(
@@ -220,6 +232,15 @@ const classFilter = computed(() =>
       ? selectedClasses.value
       : null,
 )
+
+// The backend validates strict #RRGGBB, so trim anything longer the picker
+// might hand back.
+const overlayColor = computed({
+  get: () => form.overlay_color,
+  set: (value) => {
+    form.overlay_color = String(value ?? '').slice(0, 7).toLowerCase()
+  },
+})
 
 const canExport = computed(
   () => Boolean(mapStore.currentQueryId)
@@ -350,8 +371,51 @@ function download(artifact) {
   margin-left: -2px;
 }
 
-.overlay-color {
-  max-width: 220px;
+.overlay-controls {
+  display: flex;
+  /* Stretch so both halves end up the same height */
+  align-items: stretch;
+  gap: 20px;
+  /* Breathing room between the section heading and its controls */
+  margin-top: 18px;
+}
+
+.overlay-color,
+.opacity-control {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.color-button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid rgba(0, 0, 0, 0.3);
+  border-radius: 6px;
+  background: #ffffff;
+  cursor: pointer;
+  font: inherit;
+  color: rgba(0, 0, 0, 0.87);
+}
+
+.color-button:hover {
+  border-color: rgba(0, 0, 0, 0.6);
+}
+
+.color-button-swatch {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  border-radius: 4px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15);
+}
+
+.color-button-value {
+  flex: 1;
+  text-align: left;
+  font-variant-numeric: tabular-nums;
 }
 
 .class-chip--off {
@@ -388,12 +452,14 @@ function download(artifact) {
 }
 
 .opacity-control {
-  margin-top: 14px;
-  padding: 0 4px 4px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 0 4px;
 }
 
 .control-label {
-  margin-bottom: 8px;
+  margin-bottom: 4px;
   font-size: 0.82rem;
 }
 
@@ -404,6 +470,7 @@ function download(artifact) {
 .section-title {
   font-size: 0.9rem;
   font-weight: 600;
+  margin-bottom: 4px;
 }
 
 .artifact-list {

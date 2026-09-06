@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 
 export const useMapStore = defineStore('map', () => {
   // === Map state ===
@@ -87,6 +87,23 @@ export const useMapStore = defineStore('map', () => {
     exportDialogTrigger.value++
   }
 
+  // Picking another task or model means the next run produces something else,
+  // so the export offer from the previous prediction no longer applies.
+  watch([selectedTask, modelType, modelVariant], () => {
+    currentExport.value = null
+  })
+
+  // An export belongs to one prediction. As soon as another one becomes the
+  // current prediction, the stored export result is stale and must not show up
+  // as a download offer for the new one.
+  function setCurrentQueryId(queryId) {
+    if (queryId !== currentQueryId.value) {
+      currentExport.value = null
+    }
+
+    currentQueryId.value = queryId
+  }
+
   function setViewedPrediction(
     geojson,
     queryId = null,
@@ -97,7 +114,7 @@ export const useMapStore = defineStore('map', () => {
     viewedPredictionMeta.value = meta
 
     if (queryId) {
-      currentQueryId.value = queryId
+      setCurrentQueryId(queryId)
     }
   }
 
@@ -106,7 +123,7 @@ export const useMapStore = defineStore('map', () => {
     geojson = null,
     meta = null,
   ) {
-    currentQueryId.value = queryId
+    setCurrentQueryId(queryId)
 
     if (geojson) {
       viewedPrediction.value = geojson
