@@ -62,7 +62,7 @@ def tiled_mask(image_bytes: bytes, patch_size: int, overlap: int,
             shape = (min(patch_size, h - y), min(patch_size, w - x))
             by_shape.setdefault(shape, []).append((x, y))
 
-        def paint(kept, masks) -> None:
+        def merge_tile_masks_into_full(kept, masks) -> None:
             for ((x, y), _), mask in zip(kept, masks):
                 if mask is not None:
                     full[y:y + th, x:x + tw] |= np.asarray(mask).astype(bool)
@@ -79,7 +79,7 @@ def tiled_mask(image_bytes: bytes, patch_size: int, overlap: int,
                     continue
 
                 try:
-                    paint(kept, predict([patch for _, patch in kept]))
+                    merge_tile_masks_into_full(kept, predict([patch for _, patch in kept]))
                     done += len(kept)
                     continue
                 except Exception as e:
@@ -94,7 +94,7 @@ def tiled_mask(image_bytes: bytes, patch_size: int, overlap: int,
                 _free_vram()
                 for xy, patch in kept:
                     try:
-                        paint([(xy, patch)], predict([patch]))
+                        merge_tile_masks_into_full([(xy, patch)], predict([patch]))
                         done += 1
                     except Exception as e:
                         failed += 1
