@@ -11,7 +11,7 @@ from app.services.inference_gate import InferenceGate
 
 # Consts & inits
 logger = get_logger(__name__)
-MODEL_NAMES = ["segformer", "lang_sam_large", "lang_sam_tiny", "satlas_tree", "sentinel_satlas_tree", "unet_tree", "sentinel_unet_tree", "deepforest", "yolo11"]
+MODEL_NAMES = ["segformer", "lang_sam_large", "lang_sam_tiny", "satlas_tree", "sentinel_satlas_tree", "unet_tree", "sentinel_unet_tree", "deepforest", "yolo26"]
 OFFLINE = True
 
 def _load_all(app: FastAPI) -> None:
@@ -32,7 +32,7 @@ def _load_all(app: FastAPI) -> None:
     from app.models.unet_tree_pipeline import UNetTreePipeline
     from app.models.sentinel_unet_tree_pipeline import SentinelUNetTreePipeline
     from app.models.deepforest_pipeline import DeepForestPipeline
-    from app.models.yolo11_pipeline import YOLO11Pipeline
+    from app.models.yolo26_pipeline import YOLO26Pipeline
 
     logger.info(f"imports done at {time.time() - t0:.1f}s")
 
@@ -53,7 +53,7 @@ def _load_all(app: FastAPI) -> None:
         "sentinel_satlas_tree": lambda: SentinelSatlasTreePipeline(patch_size=512, overlap=64),
         "unet_tree":   lambda: UNetTreePipeline(),
         "sentinel_unet_tree": lambda: SentinelUNetTreePipeline(),
-        "yolo11":      lambda: YOLO11Pipeline(),
+        "yolo26":      lambda: YOLO26Pipeline(),
     }
 
     with ThreadPoolExecutor(max_workers=len(model_mapping), thread_name_prefix="load") as pool:

@@ -506,7 +506,8 @@ async function confirmDelete() {
 }
 
 // list of models that return countable objects/boxes rather than polygons
-const OBJECT_DETECTION_MODELS = ['deepforest-tree', 'yolo11']
+const OBJECT_DETECTION_MODELS = ['deepforest-tree']
+const FIXED_SEGMENT_ANYTHING_MODELS = ['yolo11', 'yolo26']
 
 // Only DeepForest counts actual trees; it draws one box per tree. The
 // segmentation models return polygons/clusters, which are not countable
@@ -526,7 +527,12 @@ function treeCount(item) {
 function formatLabel(item) {
   const model = item.model_name ?? ''
 
-  if (isZeroShot(item)) return 'Segment Anything'
+  if (
+    isZeroShot(item)
+    || FIXED_SEGMENT_ANYTHING_MODELS.includes(model)
+  ) {
+    return 'Segment Anything'
+  }
 
   if (
     item.prediction_type === 'object_detection'

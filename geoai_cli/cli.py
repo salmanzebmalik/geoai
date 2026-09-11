@@ -22,7 +22,14 @@ ARTIFACT_SUFFIXES = {
     "zip": ".zip",
 }
 
-MODEL_TYPES = ("tree", "tree_satlas", "tree_unet", "tree_deepforest", "zeroshot")
+MODEL_TYPES = (
+    "tree",
+    "tree_satlas",
+    "tree_unet",
+    "tree_deepforest",
+    "zeroshot",
+    "yolo",
+)
 MODEL_VARIANTS = ("sam2.1_hiera_large", "sam2.1_hiera_tiny")
 SOURCE_TYPES = ("satellite", "ortho", "sentinel")
 MODELS_BY_SOURCE = {
@@ -30,6 +37,7 @@ MODELS_BY_SOURCE = {
         "tree",
         "tree_deepforest",
         "zeroshot",
+        "yolo",
     ),
     "satellite": (
         "tree_satlas",

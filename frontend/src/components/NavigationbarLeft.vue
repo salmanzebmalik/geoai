@@ -264,7 +264,7 @@
             @update:model-value="onTaskChange"
           ></v-select>
 
-          <template v-if="mapStore.selectedTask === 'Zero-Shot'">
+          <template v-if="requiresKeywords">
           <v-list-item prepend-icon="mdi-plus" title="Keywords">
             <template #append>
               <v-tooltip location="bottom" max-width="260">
@@ -331,7 +331,7 @@
               mapStore.mapType === 'osm' ||
               !mapStore.bbox ||
               !mapStore.selectedTask ||
-              (mapStore.selectedTask === 'Zero-Shot' && !mapStore.keyword.trim()) ||
+              (requiresKeywords && !mapStore.keyword.trim()) ||
               tooManyKeywords
             "
           >Run</v-btn>
@@ -380,9 +380,13 @@ const keywordTerms = computed(() => [
   ),
 ])
 
-// whether number of keywords exceeds maximum allowed
+// LangSAM requires keywords; the fixed YOLO26 model does not.
+const requiresKeywords = computed(
+  () => mapStore.modelType === 'zeroshot',
+)
+
 const tooManyKeywords = computed(
-  () => mapStore.selectedTask === 'Zero-Shot'
+  () => requiresKeywords.value
     && keywordTerms.value.length > MAX_KEYWORDS,
 )
 
@@ -472,7 +476,6 @@ const TREE_MODELS_BY_MAP_TYPE = {
   orthophoto: [
     { title: 'TCD-Segformer', value: 'tree' },
     { title: 'DeepForest Boxes', value: 'tree_deepforest' },
-    { title: 'YOLO11', value: 'yolo' },
   ],
   germany: [
     { title: 'Satlas', value: 'tree_satlas' },
@@ -490,6 +493,7 @@ const TREE_MODELS_BY_MAP_TYPE = {
 const ZEROSHOT_MODEL_OPTIONS = [
   { title: 'LangSAM (Large)', value: 'sam2.1_hiera_large' },
   { title: 'LangSAM (Tiny)', value: 'sam2.1_hiera_tiny' },
+  { title: 'YOLO26', value: 'yolo' },
 ]
 
 // model options for the selected task
@@ -501,16 +505,29 @@ const modelOptions = computed(() =>
 
 // get/set model selection based on the selected task
 const modelSelection = computed({
-  get: () =>
-    mapStore.selectedTask === 'Zero-Shot'
-      ? mapStore.modelVariant
-      : mapStore.modelType,
-  set: (value) => {
-    if (mapStore.selectedTask === 'Zero-Shot') {
-      mapStore.modelVariant = value
-    } else {
-      mapStore.modelType = value
+  get: () => {
+    if (mapStore.selectedTask !== 'Zero-Shot') {
+      return mapStore.modelType
     }
+
+    return mapStore.modelType === 'yolo'
+      ? 'yolo'
+      : mapStore.modelVariant
+  },
+
+  set: (value) => {
+    if (mapStore.selectedTask !== 'Zero-Shot') {
+      mapStore.modelType = value
+      return
+    }
+
+    if (value === 'yolo') {
+      mapStore.modelType = 'yolo'
+      return
+    }
+
+    mapStore.modelType = 'zeroshot'
+    mapStore.modelVariant = value
   },
 })
 
