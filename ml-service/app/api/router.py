@@ -18,5 +18,5 @@ api_router.include_router(
 api_router.include_router(
     yolo.router,
     prefix="/predict",
-    tags=["YOLO11 Detection"],
+    tags=["YOLO26 Detection"],
 )

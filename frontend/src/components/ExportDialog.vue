@@ -227,7 +227,7 @@ const MODEL_LABELS = {
   tree_unet: 'UNet',
   tree_satlas_sentinel: 'Satlas (Sentinel)',
   tree_unet_sentinel: 'UNet (Sentinel)',
-  yolo: 'YOLO11',
+  yolo: 'YOLO26',
 }
 
 // get the label for a model type
