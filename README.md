@@ -6,7 +6,7 @@ Frontend (Vue + Veutify)
    ↓
 FastAPI Backend
    ↓
-Supabase PostgreSQL
+PostgreSQL
    ↓
 Image Processing Layer
    ↓
