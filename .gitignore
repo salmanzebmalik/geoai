@@ -100,6 +100,7 @@ shared_storage/
 ml-service/app/models/datasets/
 ml-service/app/models/local_langsam/
 ml-service/app/models/local_tcd-segformer_local/
+ml-service/app/models/local_prithvi_water/
 Grounded-SAM-2/
 
 # ============================================================
@@ -174,3 +175,8 @@ venv*/
 *.log.old
 *.pid
 Miniforge3-*.sh
+
+ml-service/lightning_logs/
+
+prithvi
+image_pipeline/image_conversion_v2

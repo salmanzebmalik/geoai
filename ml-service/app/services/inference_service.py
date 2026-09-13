@@ -53,6 +53,15 @@ def run_tree_detection(pipeline, image_bytes: bytes):
     return result
 
 
+def run_water_detection(pipeline, image_bytes: bytes):
+    start_time = time.time()
+    bounds, crs = read_georeference(image_bytes)
+    mask = pipeline.get_full_mask_from_bytes(image_bytes)
+    result = _mask_to_geojson(mask, bounds, crs, "water")
+    logger.info(f"Water detection complete | {len(result['features'])} features | {crs.to_string()} | {time.time() - start_time:.2f}s")
+    return result
+
+
 def run_zero_shot_detection(pipeline, image_bytes: bytes, keyword: str = "tree"):
     start_time = time.time()
     bounds, crs = read_georeference(image_bytes)

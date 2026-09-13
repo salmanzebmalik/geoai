@@ -7,10 +7,12 @@ ML_SERVICE_DIR = Path(__file__).resolve().parents[2]
 REPOSITORY_ROOT = ML_SERVICE_DIR.parent
 ENV_FILE = ML_SERVICE_DIR / ".env"
 DEFAULT_SHARED_STORAGE = REPOSITORY_ROOT / "storage"
+DEFAULT_PRITHVI_MODEL_DIR = ML_SERVICE_DIR / "app" / "models" / "local_prithvi_water"
 
 
 class Settings(BaseSettings):
     shared_storage_dir: str = str(DEFAULT_SHARED_STORAGE)
+    prithvi_model_dir: str = str(DEFAULT_PRITHVI_MODEL_DIR)
 
     max_concurrent_inferences: int = Field(default=1, ge=1)
     busy_retry_after_seconds: int = Field(default=30, ge=1)

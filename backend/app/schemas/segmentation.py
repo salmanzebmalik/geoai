@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 SourceType = Literal["satellite", "ortho", "sentinel"]
 ModelType = Literal[
     "tree", "tree_satlas", "tree_unet", "tree_satlas_sentinel", "tree_unet_sentinel",
-    "tree_deepforest", "zeroshot", "yolo",
+    "tree_deepforest", "zeroshot", "yolo", "water_prithvi",
 ]
 ModelVariant = Literal["sam2.1_hiera_large", "sam2.1_hiera_tiny"]
 MODELS_BY_SOURCE: dict[SourceType, tuple[ModelType, ...]] = {
@@ -28,6 +28,7 @@ MODELS_BY_SOURCE: dict[SourceType, tuple[ModelType, ...]] = {
     "sentinel": (
         "tree_satlas_sentinel",
         "tree_unet_sentinel",
+        "water_prithvi",
     ),
 }
 VectorFormat = Literal["geojson", "gpkg", "flatgeobuf", "shapefile"]
@@ -115,6 +116,11 @@ class PredictionRequest(BaseModel):
 class FetchImageRequest(BaseModel):
     bbox: BoundingBox
     source_type: SourceType = "satellite"
+
+    # Sentinel crops differ per model: the tree models want a display stretch,
+    # water_prithvi wants raw reflectance. Optional so existing callers and the
+    # non-sentinel sources are unaffected.
+    model_type: Optional[ModelType] = None
 
     # Sentinel-2 only; see PredictionRequest above.
     date_from: Optional[str] = None

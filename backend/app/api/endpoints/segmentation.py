@@ -283,6 +283,7 @@ def fetch_image(
             date_from=request.date_from,
             date_to=request.date_to,
             max_cloud_cover=request.max_cloud_cover,
+            model_type=request.model_type,
         )
 
         return image_info

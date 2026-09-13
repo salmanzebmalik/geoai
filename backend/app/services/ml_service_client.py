@@ -7,7 +7,7 @@ import logging
 
 ModelType = Literal[
     "tree", "tree_satlas", "tree_unet", "tree_satlas_sentinel", "tree_unet_sentinel",
-    "tree_deepforest", "zeroshot", "yolo",
+    "tree_deepforest", "zeroshot", "yolo", "water_prithvi",
 ]
 
 ML_ENDPOINTS = {
@@ -18,7 +18,8 @@ ML_ENDPOINTS = {
     "tree_unet_sentinel": "/api/v1/predict/tree/unet/sentinel",      # UNet, 10m sentinel
     "tree_deepforest": "/api/v1/predict/tree/deepforest",  # DeepForest boxes, 10cm ortho
     "zeroshot": "/api/v1/predict/zeroshot",
-    "yolo": "/api/v1/predict/yolo"
+    "yolo": "/api/v1/predict/yolo",
+    "water_prithvi": "/api/v1/predict/water/prithvi",  # Prithvi Sen1Floods11, 10m sentinel
 }
 
 DEFAULT_BUSY_RETRY_AFTER_SECONDS = 30

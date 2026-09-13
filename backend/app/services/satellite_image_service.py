@@ -52,6 +52,13 @@ class TiTilerResponseError(TiTilerError):
         
 TITILER_DOWNLOAD_CHUNK_SIZE_BYTES = 1024 * 1024
 
+# Prithvi Sen1Floods11 reads six bands in this exact order and normalises them
+# as reflectance, so this request must not carry a rescale: rescale makes
+# titiler return uint8 (rio_tiler post_process forces out_dtype="uint8") and the
+# model would then see values ~10x too small.
+PRITHVI_ASSETS = ["B02", "B03", "B04", "B8A", "B11", "B12"]
+PRITHVI_MODELS = {"water_prithvi"}
+
 def get_shared_storage_dir() -> Path:
     """
     Return shared storage root.
@@ -133,6 +140,7 @@ def build_titiler_request(
     date_from: str | None = None,
     date_to: str | None = None,
     max_cloud_cover: float | None = None,
+    model_type: str | None = None,
 ) -> tuple[str, dict]:
     bbox_string = bbox_to_titiler_string(bbox)
     
@@ -181,18 +189,26 @@ def build_titiler_request(
             f"{settings.titiler_base_url}/searches/{search_id}"
             f"/bbox/{bbox_string}.tif"
         )
+        # take the first VALID pixel down the cloud-sorted stack; with real
+        # valid-data footprints this lets a partial granule fall through to
+        # a neighbouring scene instead of leaving a hole
+        common = {
+            "pixel_selection": "first",
+            "dst_crs": dst_crs,
+            **resampling,
+        }
+
+        if model_type in PRITHVI_MODELS:
+            # raw uint16 reflectance, no rescale -- see PRITHVI_ASSETS above
+            return endpoint, {"assets": PRITHVI_ASSETS, **common}
+
         params = {
             # raw 16-bit L2A bands, so the true-colour trio plus the same
             # reflectance stretch the tile layers use
 
             "assets": ["B04", "B03", "B02", "B08"], # b08 included for ndvi
             "rescale": "0,3000",
-            # take the first VALID pixel down the cloud-sorted stack; with real
-            # valid-data footprints this lets a partial granule fall through to
-            # a neighbouring scene instead of leaving a hole
-            "pixel_selection": "first",
-            "dst_crs": dst_crs,
-            **resampling,
+            **common,
         }
         return endpoint, params
 
@@ -282,6 +298,7 @@ def fetch_satellite_image_from_titiler(
     date_from: str | None = None,
     date_to: str | None = None,
     max_cloud_cover: float | None = None,
+    model_type: str | None = None,
 ) -> tuple[str, ImageInfo]:
     """
     Fetch cropped image from tiTiler and save it into shared storage.
@@ -298,6 +315,7 @@ def fetch_satellite_image_from_titiler(
         date_from=date_from,
         date_to=date_to,
         max_cloud_cover=max_cloud_cover,
+        model_type=model_type,
     )
 
     request_url = endpoint + "?" + urlencode(params, doseq=True)

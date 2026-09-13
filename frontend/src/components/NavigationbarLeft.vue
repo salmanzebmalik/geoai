@@ -465,6 +465,7 @@ const TASK_OPTIONS_BY_MAP_TYPE = {
   osm: [],
   sentinel: [
     { title: 'Tree Detection', value: 'Tree Detection' },
+    { title: 'Water Detection', value: 'Water Detection' },
   ],
 }
 
@@ -489,6 +490,16 @@ const TREE_MODELS_BY_MAP_TYPE = {
   ],
 }
 
+// Water Detection needs the six-band reflectance crop, which only sentinel serves
+const WATER_MODELS_BY_MAP_TYPE = {
+  orthophoto: [],
+  germany: [],
+  osm: [],
+  sentinel: [
+    { title: 'Prithvi (Sen1Floods11)', value: 'water_prithvi' },
+  ],
+}
+
 // Zero-Shot models (tiny weights vs. previous large weights)
 const ZEROSHOT_MODEL_OPTIONS = [
   { title: 'LangSAM (Large)', value: 'sam2.1_hiera_large' },
@@ -497,11 +508,13 @@ const ZEROSHOT_MODEL_OPTIONS = [
 ]
 
 // model options for the selected task
-const modelOptions = computed(() =>
-  mapStore.selectedTask === 'Zero-Shot'
-    ? ZEROSHOT_MODEL_OPTIONS
-    : TREE_MODELS_BY_MAP_TYPE[mapStore.mapType] ?? []
-)
+const modelOptions = computed(() => {
+  if (mapStore.selectedTask === 'Zero-Shot') return ZEROSHOT_MODEL_OPTIONS
+  if (mapStore.selectedTask === 'Water Detection') {
+    return WATER_MODELS_BY_MAP_TYPE[mapStore.mapType] ?? []
+  }
+  return TREE_MODELS_BY_MAP_TYPE[mapStore.mapType] ?? []
+})
 
 // get/set model selection based on the selected task
 const modelSelection = computed({

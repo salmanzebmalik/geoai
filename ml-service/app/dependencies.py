@@ -54,6 +54,13 @@ def get_sentinel_satlas_tree_model(request: Request):
     return model
 
 
+def get_prithvi_water_model(request: Request):
+    model = request.app.state.models.get("prithvi_water")
+    if model is None:
+        raise HTTPException(status_code=503, detail="Prithvi water model not available (pip install terratorch, then download the checkpoint)")
+    return model
+
+
 def get_deepforest_model(request: Request):
     model = request.app.state.models.get("deepforest")
     if model is None:

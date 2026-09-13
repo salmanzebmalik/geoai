@@ -438,6 +438,7 @@ def create_prediction(
             date_from=getattr(request, "date_from", None),
             date_to=getattr(request, "date_to", None),
             max_cloud_cover=getattr(request, "max_cloud_cover", None),
+            model_type=request.model_type,
         )
 
         db_query.image_url = image_info.image_url

@@ -112,6 +112,7 @@ dependencies = [
     "satlaspretrain-models==0.3.1",
     "segmentation-models-pytorch>=0.5.0",
     "alembic>=1.19,<2",
+    "terratorch>=1.2.13",
 ]
 
 [project.scripts]
