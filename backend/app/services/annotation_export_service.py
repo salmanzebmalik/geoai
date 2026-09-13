@@ -246,14 +246,21 @@ def _blend_overlay(
     rgb[:, pixels] = overlay.astype(rgb.dtype)
 
 
+def _to_display_rgb(rgb: np.ndarray) -> np.ndarray:
+    # the water crop skips titiler's rescale, so apply the same 0-3000 stretch
+    if rgb.dtype == np.uint8:
+        return rgb
+    return (np.clip(rgb / 3000.0, 0.0, 1.0) * 255.0).astype(np.uint8)
+
+
 def _read_rgb(source: rasterio.io.DatasetReader) -> np.ndarray:
     if source.count == 1:
         band = source.read(1)
-        return np.stack((band, band, band))
+        return _to_display_rgb(np.stack((band, band, band)))
     if source.count == 2:
         first, second = source.read((1, 2))
-        return np.stack((first, second, first))
-    return source.read((1, 2, 3))
+        return _to_display_rgb(np.stack((first, second, first)))
+    return _to_display_rgb(source.read((1, 2, 3)))
 
 
 def _write_rasters(

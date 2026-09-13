@@ -52,11 +52,15 @@ class TiTilerResponseError(TiTilerError):
         
 TITILER_DOWNLOAD_CHUNK_SIZE_BYTES = 1024 * 1024
 
-# Prithvi Sen1Floods11 reads six bands in this exact order and normalises them
-# as reflectance, so this request must not carry a rescale: rescale makes
-# titiler return uint8 (rio_tiler post_process forces out_dtype="uint8") and the
-# model would then see values ~10x too small.
-PRITHVI_ASSETS = ["B02", "B03", "B04", "B8A", "B11", "B12"]
+# Bands 1-3 are R,G,B on every input.tiff regardless of source or model, which
+# is what the annotation export and the NDVI helper both index blindly. Prithvi
+# wants blue first, so its pipeline reorders on read rather than this request
+# breaking the convention for everyone else.
+#
+# No rescale: rescale makes titiler return uint8 (rio_tiler post_process forces
+# out_dtype="uint8") and the model normalises raw reflectance, so it would see
+# values ~10x too small.
+PRITHVI_ASSETS = ["B04", "B03", "B02", "B8A", "B11", "B12"]
 PRITHVI_MODELS = {"water_prithvi"}
 
 def get_shared_storage_dir() -> Path:

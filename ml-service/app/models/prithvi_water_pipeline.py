@@ -26,6 +26,11 @@ REFLECTANCE_SCALE = 10000.0
 
 WATER_CLASS = 1
 
+# input.tiff arrives R,G,B,B8A,B11,B12 (bands 1-3 are R,G,B for every source).
+# The model wants BLUE, GREEN, RED, NIR_NARROW, SWIR_1, SWIR_2, so the first
+# three are reversed on read.
+BAND_INDEXES = [3, 2, 1, 4, 5, 6]
+
 
 class PrithviWaterPipeline:
     """Water / flood segmentation on 6-band Sentinel-2 L2A.
@@ -82,13 +87,13 @@ class PrithviWaterPipeline:
 
     def get_full_mask_from_bytes(self, image_bytes: bytes) -> np.ndarray:
         with rasterio.MemoryFile(image_bytes) as mem, mem.open() as src:
-            if src.count < len(self.bands):
+            if src.count < len(BAND_INDEXES):
                 raise ValueError(
-                    f"Prithvi water needs {len(self.bands)} bands "
-                    f"(B02 B03 B04 B8A B11 B12), got {src.count}. "
+                    f"Prithvi water needs {len(BAND_INDEXES)} bands "
+                    f"(B04 B03 B02 B8A B11 B12), got {src.count}. "
                     "The crop was fetched for a different model."
                 )
-            image = src.read(indexes=list(range(1, len(self.bands) + 1)))
+            image = src.read(indexes=BAND_INDEXES)
 
         data = image.astype(np.float32) / REFLECTANCE_SCALE
 
