@@ -11,7 +11,7 @@ from app.services.inference_gate import InferenceGate
 
 # Consts & inits
 logger = get_logger(__name__)
-MODEL_NAMES = ["segformer", "lang_sam_large", "lang_sam_tiny", "satlas_tree", "sentinel_satlas_tree", "unet_tree", "sentinel_unet_tree", "deepforest", "yolo26", "prithvi_water"]
+MODEL_NAMES = ["segformer", "lang_sam_large", "lang_sam_tiny", "satlas_tree", "sentinel_satlas_tree", "deepforest", "yolo26", "prithvi_water"]
 OFFLINE = True
 
 def _load_all(app: FastAPI) -> None:
@@ -29,8 +29,6 @@ def _load_all(app: FastAPI) -> None:
     from app.models.sam_pipeline import LangSAMPipeline
     from app.models.satlas_tree_pipeline import SatlasTreePipeline
     from app.models.sentinel_satlas_tree_pipeline import SentinelSatlasTreePipeline
-    from app.models.unet_tree_pipeline import UNetTreePipeline
-    from app.models.sentinel_unet_tree_pipeline import SentinelUNetTreePipeline
     from app.models.deepforest_pipeline import DeepForestPipeline
     from app.models.yolo26_pipeline import YOLO26Pipeline
     from app.models.prithvi_water_pipeline import PrithviWaterPipeline
@@ -52,8 +50,6 @@ def _load_all(app: FastAPI) -> None:
         "segformer":   lambda: TCDSegformer(offline=OFFLINE, patch_size=1024, overlap=128, batch_size=1),
         "satlas_tree": lambda: SatlasTreePipeline(patch_size=512, overlap=64),
         "sentinel_satlas_tree": lambda: SentinelSatlasTreePipeline(patch_size=512, overlap=64),
-        "unet_tree":   lambda: UNetTreePipeline(),
-        "sentinel_unet_tree": lambda: SentinelUNetTreePipeline(),
         "yolo26":      lambda: YOLO26Pipeline(),
         "prithvi_water": lambda: PrithviWaterPipeline(),
     }
