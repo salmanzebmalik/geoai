@@ -3,11 +3,12 @@ import time
 
 import geopandas as gpd
 import numpy as np
-import pandas as pd
 import rasterio
+import torch
+from rasterio.enums import Resampling
 from rasterio.transform import xy
 from shapely.geometry import box as shp_box
-import torch
+from torchvision.ops import batched_nms
 from ultralytics import YOLO
 
 from app.utils.instancing import _area_m2
@@ -15,30 +16,35 @@ from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
+# The model was trained on xView, which is 0.3 m WorldView-3 imagery. Objects have to
+# appear at that scale: on a 10 cm orthophoto a car is 3x larger than anything it saw.
+XVIEW_GSD_M = 0.3
+
 
 class YOLO26Pipeline:
-    """Production-grade YOLO26 Object Detection Pipeline for geospatial raster imagery.
-
-    Supports single-pass inference for small chips and automated
-    sliding-window tiling for large-scale rasters, custom-tailored for
-    yolo26l.pt operating at a native resolution of 1024x1024 with a 20% overlap.
-    """
+    """YOLO26 object detection on a georeferenced crop, tiled with cross-tile NMS."""
 
     def __init__(
             self,
-            model_path: str = "app/models/yolo26/best_yolo26l_v1.pt",
-            conf_min: float = 0.35,
+            model_path: str | None = None,
+            conf_min: float = 0.15,
             imgsz: int = 1024,
             tile_size: int = 1024,
-            overlap: int = 205,  # 20% overlap matching training slicing pipeline (~819px stride)
+            overlap: int = 205,
+            iou: float = 0.5,
+            target_gsd: float | None = XVIEW_GSD_M,
     ):
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.conf_min = conf_min
         self.imgsz = imgsz
         self.tile_size = tile_size
         self.overlap = overlap
+        self.iou = iou
+        self.target_gsd = target_gsd # 0.1 -> 0.3 xview resolution
 
-        path = Path(model_path)
+        path = Path(model_path) if model_path else (
+            Path(__file__).parent / "yolo26" / "best_yolo26l_v1.pt"
+        )
         if not path.exists():
             raise FileNotFoundError(f"YOLO26 checkpoint not found at {path}.")
 
@@ -49,156 +55,82 @@ class YOLO26Pipeline:
         except Exception as e:
             logger.warning(f"Could not move model explicitly to {self.device}: {e}")
 
-    def _preprocess_image(self, img_array: np.ndarray) -> np.ndarray:
-        """Applies 2nd-98th percentile contrast stretching for raw satellite imagery."""
-        img = img_array.astype(np.float32)
-        for i in range(img.shape[-1]):
-            band = img[:, :, i]
-            p2, p98 = np.percentile(band, (2, 98))
-            img[:, :, i] = np.clip((band - p2) / (p98 - p2 + 1e-8) * 255.0, 0, 255)
-        return img.astype(np.uint8)
+    def _read_at_training_scale(self, src) -> tuple[np.ndarray, rasterio.Affine]:
+        """The crop as (H, W, 3) BGR uint8 at target_gsd, and the transform for that grid."""
+        scale = 1.0
+        if self.target_gsd and src.crs.is_projected:
+            scale = min(1.0, src.res[0] / self.target_gsd)  # only ever downsample
+        height = max(1, round(src.height * scale))
+        width = max(1, round(src.width * scale))
+
+        bands = [1, 2, 3] if src.count >= 3 else [1, 1, 1]
+        data = src.read(bands, out_shape=(len(bands), height, width), resampling=Resampling.average)
+        if data.dtype == np.uint16:
+            data = (data // 256).astype(np.uint8)
+
+        transform = src.transform * rasterio.Affine.scale(src.width / width, src.height / height)
+        # Ultralytics treats numpy input as OpenCV BGR; rasterio returns RGB
+        return np.ascontiguousarray(np.moveaxis(data, 0, -1)[..., ::-1]), transform
+
+    def _tile_origins(self, length: int) -> list[int]:
+        if length <= self.tile_size:
+            return [0]
+        step = self.tile_size - self.overlap
+        # last tile sits flush with the edge instead of being a thin remainder
+        return sorted({min(pos, length - self.tile_size) for pos in range(0, length, step)})
 
     @torch.inference_mode()
     def predict_boxes_geojson(self, image_bytes: bytes) -> dict:
         start = time.time()
 
-        # Load raster imagery safely from memory buffer
         with rasterio.MemoryFile(image_bytes) as memfile, memfile.open() as src:
-            width, height = src.width, src.height
-            crs = src.crs
-            bounds = src.bounds
-
-            if crs is None:
+            if src.crs is None:
                 raise ValueError("Input image has no CRS; cannot georeference predictions.")
+            crs = src.crs
+            image, transform = self._read_at_training_scale(src)
 
-            # --- BRANCH 1: Single-pass inference for small rasters ---
-            if width <= self.tile_size and height <= self.tile_size:
-                channels = [1, 2, 3] if src.count >= 3 else [1, 1, 1]
-                raw_img = np.moveaxis(src.read(channels), 0, -1)
-                if raw_img.dtype == np.uint16:
-                    raw_img = (raw_img / 256).astype(np.uint8)
-                img = self._preprocess_image(raw_img)
+        height, width = image.shape[:2]
+        boxes, scores, class_ids = [], [], []
+        for y in self._tile_origins(height):
+            for x in self._tile_origins(width):
+                tile = np.ascontiguousarray(image[y:y + self.tile_size, x:x + self.tile_size])
+                if not tile.any():  # entirely outside the drawn bbox
+                    continue
+                result = self.model.predict(
+                    source=tile, conf=self.conf_min, imgsz=self.imgsz, device=self.device, verbose=False,
+                )[0]
+                if len(result.boxes) == 0:
+                    continue
+                boxes.append(result.boxes.xyxy.cpu() + torch.tensor([x, y, x, y], dtype=torch.float32))
+                scores.append(result.boxes.conf.cpu())
+                class_ids.append(result.boxes.cls.cpu().long())
 
-                results = self.model.predict(
-                    source=np.ascontiguousarray(img),
-                    conf=self.conf_min,
-                    imgsz=self.imgsz,
-                    device=self.device,
-                    verbose=False,
-                )
+        if not boxes:
+            return {"type": "FeatureCollection", "features": []}
 
-                if not results or len(results[0].boxes) == 0:
-                    return {"type": "FeatureCollection", "features": []}
+        boxes, scores, class_ids = torch.cat(boxes), torch.cat(scores), torch.cat(class_ids)
+        # overlapping tiles see the same object twice; merge those per class
+        keep = batched_nms(boxes, scores, class_ids, self.iou)
+        boxes, scores, class_ids = boxes[keep].numpy(), scores[keep].numpy(), class_ids[keep].numpy()
 
-                transform = rasterio.transform.from_bounds(*bounds, width, height)
-                geoms, scores, class_ids, class_names = [], [], [], []
+        xs0, ys0 = xy(transform, boxes[:, 1], boxes[:, 0], offset="ul")
+        xs1, ys1 = xy(transform, boxes[:, 3], boxes[:, 2], offset="ul")
+        geoms = [shp_box(min(a, c), min(b, d), max(a, c), max(b, d)) for a, b, c, d in zip(xs0, ys0, xs1, ys1)]
 
-                for box in results[0].boxes:
-                    xyxy = box.xyxy[0].cpu().numpy()
-                    score = float(box.conf[0].cpu().item())
-                    cls_id = int(box.cls[0].cpu().item())
-                    xmin, ymin, xmax, ymax = xyxy
-
-                    # Transform pixel coordinates to geospatial CRS coordinates
-                    x0, y0 = xy(transform, ymin, xmin, offset="ul")
-                    x1, y1 = xy(transform, ymax, xmax, offset="ul")
-                    geoms.append(shp_box(min(x0, x1), min(y0, y1), max(x0, x1), max(y0, y1)))
-                    scores.append(score)
-                    class_ids.append(cls_id)
-                    class_names.append(self.model.names[cls_id])
-
-                gdf = gpd.GeoDataFrame(
-                    {"score": scores, "class_id": class_ids, "class": class_names},
-                    geometry=geoms,
-                    crs=crs,
-                )
-
-            # --- BRANCH 2: Sliding-window tiling for large-scale rasters ---
-            else:
-                step = self.tile_size - self.overlap
-                all_gdfs = []
-
-                # Iterate through raster using sliding windows
-                for y in range(0, height, step):
-                    for x in range(0, width, step):
-                        w_width = min(self.tile_size, width - x)
-                        w_height = min(self.tile_size, height - y)
-                        window = rasterio.windows.Window(x, y, w_width, w_height)
-
-                        channels = [1, 2, 3] if src.count >= 3 else [1, 1, 1]
-                        window_data = src.read(channels, window=window)
-                        raw_img = np.moveaxis(window_data, 0, -1)
-                        if raw_img.dtype == np.uint16:
-                            raw_img = (raw_img / 256).astype(np.uint8)
-
-                        # Pad edge tiles with zeros to match exact 1024x1024 tensor input requirements
-                        if raw_img.shape[0] < self.tile_size or raw_img.shape[1] < self.tile_size:
-                            padded_img = np.zeros((self.tile_size, self.tile_size, raw_img.shape[2]),
-                                                  dtype=raw_img.dtype)
-                            padded_img[0:raw_img.shape[0], 0:raw_img.shape[1]] = raw_img
-                            raw_img = padded_img
-
-                        img = self._preprocess_image(raw_img)
-
-                        results = self.model.predict(
-                            source=np.ascontiguousarray(img),
-                            conf=self.conf_min,
-                            imgsz=self.imgsz,
-                            device=self.device,
-                            verbose=False,
-                        )
-
-                        if not results or len(results[0].boxes) == 0:
-                            continue
-
-                        window_transform = rasterio.windows.transform(window, src.transform)
-                        geoms, scores, class_ids, class_names = [], [], [], []
-
-                        for box in results[0].boxes:
-                            xyxy = box.xyxy[0].cpu().numpy()
-                            score = float(box.conf[0].cpu().item())
-                            cls_id = int(box.cls[0].cpu().item())
-                            xmin, ymin, xmax, ymax = xyxy
-
-                            # Clamp coordinates to actual window bounds (ignoring padding regions)
-                            xmin = min(xmin, w_width)
-                            xmax = min(xmax, w_width)
-                            ymin = min(ymin, w_height)
-                            ymax = min(ymax, w_height)
-
-                            if xmax <= xmin or ymax <= ymin:
-                                continue
-
-                            # Map local window predictions to master geospatial coordinates
-                            x0, y0 = xy(window_transform, ymin, xmin, offset="ul")
-                            x1, y1 = xy(window_transform, ymax, xmax, offset="ul")
-                            geoms.append(shp_box(min(x0, x1), min(y0, y1), max(x0, x1), max(y0, y1)))
-                            scores.append(score)
-                            class_ids.append(cls_id)
-                            class_names.append(self.model.names[cls_id])
-
-                        if geoms:
-                            tile_gdf = gpd.GeoDataFrame(
-                                {"score": scores, "class_id": class_ids, "class": class_names},
-                                geometry=geoms,
-                                crs=crs,
-                            )
-                            all_gdfs.append(tile_gdf)
-
-                if not all_gdfs:
-                    return {"type": "FeatureCollection", "features": []}
-
-                # Concatenate all tile dataframes and remove boundary duplicates from overlapping zones
-                gdf = pd.concat(all_gdfs, ignore_index=True)
-                gdf = gpd.GeoDataFrame(gdf, geometry="geometry", crs=crs)
-                gdf = gdf.drop_duplicates(subset=["geometry", "class_id"])
-
-        # Calculate bounding box physical areas and reproject to WGS84 for GeoJSON export
-        if not gdf.empty:
-            gdf["area_m2"] = _area_m2(gdf)
-            gdf = gdf.to_crs("EPSG:4326")
+        gdf = gpd.GeoDataFrame(
+            {
+                "score": scores.astype(float),
+                "class_id": class_ids.astype(int),
+                "class": [self.model.names[int(c)] for c in class_ids],
+            },
+            geometry=geoms,
+            crs=crs,
+        )
+        gdf["area_m2"] = _area_m2(gdf)
+        gdf = gdf.to_crs("EPSG:4326")
 
         logger.info(
-            f"YOLO26 inference complete | {len(gdf)} detections | {time.time() - start:.2f}s"
+            f"YOLO26 inference complete | {width}x{height} px at {transform.a:.2f} m | "
+            f"{len(gdf)} detections | {time.time() - start:.2f}s"
         )
         return gdf.__geo_interface__
