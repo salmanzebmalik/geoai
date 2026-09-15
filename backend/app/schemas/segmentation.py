@@ -20,14 +20,12 @@ MODELS_BY_SOURCE: dict[SourceType, tuple[ModelType, ...]] = {
     ),
     "satellite": (
         "tree_satlas",
-        "tree_unet",
     ),
     # Sentinel-2 is 10 m RGB like the "satellite" source, so the same models
     # apply. Required: upstream's validators do MODELS_BY_SOURCE[source_type],
     # which raises KeyError for a source with no entry.
     "sentinel": (
         "tree_satlas_sentinel",
-        "tree_unet_sentinel",
         "water_prithvi",
     ),
 }

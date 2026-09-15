@@ -480,13 +480,11 @@ const TREE_MODELS_BY_MAP_TYPE = {
   ],
   germany: [
     { title: 'Satlas', value: 'tree_satlas' },
-    { title: 'UNet', value: 'tree_unet' },
   ],
   osm: [],
   // 10 m like satellite, so the same two models; mirrors MODELS_BY_SOURCE in the backend
   sentinel: [
     { title: 'Satlas', value: 'tree_satlas_sentinel' },
-    { title: 'UNet', value: 'tree_unet_sentinel' },
   ],
 }
 
