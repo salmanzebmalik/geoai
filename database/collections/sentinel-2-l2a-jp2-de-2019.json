@@ -1,0 +1,237 @@
+{
+ "type": "Collection",
+ "id": "sentinel-2-l2a-jp2-de-2019",
+ "stac_version": "1.1.0",
+ "stac_extensions": [
+  "https://stac-extensions.github.io/eo/v1.1.0/schema.json",
+  "https://stac-extensions.github.io/item-assets/v1.0.0/schema.json"
+ ],
+ "title": "Sentinel-2 L2A raw .jp2 bands, Germany, 2019",
+ "description": "Raw 16-bit Sentinel-2 L2A granules for 2019, restricted to the 106 German MGRS tiles. Twelve assets per item, one per band, pointing at the original .jp2 files -- identical data to the sentinel-2-l2a-worldwide-2019 collection. The difference is the item geometry: here it is the REAL valid-data footprint derived from the granule's non-nodata region, whereas the worldwide collection uses the full MGRS tile outline. That matters because pgstac's mosaic shortcuts (skipcovered / exitwhenfull) compare geometries: with tile outlines, a partial granule claims coverage it lacks, pgstac stops early, and a bbox crop over that area comes back blank. Values are reflectance, so render with assets=B04&assets=B03&assets=B02&rescale=0,3000 for true colour.",
+ "license": "other",
+ "extent": {
+  "spatial": {
+   "bbox": [
+    [
+     4.2904841,
+     45.8957046,
+     16.7572582,
+     55.9457344
+    ]
+   ]
+  },
+  "temporal": {
+   "interval": [
+    [
+     "2019-01-01T10:54:39Z",
+     "2019-12-30T11:03:47Z"
+    ]
+   ]
+  }
+ },
+ "summaries": {
+  "constellation": [
+   "sentinel-2"
+  ],
+  "gsd": [
+   10,
+   20,
+   60
+  ],
+  "platform": [
+   "sentinel-2a",
+   "sentinel-2b"
+  ],
+  "eo:cloud_cover": {
+   "minimum": 0.0001,
+   "maximum": 87.6111
+  },
+  "s2:valid_fraction": {
+   "minimum": 0.28283,
+   "maximum": 0.98663
+  }
+ },
+ "item_assets": {
+  "B01": {
+   "type": "image/jp2",
+   "roles": [
+    "data"
+   ],
+   "gsd": 60,
+   "title": "coastal (60m)",
+   "eo:bands": [
+    {
+     "name": "B01",
+     "common_name": "coastal",
+     "center_wavelength": 0.443
+    }
+   ]
+  },
+  "B02": {
+   "type": "image/jp2",
+   "roles": [
+    "data"
+   ],
+   "gsd": 10,
+   "title": "blue (10m)",
+   "eo:bands": [
+    {
+     "name": "B02",
+     "common_name": "blue",
+     "center_wavelength": 0.49
+    }
+   ]
+  },
+  "B03": {
+   "type": "image/jp2",
+   "roles": [
+    "data"
+   ],
+   "gsd": 10,
+   "title": "green (10m)",
+   "eo:bands": [
+    {
+     "name": "B03",
+     "common_name": "green",
+     "center_wavelength": 0.56
+    }
+   ]
+  },
+  "B04": {
+   "type": "image/jp2",
+   "roles": [
+    "data"
+   ],
+   "gsd": 10,
+   "title": "red (10m)",
+   "eo:bands": [
+    {
+     "name": "B04",
+     "common_name": "red",
+     "center_wavelength": 0.665
+    }
+   ]
+  },
+  "B05": {
+   "type": "image/jp2",
+   "roles": [
+    "data"
+   ],
+   "gsd": 20,
+   "title": "rededge (20m)",
+   "eo:bands": [
+    {
+     "name": "B05",
+     "common_name": "rededge",
+     "center_wavelength": 0.705
+    }
+   ]
+  },
+  "B06": {
+   "type": "image/jp2",
+   "roles": [
+    "data"
+   ],
+   "gsd": 20,
+   "title": "rededge (20m)",
+   "eo:bands": [
+    {
+     "name": "B06",
+     "common_name": "rededge",
+     "center_wavelength": 0.74
+    }
+   ]
+  },
+  "B07": {
+   "type": "image/jp2",
+   "roles": [
+    "data"
+   ],
+   "gsd": 20,
+   "title": "rededge (20m)",
+   "eo:bands": [
+    {
+     "name": "B07",
+     "common_name": "rededge",
+     "center_wavelength": 0.783
+    }
+   ]
+  },
+  "B08": {
+   "type": "image/jp2",
+   "roles": [
+    "data"
+   ],
+   "gsd": 10,
+   "title": "nir (10m)",
+   "eo:bands": [
+    {
+     "name": "B08",
+     "common_name": "nir",
+     "center_wavelength": 0.842
+    }
+   ]
+  },
+  "B8A": {
+   "type": "image/jp2",
+   "roles": [
+    "data"
+   ],
+   "gsd": 20,
+   "title": "nir08 (20m)",
+   "eo:bands": [
+    {
+     "name": "B8A",
+     "common_name": "nir08",
+     "center_wavelength": 0.865
+    }
+   ]
+  },
+  "B09": {
+   "type": "image/jp2",
+   "roles": [
+    "data"
+   ],
+   "gsd": 60,
+   "title": "nir09 (60m)",
+   "eo:bands": [
+    {
+     "name": "B09",
+     "common_name": "nir09",
+     "center_wavelength": 0.945
+    }
+   ]
+  },
+  "B11": {
+   "type": "image/jp2",
+   "roles": [
+    "data"
+   ],
+   "gsd": 20,
+   "title": "swir16 (20m)",
+   "eo:bands": [
+    {
+     "name": "B11",
+     "common_name": "swir16",
+     "center_wavelength": 1.61
+    }
+   ]
+  },
+  "B12": {
+   "type": "image/jp2",
+   "roles": [
+    "data"
+   ],
+   "gsd": 20,
+   "title": "swir22 (20m)",
+   "eo:bands": [
+    {
+     "name": "B12",
+     "common_name": "swir22",
+     "center_wavelength": 2.19
+    }
+   ]
+  }
+ },
+ "links": []
+}

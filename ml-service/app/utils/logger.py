@@ -1,6 +1,5 @@
 import logging
 import sys
-import os
 
 # Define consistent log format
 LOG_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"

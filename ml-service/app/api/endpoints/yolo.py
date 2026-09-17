@@ -1,35 +1,70 @@
-from fastapi import APIRouter, HTTPException
+from typing import Optional
+from uuid import uuid4
+
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from pathlib import Path
-from app.models.yolo11_pipeline import YOLO11Pipeline
-from app.core.config import settings
+
+from app.dependencies import acquire_inference_slot, get_yolo26_model
+from app.schemas.prediction import PredictionResponse
+from app.services.storage_service import (
+    read_image_from_shared_storage,
+    save_geojson_to_shared_storage,
+)
+from app.utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 router = APIRouter()
-pipeline = YOLO11Pipeline()
 
 
 class YoloPredictionRequest(BaseModel):
-    query_id: str
+    query_id: Optional[str] = None
     input_image_path: str
-    output_dir: str
-    min_lon: float
-    min_lat: float
-    max_lon: float
-    max_lat: float
+    output_dir: Optional[str] = None
+    min_lon: Optional[float] = None
+    min_lat: Optional[float] = None
+    max_lon: Optional[float] = None
+    max_lat: Optional[float] = None
 
 
-@router.post("/yolo")
-async def predict_yolo(payload: YoloPredictionRequest):
+@router.post("/yolo", response_model=PredictionResponse)
+def predict_yolo(
+    payload: YoloPredictionRequest,
+    yolo26=Depends(get_yolo26_model),
+    _inference_slot=Depends(acquire_inference_slot),
+):
+    """Run YOLO26 detection on a raster from shared storage and store the GeoJSON."""
+    query_id = payload.query_id or str(uuid4())
+
     try:
-        # Reconstruct full absolute path using shared storage root
-        full_image_path = Path(settings.shared_storage_path) / payload.input_image_path
+        logger.info(f"YOLO26 query {query_id} on {payload.input_image_path}")
 
-        detections = pipeline.predict(str(full_image_path))
+        image_bytes = read_image_from_shared_storage(
+            input_image_path=payload.input_image_path,
+            output_dir=payload.output_dir,
+        )
 
-        return {
-            "success": True,
-            "query_id": payload.query_id,
-            "detections": detections
-        }
+        geojson_dict = yolo26.predict_boxes_geojson(image_bytes)
+        feature_count = len(geojson_dict.get("features", []))
+
+        result_path = save_geojson_to_shared_storage(
+            query_id=query_id,
+            geojson=geojson_dict,
+            output_dir=payload.output_dir,
+        )
+
+        return PredictionResponse(
+            query_id=query_id,
+            status="completed",
+            model_name="yolo26",
+            prediction_type="object_detection",
+            result_path=result_path,
+            feature_count=feature_count,
+            summary=f"Found {feature_count} objects",
+        )
+
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"YOLO26 prediction failed for query_id={query_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Inference error: {str(e)}")

@@ -4,6 +4,9 @@ import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import vueDevTools from 'vite-plugin-vue-devtools'
 
+const BACKEND_PORT = process.env.BACKEND_PORT || 8003 
+const TITILER_PORT = process.env.TITILER_PORT || 8001
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
@@ -16,8 +19,21 @@ export default defineConfig({
     },
   },
   server: {
+    watch: {
+      usePolling: true,
+      interval: 400,
+      ignored: ['**/node_modules/**', '**/dist/**', '**/../storage/**'],
+    },
     proxy: {
-      '/api': 'http://127.0.0.1:8002',
+      '/api': {
+        target: `http://127.0.0.1:${BACKEND_PORT}`,
+        changeOrigin: true,
+      },
+      '/image-api': {
+        target: `http://127.0.0.1:${TITILER_PORT}`,
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/image-api/, ''),
+      },
     },
   },
 })

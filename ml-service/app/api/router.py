@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.endpoints import tree_detection, zero_shot, yolo
+from app.api.endpoints import tree_detection, zero_shot, yolo, water_detection
 
 api_router = APIRouter()
 
@@ -18,5 +18,11 @@ api_router.include_router(
 api_router.include_router(
     yolo.router,
     prefix="/predict",
-    tags=["YOLO11 Detection"],
+    tags=["YOLO26 Detection"],
+)
+
+api_router.include_router(
+    water_detection.router,
+    prefix="/predict",
+    tags=["Water Detection"],
 )

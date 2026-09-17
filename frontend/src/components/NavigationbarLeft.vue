@@ -2,29 +2,91 @@
   <v-navigation-drawer permanent width="300" color="#1b2e1b">
     <!--  Map picker -->
       <div class="map-picker">
-        <p class="picker-label">Map</p>
-        <v-btn-toggle
+        <div class="picker-title">
+          <v-icon size="18" class="mr-2">mdi-layers</v-icon>
+          <p class="picker-label">MAP</p>
+        </div>
+        
+        <v-select
           v-model="mapStore.mapType"
-          rounded
-          divided
+          :items="mapTypeOptions"
           variant="outlined"
-          color="success"
-          class="map-type-toggle"
+          density="comfortable"
+          hide-details
+          class="map-type-select"
         >
-          <v-btn value="osm" prepend-icon="mdi-map">
-            OSM
-          </v-btn>
-          <v-btn value="germany" prepend-icon="mdi-earth">
-            Germany
-          </v-btn>
-          <v-btn value="orthophoto" prepend-icon="mdi-magnify">
-            NRW
-          </v-btn>
-        </v-btn-toggle>
+          <template #item="{ item, props: itemProps }">
+            <v-list-item v-bind="itemProps" title="" class="map-select-item">
+              <template #prepend>
+                <img :src="item.thumbnail" alt="" class="map-thumb" />
+              </template>
+              <v-list-item-title class="map-item-title">{{ item.title }}</v-list-item-title>
+              <v-list-item-subtitle class="map-item-subtitle">{{ item.description }}</v-list-item-subtitle>
+            </v-list-item>
+          </template>
+        </v-select>
+
+        <!-- Sentinel-specific controls -->
+        <div class="sentinel-controls" v-if="mapStore.mapType === 'sentinel'">
+          <div class="sentinel-label">
+            <v-icon size="16" class="mr-2">mdi-cloud</v-icon>
+            <p>Max. cloud coverage</p>
+          </div>
+          
+          <!-- Cloud coverage slider -->
+          <div class="cloud-slider-row">
+            <v-slider
+              v-model="mapStore.sentinelMaxCloudCover"
+              :min="0"
+              :max="100"
+              :step="1"
+              hide-details
+              color="#a5d6a7"
+              track-color="rgba(255, 255, 255, 0.25)"
+              thumb-size="15"
+              class="cloud-slider"
+              @end="mapStore.triggerSentinelRefresh()"
+            ></v-slider>
+            <span class="cloud-value">{{ mapStore.sentinelMaxCloudCover }}%</span>
+          </div>
+
+          <!-- Sentinel date range picker -->
+          <div class="sentinel-label">
+            <v-icon size="16" class="mr-2">mdi-calendar-range</v-icon>
+            <span>Date range</span>
+          </div>
+
+          <v-date-picker
+            v-model="sentinelDateRange"
+            multiple="range"
+            show-adjacent-months
+            hide-header
+            first-day-of-week="1"
+            theme="dark"
+            color="#8bc34a"
+            bg-color="transparent"
+            elevation="0"
+            width="100%"
+            :min="sentinelMinDate"
+            :max="sentinelMaxDate"
+            class="sentinel-date-picker"
+          >
+            <template #controls="{ monthText, yearText, openMonths, openYears }">
+              <v-sheet
+                class="w-100 d-flex align-center rounded-lg pa-1 ga-1"
+                color="rgba(255, 255, 255, 0.08)"
+              >
+                <v-btn :text="monthText" append-icon="$dropdown" size="small" variant="tonal" class="px-2" @click="openMonths"></v-btn>
+                <v-btn :text="yearText" append-icon="$dropdown" size="small" variant="tonal" class="px-2" @click="openYears"></v-btn>
+              </v-sheet>
+            </template>
+          </v-date-picker>
+        </div>
       </div>
 
       <v-divider/>
     
+      <!-- Prediction workflow -->
       <v-list class="procedure" lines="one">
         <!-- Area selection -->
           <v-list-item
@@ -32,20 +94,158 @@
             title="Area"
           ></v-list-item>
           
-          <v-btn
-            @click="mapStore.triggerDrawing()"
-            class="select-button"
-            prepend-icon="mdi-select"
-          >Select Area</v-btn>
-          
-          <div class="bbox-info" v-if="mapStore.bbox">
-            <span>N {{ mapStore.bbox.max_lat.toFixed(5) }}</span>
-            <span>S {{ mapStore.bbox.min_lat.toFixed(5) }}</span>
-            <span>E {{ mapStore.bbox.max_lon.toFixed(5) }}</span>
-            <span>W {{ mapStore.bbox.min_lon.toFixed(5) }}</span>
-            <span class="area">{{ formatArea(mapStore.areaSqm) }}</span>
+          <div class="area-buttons">
+            <v-btn
+              @click="mapStore.triggerDrawing()"
+              class="select-button"
+              prepend-icon="mdi-vector-square"
+            >Select Area</v-btn>
+
+            <v-btn
+              @click="mapStore.coordinateInputOpen = true"
+              class="input-coords-button"
+              aria-label="Enter coordinates manually"
+              variant="tonal"
+            >
+              <v-icon icon="mdi-pencil" />
+            </v-btn>
+
+            <v-btn
+              v-if="mapStore.bbox"
+              @click="mapStore.clearBbox()"
+              class="input-coords-button"
+              aria-label="Clear selected area"
+              title="Clear selected area"
+              variant="tonal"
+            >
+              <v-icon icon="mdi-close" />
+            </v-btn>
           </div>
 
+          <!-- Area information -->
+          <div class="bbox-info" v-if="mapStore.bbox">
+            <div class="bbox-coords">
+              <span class="bbox-coord">
+                <span class="bbox-dir">N</span>{{ mapStore.bbox.max_lat.toFixed(5) }}
+              </span>
+              <span class="bbox-coord">
+                <span class="bbox-dir">S</span>{{ mapStore.bbox.min_lat.toFixed(5) }}
+              </span>
+              <span class="bbox-coord">
+                <span class="bbox-dir">E</span>{{ mapStore.bbox.max_lon.toFixed(5) }}
+              </span>
+              <span class="bbox-coord">
+                <span class="bbox-dir">W</span>{{ mapStore.bbox.min_lon.toFixed(5) }}
+              </span>
+            </div>
+            <div class="bbox-area">
+              <span class="area">{{ formatArea(mapStore.areaSqm) }}</span>
+              <span class="area-fields">~ {{ formatSoccerFields(mapStore.areaSqm) }} soccer fields</span>
+            </div>
+          </div>
+
+          <!--Raster estimate box-->
+          <div
+            v-if="mapStore.bbox && supportsPredictionMap"
+            class="raster-estimate"
+            :class="{
+              'raster-estimate--blocked':
+                mapStore.rasterEstimate &&
+                !mapStore.rasterEstimate.allowed,
+              'raster-estimate--error':
+                mapStore.rasterEstimateError,
+            }"
+          >
+            <div
+              v-if="mapStore.isEstimatingRaster"
+              class="raster-estimate-loading"
+            >
+              <v-progress-circular
+                indeterminate
+                size="14"
+                width="2"
+              />
+              <span>Calculating workload…</span>
+            </div>
+
+            <template v-else-if="mapStore.rasterEstimate">
+              <div class="raster-estimate-head">
+                <span
+                  class="raster-estimate-status"
+                  :class="{
+                    'raster-estimate-status--blocked':
+                      !mapStore.rasterEstimate.allowed,
+                  }"
+                >
+                  <v-icon size="15">
+                    {{
+                      mapStore.rasterEstimate.allowed
+                        ? 'mdi-check-circle-outline'
+                        : 'mdi-alert-circle-outline'
+                    }}
+                  </v-icon>
+                  {{
+                    mapStore.rasterEstimate.allowed
+                      ? 'Within processing limit'
+                      : 'Not within processing limit'
+                  }}
+                </span>
+
+                <v-icon
+                  :icon="rasterDetailsOpen
+                    ? 'mdi-chevron-up'
+                    : 'mdi-information-outline'"
+                  size="20"
+                  class="raster-estimate-toggle"
+                  :title="rasterDetailsOpen ? 'Hide details' : 'Show details'"
+                  @click="rasterDetailsOpen = !rasterDetailsOpen"
+                />
+              </div>
+
+              <v-expand-transition>
+                <div v-if="rasterDetailsOpen" class="raster-estimate-details">
+                  <span class="raster-estimate-size">
+                    {{
+                      formatPixelCount(
+                        mapStore.rasterEstimate.width_pixels,
+                      )
+                    }}
+                    ×
+                    {{
+                      formatPixelCount(
+                        mapStore.rasterEstimate.height_pixels,
+                      )
+                    }}
+                    pixels
+                    ({{ formatMegapixels(mapStore.rasterEstimate.megapixels) }} MP)
+                  </span>
+
+                  <span class="raster-estimate-limit">
+                    Limit:
+                    {{
+                      formatMegapixels(
+                        mapStore.rasterEstimate.max_total_pixels / 1_000_000,
+                      )
+                    }}
+                    MP total /
+                    {{
+                      formatPixelCount(
+                        mapStore.rasterEstimate.max_side_pixels,
+                      )
+                    }}
+                    px per side
+                  </span>
+                </div>
+              </v-expand-transition>
+            </template>
+
+            <span
+              v-else-if="mapStore.rasterEstimateError"
+              class="raster-estimate-status raster-estimate-status--blocked"
+            >
+              {{ mapStore.rasterEstimateError }}
+            </span>
+          </div>
           <!-- Task selection  -->
           <v-list-item
             prepend-icon="mdi-numeric-2-circle"
@@ -53,27 +253,48 @@
           ></v-list-item>
           
           <v-select
-            :items="['Tree Detection', 'Zero-Shot']"
-            placeholder="Select Task"
+            :items="availableTasks"
+            :disabled="!availableTasks.length"
+            :placeholder="availableTasks.length ? 'Select Task' : 'No tasks available'"
             variant="solo"
             density="compact"
             class="ml-task-dropdown"
             hide-details
-            v-model="mapStore.selectedTask" 
+            v-model="mapStore.selectedTask"
             @update:model-value="onTaskChange"
           ></v-select>
 
-          <template v-if="mapStore.selectedTask === 'Zero-Shot'">
-          <v-list-item prepend-icon="mdi-plus" title="Keyword" />
+          <template v-if="requiresKeywords">
+          <v-list-item prepend-icon="mdi-plus" title="Keywords">
+            <template #append>
+              <v-tooltip location="bottom" max-width="260">
+                <template #activator="{ props }">
+                  <v-icon
+                    v-bind="props"
+                    icon="mdi-information-outline"
+                    size="small"
+                    class="keyword-info"
+                  />
+                </template>
+                Separate keywords with commas, e.g.
+                "buildings, pools, cars". At most {{ MAX_KEYWORDS }} keywords
+                per prediction.
+              </v-tooltip>
+            </template>
+          </v-list-item>
           <v-text-field
             v-model="mapStore.keyword"
-            placeholder="e.g., buildings, swimming pools, trees"
+            placeholder="buildings, pools, cars"
             variant="solo"
             density="compact"
             class="ml-task-dropdown"
-            hide-details
+            :hide-details="!tooManyKeywords"
+            :error="tooManyKeywords"
+            :error-messages="tooManyKeywords
+              ? `${keywordTerms.length} keywords entered, at most ${MAX_KEYWORDS} are allowed`
+              : []"
             prepend-inner-icon="mdi-magnify"
-            @keyup.enter="mapStore.triggerRun()"
+            @keyup.enter="startRun"
           />
         </template>
 
@@ -84,8 +305,10 @@
           ></v-list-item>
           
           <v-select
-            :items="[mapStore.selectedTask === 'Zero-Shot' ? 'LangSAM' : 'TCD-Segformer-MIT-B5']"
-            :model-value="mapStore.selectedTask === 'Zero-Shot' ? 'LangSAM' : 'TCD-Segformer-MIT-B5'"
+            :items="modelOptions"
+            :disabled="!modelOptions.length"
+            :placeholder= "modelOptions.length ? 'Select Model' : 'No models available'"
+            v-model="modelSelection"
             variant="solo"
             density="compact"
             class="ml-task-dropdown"
@@ -99,21 +322,265 @@
           ></v-list-item>
           
           <v-btn
-            @click="mapStore.triggerRun()"
+            @click="startRun"
             prepend-icon="mdi-rocket-launch"
             class="run-btn"
             color="success"
-            :disabled="mapStore.mapType === 'osm' || !mapStore.bbox || !mapStore.selectedTask || (mapStore.selectedTask === 'Zero-Shot' && !mapStore.keyword)"
+            :disabled="
+              mapStore.isPredicting ||
+              mapStore.mapType === 'osm' ||
+              !mapStore.bbox ||
+              !mapStore.selectedTask ||
+              (requiresKeywords && !mapStore.keyword.trim()) ||
+              tooManyKeywords
+            "
           >Run</v-btn>
+
+          <v-list-item
+            prepend-icon="mdi-numeric-5-circle"
+            title="Export"
+          ></v-list-item>
+          <v-btn
+            @click="mapStore.openExportDialog()"
+            prepend-icon="mdi-tray-arrow-down"
+            class="run-btn"
+            color="success"
+            variant="tonal"
+            :disabled="!mapStore.currentQueryId"
+          >Export Prediction</v-btn>
       </v-list>
   </v-navigation-drawer>
 </template>
 
 <script setup>
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useMapStore } from '@/stores/map'
+import osmThumb from '@/assets/map-osm.jpg'
+import germanyThumb from '@/assets/map-germany.jpg'
+import orthophotoThumb from '@/assets/map-orthophoto.jpg'
+import sentinelThumb from '@/assets/map-sentinel.jpg'
 
 const mapStore = useMapStore()
+// map types that can run a prediction, mirrors getPredictionSourceType() in Map.vue
+const supportsPredictionMap = computed(() =>
+  ['orthophoto', 'germany', 'sentinel'].includes(mapStore.mapType)
+)
 
+const rasterDetailsOpen = ref(false) // whether the raster estimate details are expanded
+
+const MAX_KEYWORDS = 20 // maximum number of keywords allowed for zero-shot prediction (backend)
+
+// compute individual keywords from keyword string
+const keywordTerms = computed(() => [
+  ...new Set(
+    mapStore.keyword
+      .split(',')
+      .map((term) => term.trim())
+      .filter(Boolean),
+  ),
+])
+
+// LangSAM requires keywords; the fixed YOLO26 model does not.
+const requiresKeywords = computed(
+  () => mapStore.modelType === 'zeroshot',
+)
+
+const tooManyKeywords = computed(
+  () => requiresKeywords.value
+    && keywordTerms.value.length > MAX_KEYWORDS,
+)
+
+// start prediction run
+function startRun() {
+  if (tooManyKeywords.value) return
+
+  mapStore.triggerRun()
+}
+
+// format pixel count with thousands separator
+function formatPixelCount(value) {
+  return Number(value).toLocaleString()
+}
+
+// format megapixels to 2 decimal places
+function formatMegapixels(value) {
+  return Number(value).toFixed(2)
+}
+
+// the sidebar can swallow a mouseup and leave the slider thumb stuck to the
+// cursor, so catch the release early and redispatch it straight at window
+function releaseStuckDrag(e) {
+  if (!e.isTrusted) return // ignore the synthetic event this handler itself dispatches
+  window.dispatchEvent(new MouseEvent('mouseup', {
+    bubbles: false,
+    cancelable: true,
+    clientX: e.clientX,
+    clientY: e.clientY,
+    button: e.button,
+  }))
+}
+
+// mounted/unmounted listeners to catch mouseup events outside the sidebar
+onMounted(() => window.addEventListener('mouseup', releaseStuckDrag, { capture: true }))
+onUnmounted(() => window.removeEventListener('mouseup', releaseStuckDrag, { capture: true }))
+
+
+// map type options for the map picker
+const mapTypeOptions = [
+  {
+    title: 'NRW',
+    value: 'orthophoto',
+    description: 'High-resolution aerial imagery (10cm/px; 2021/2022)',
+    thumbnail: orthophotoThumb,
+  },
+  {
+    title: 'Germany',
+    value: 'germany',
+    description: 'Coarse aerial imagery (3-5m/px; 2020)',
+    thumbnail: germanyThumb,
+  },
+  {
+    title: 'Sentinel',
+    value: 'sentinel',
+    description: 'Satellite imagery (10m/px; 2018-2024 available)',
+    thumbnail: sentinelThumb,
+  },
+  {
+    title: 'OSM',
+    value: 'osm',
+    description: 'Open street map (no prediction)',
+    thumbnail: osmThumb,
+  },
+]
+
+// available tasks for the selected map type
+const TASK_OPTIONS_BY_MAP_TYPE = {
+  orthophoto: [
+    { title: 'Tree Detection', value: 'Tree Detection' },
+    { title: 'Segment Anything', value: 'Zero-Shot' },
+  ],
+  germany: [
+    { title: 'Tree Detection', value: 'Tree Detection' },
+  ],
+  osm: [],
+  sentinel: [
+    { title: 'Tree Detection', value: 'Tree Detection' },
+    { title: 'Water Detection', value: 'Water Detection' },
+  ],
+}
+
+// get available tasks for the selected map type
+const availableTasks = computed(() => TASK_OPTIONS_BY_MAP_TYPE[mapStore.mapType] ?? [])
+
+// only the models that match the current dataset's resolution are displayed
+const TREE_MODELS_BY_MAP_TYPE = {
+  orthophoto: [
+    { title: 'TCD-Segformer', value: 'tree' },
+    { title: 'DeepForest Boxes', value: 'tree_deepforest' },
+  ],
+  germany: [
+    { title: 'Satlas', value: 'tree_satlas' },
+  ],
+  osm: [],
+  // 10 m like satellite, so the same two models; mirrors MODELS_BY_SOURCE in the backend
+  sentinel: [
+    { title: 'Satlas', value: 'tree_satlas_sentinel' },
+  ],
+}
+
+// Water Detection needs the six-band reflectance crop, which only sentinel serves
+const WATER_MODELS_BY_MAP_TYPE = {
+  orthophoto: [],
+  germany: [],
+  osm: [],
+  sentinel: [
+    { title: 'Prithvi (Sen1Floods11)', value: 'water_prithvi' },
+  ],
+}
+
+// Zero-Shot models (tiny weights vs. previous large weights)
+const ZEROSHOT_MODEL_OPTIONS = [
+  { title: 'LangSAM (Large)', value: 'sam2.1_hiera_large' },
+  { title: 'LangSAM (Tiny)', value: 'sam2.1_hiera_tiny' },
+  { title: 'YOLO26', value: 'yolo' },
+]
+
+// model options for the selected task
+const modelOptions = computed(() => {
+  if (mapStore.selectedTask === 'Zero-Shot') return ZEROSHOT_MODEL_OPTIONS
+  if (mapStore.selectedTask === 'Water Detection') {
+    return WATER_MODELS_BY_MAP_TYPE[mapStore.mapType] ?? []
+  }
+  return TREE_MODELS_BY_MAP_TYPE[mapStore.mapType] ?? []
+})
+
+// get/set model selection based on the selected task
+const modelSelection = computed({
+  get: () => {
+    if (mapStore.selectedTask !== 'Zero-Shot') {
+      return mapStore.modelType
+    }
+
+    return mapStore.modelType === 'yolo'
+      ? 'yolo'
+      : mapStore.modelVariant
+  },
+
+  set: (value) => {
+    if (mapStore.selectedTask !== 'Zero-Shot') {
+      mapStore.modelType = value
+      return
+    }
+
+    if (value === 'yolo') {
+      mapStore.modelType = 'yolo'
+      return
+    }
+
+    mapStore.modelType = 'zeroshot'
+    mapStore.modelVariant = value
+  },
+})
+
+//Sentinel date range picker
+// v-date-picker (multiple="range") works with Date objects
+const sentinelMinDate = new Date(2018, 0, 1)
+const sentinelMaxDate = new Date(2024, 11, 31)
+
+function fromISODate(iso) {
+  const [y, m, d] = iso.split('-').map(Number)
+  return new Date(y, m - 1, d)
+}
+
+function toISODate(date) {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+const sentinelDateRange = ref([
+  fromISODate(mapStore.sentinelDateFrom),
+  fromISODate(mapStore.sentinelDateTo),
+])
+
+// Only commit + trigger a refresh once a full [start, end] range is picked
+watch(sentinelDateRange, (range) => {
+  if (range.length !== 2) return
+  mapStore.sentinelDateFrom = toISODate(range[0])
+  mapStore.sentinelDateTo = toISODate(range[1])
+  mapStore.triggerSentinelRefresh()
+})
+
+// update model type based on selected task
+watch(() => mapStore.mapType, () => {
+  if (!availableTasks.value.some((t) => t.value === mapStore.selectedTask)) {
+    mapStore.selectedTask = availableTasks.value[0]?.value ?? null
+  }
+  onTaskChange()
+})
+
+// format area in sqm to m2 or km2
 function formatArea(sqm) {
   if (sqm == null) return ''
   return sqm > 1_000_000
@@ -121,13 +588,25 @@ function formatArea(sqm) {
     : `${Math.round(sqm)} m²`
 }
 
+const SOCCER_FIELD_SQM = 7140 // average area of a soccer field in square meters
+
+// format area in sqm to number of soccer fields
+function formatSoccerFields(sqm) {
+  if (sqm == null) return ''
+  return (sqm / SOCCER_FIELD_SQM).toFixed(0)
+}
+
 // Update model type based on selected task
 function onTaskChange() {
   if (mapStore.selectedTask === 'Zero-Shot') {
     mapStore.modelType = 'zeroshot'
-  } else {
-    mapStore.modelType = 'tree'
+    mapStore.modelVariant = mapStore.modelVariant || 'sam2.1_hiera_large'
+  } else if (mapStore.selectedTask) {
+    mapStore.modelType = modelOptions.value[0]?.value ?? null
     mapStore.keyword = ''   // clear keyword for non zero shot
+  } else {
+    mapStore.modelType = null
+    mapStore.keyword = ''
   }
 }
 
@@ -142,27 +621,171 @@ function onTaskChange() {
   }
 }
 
-.picker-label {
-  font-size: 11px;
-  text-transform: uppercase;
+.picker-title {
+  display: flex;
+  align-items: center;
   margin-bottom: 10px;
 }
 
-.map-type-toggle {
+.picker-label {
+  font-size: 11px;
+  margin: 0;
+}
+
+.map-type-select {
   width: 100%;
 }
 
-.map-type-toggle :deep(.v-btn:not(.v-btn--active)) {
+.map-type-select :deep(.v-field) {
   color: white;
 }
 
-.map-type-toggle :deep(.v-btn) {
-  border-color: rgba(255, 255, 255, 0.2);
+.map-type-select :deep(.v-field__input) {
+  font-size: 15px;
+}
+
+.map-type-select :deep(.v-field__outline) {
+  --v-field-border-opacity: 0.3;
+}
+
+.sentinel-controls {
+  margin-top: 14px;
+  padding-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sentinel-label {
+  display: flex;
+  align-items: center;
+  font-size: 11px;
+  text-transform: uppercase;
+  margin-top: 8px;
+}
+
+.sentinel-label:first-child {
+  margin-top: 0;
+}
+
+.sentinel-label p {
+  margin: 0;
+}
+
+.cloud-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cloud-slider {
+  flex: 1;
+}
+
+.cloud-value {
+  font-size: 13px;
+  font-weight: 600;
+  color: #a5d6a7;
+  min-width: 32px;
+  text-align: right;
+}
+
+.sentinel-date-picker {
+  align-self: center;
+  overflow: hidden;
+}
+
+.sentinel-date-picker :deep(.v-picker__body) {
+  background: transparent;
+}
+
+.sentinel-date-picker :deep(.v-date-picker-month__day-btn) {
+  --v-btn-size: 12px;
+  --v-btn-height: 26px;
+  width: 26px !important;
+  height: 26px !important;
+}
+
+.sentinel-date-picker :deep(.v-date-picker-month__day--selected .v-btn) {
+  background-color: #a5d6a78c;
+}
+
+.sentinel-date-picker :deep(.v-date-picker-month) {
+  padding: 0 4px 8px;
+}
+
+.sentinel-date-picker :deep(.v-date-picker-month__days) {
+  column-gap: 2px;
+}
+
+.sentinel-date-picker :deep(.v-date-picker-month__day) {
+  width: 28px;
+  height: 28px;
+}
+
+.sentinel-date-picker :deep(.v-date-picker-years__content) {
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px 12px;
+  padding-inline: 8px;
+}
+
+.sentinel-date-picker :deep(.v-date-picker-years) {
+  height: auto;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.map-select-item {
+  padding-inline-start: 8px;
+}
+
+.map-thumb {
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.map-item-title {
+  font-size: 15px;
+  font-weight: 500;
+  margin-left: 8px;
+}
+
+.map-item-subtitle {
+  font-size: 12px;
+  opacity: 0.7;
+  white-space: normal;
+  margin-left: 8px;
+}
+
+.area-buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 90%;
+  margin: 0 16px;
 }
 
 .select-button {
-  width: 90%;
-  margin: 0 16px;
+  flex: 1;
+  min-width: 0;
+}
+
+.input-coords-button {
+  flex-shrink: 0;
+  min-width: 0;
+  padding: 0 14px;
+}
+
+.keyword-info {
+  opacity: 0.7;
+  cursor: help;
+}
+
+.keyword-info:hover {
+  opacity: 1;
 }
 
 .ml-task-dropdown {
@@ -176,7 +799,7 @@ function onTaskChange() {
 }
 
 .run-btn.v-btn--disabled {
-  opacity: 40%;
+  opacity: 30%;
   background-color: grey;
 }
 
@@ -187,13 +810,134 @@ function onTaskChange() {
 }
 
 .bbox-info {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  width: 90%;
+  margin: 8px 16px;
+  padding: 10px 12px;
+  background-color: rgba(139, 195, 74, 0.1);
+  border: 1px solid rgba(139, 195, 74, 0.2);
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.bbox-coords {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: auto auto;
+  column-gap: 14px;
+  row-gap: 4px;
+  color: #ffffff;
+}
+
+.bbox-coord {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.bbox-dir {
+  min-width: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #a5d6a7;
+}
+
+.bbox-area {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(139, 195, 74, 0.2);
+}
+
+.area {
+  color: #a5d6a7;
+  white-space: nowrap;
+}
+
+.area-fields {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.7);
+  white-space: nowrap;
+}
+
+
+.raster-estimate {
+  display: flex;
+  flex-direction: column;
   gap: 4px;
   width: 90%;
   margin: 8px 16px;
-  padding: 8px;
-  font-size: 12px;
-  text-align: center;
+  padding: 6px 11px;
+  border: 1px solid rgba(139, 195, 74, 0.28);
+  border-radius: 8px;
+  background: rgba(139, 195, 74, 0.08);
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 13px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
+
+.raster-estimate--blocked,
+.raster-estimate--error {
+  border-color: rgba(239, 83, 80, 0.55);
+  background: rgba(239, 83, 80, 0.1);
+}
+
+.raster-estimate-loading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.raster-estimate-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.raster-estimate-toggle {
+  cursor: pointer;
+  opacity: 0.8;
+}
+
+.raster-estimate-toggle:hover {
+  opacity: 1;
+}
+
+.raster-estimate-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 6px;
+  margin-top: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.raster-estimate-size {
+  color: white;
+}
+
+.raster-estimate-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  color: #a5d6a7;
+}
+
+.raster-estimate-status--blocked {
+  color: #ef9a9a;
+}
+
+.raster-estimate-limit {
+  color: rgba(255, 255, 255, 0.5);
+}
+
 </style>

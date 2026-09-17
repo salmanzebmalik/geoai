@@ -1,15 +1,18 @@
 from pathlib import Path
-import time
 
 import numpy as np
 import torch
 from PIL import Image
 from lang_sam import LangSAM  # https://github.com/luca-medeiros/lang-segment-anything.git
-import rasterio
+from lang_sam.models.sam import SAM
+import contextlib
+import io
+
 from rasterio.windows import Window
-from tqdm import tqdm
 from typing import Optional
+
 from app.models.model_downloader import ensure_langsam_models
+from app.utils.tiling import tiled_mask
 
 
 # Supress LangSAM internal noisy prints
@@ -25,99 +28,64 @@ logger = get_logger(__name__)
 
 
 class LangSAMPipeline:
-    def __init__(
-        self,
-        patch_size: int = 1024,
-        overlap: int = 128,
-        device: Optional[str] = None,
-        offline: bool = True,
-        # confidence thresholds for LangSAM predictions --- need to tune
-        text_threshold: float = 0.15,
-        box_threshold: float = 0.3
-    ):
+    def __init__(self,patch_size: int = 1024,overlap: int = 128,device: Optional[str] = None,
+                 offline: bool = True,text_threshold: float = 0.15,box_threshold: float = 0.3,
+                 variant: str = "sam2.1_hiera_large",batch_size: int = 1,
+                 share_gdino_from: Optional["LangSAMPipeline"] = None):
         self.patch_size = patch_size
         self.overlap = overlap
+        self.batch_size = batch_size
         self.text_threshold = text_threshold
         self.box_threshold = box_threshold
-        if device is None:
-            self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        else:
-            self.device = device
+        self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
 
         if offline:
             # set directory paths for local model files
             current_dir = Path(__file__).parent.resolve()
             model_dir = current_dir.parent / "models" / "local_langsam"
-
-            ensure_langsam_models(model_dir)  # will download if missing (with lock)
-
-            sam_ckpt_path = f"{model_dir}/sam2.1_hiera_large.pt"
+            ensure_langsam_models(model_dir, variant=variant)  # will download if missing (with lock)
+            sam_ckpt_path = f"{model_dir}/{variant}.pt"
             gdino_model_path = f"{model_dir}/groundingdino_hf_model"
 
-            self.model = LangSAM(
-                sam_type="sam2.1_hiera_large",
-                sam_ckpt_path=sam_ckpt_path,
-                gdino_model_ckpt_path=gdino_model_path,
-                gdino_processor_ckpt_path=gdino_model_path,
-            )
+            if share_gdino_from is None:
+                self.model = LangSAM(sam_type=variant,sam_ckpt_path=sam_ckpt_path,gdino_model_ckpt_path=gdino_model_path,gdino_processor_ckpt_path=gdino_model_path,device=self.device)
+            else:
+                # only the SAM checkpoint differs between variants
+                self.model = LangSAM.__new__(LangSAM)
+                # initialize the SAM model with the specified variant and checkpoint
+                self.model.sam_type = variant
+                self.model.sam = SAM()
+                self.model.sam.build_model(variant, sam_ckpt_path, device=self.device)
+                # reuse the GroundingDINO model from the first LangSAMPipeline instance 
+                self.model.gdino = share_gdino_from.model.gdino
+                logger.info(f"{variant} reusing GroundingDINO from {share_gdino_from.model.sam_type}")
         else:  # online
             self.model = LangSAM()
 
+    def _predict(self, patches: list[np.ndarray], keyword: str):
+        # autocast for bfloat16 on CUDA
+        with contextlib.redirect_stdout(io.StringIO()), torch.autocast(device_type=self.device,dtype=torch.bfloat16,enabled=(self.device == "cuda")):
+            # run the model on the patches with the given keyword
+            res = self.model.predict([Image.fromarray(p) for p in patches], [keyword] * len(patches),text_threshold=self.text_threshold,box_threshold=self.box_threshold)
+
+        out = []
+        for patch, item in zip(patches, res or []):
+            masks = item.get("masks") if item else None
+            if masks is None or len(masks) == 0:
+                out.append(None)
+                continue
+
+            m = masks.cpu().numpy() if hasattr(masks, "cpu") else np.asarray(masks)
+            m = np.any(m, axis=0) if m.ndim == 3 else m
+            th, tw = patch.shape[:2]
+            if m.shape != (th, tw):
+                m = np.array(Image.fromarray(m.astype(bool)).resize((tw, th), Image.NEAREST))
+            out.append(m)
+        return out
+
     def get_full_mask_from_bytes(self, image_bytes: bytes, keyword: str = "tree") -> np.ndarray:
-        start_time = time.time()
-        stride = self.patch_size - self.overlap
-        with rasterio.MemoryFile(image_bytes) as memfile, memfile.open() as src:
-            h, w = src.height, src.width
-            logger.info(f"Image dimensions: {h}x{w}")
+            return tiled_mask(image_bytes, self.patch_size, self.overlap,
+                              lambda p: self._predict(p, keyword), label="langsam",
+                              batch_size=self.batch_size)
+ 
 
-            full_mask = np.zeros((h, w), dtype=bool)
-
-            # Calculate the total of tiles
-            tiles_y = (h + stride - 1) // stride
-            tiles_x = (w + stride - 1) // stride
-            total_tiles = tiles_y * tiles_x
-            logger.info(f"Processing {total_tiles} tiles")
-            processed = 0
-            failed = 0
-
-
-            for y in range(0, h, stride):
-                for x in range(0, w, stride):
-                    th = min(self.patch_size, h - y)
-                    tw = min(self.patch_size, w - x)
-                    window = Window(x, y, tw, th)
-                    try:
-                        patch = src.read([1, 2, 3], window=window)
-                        patch = np.moveaxis(patch, 0, -1)
-                        patch = patch.copy() # ensure contiguous array for PIL
-                        if patch.dtype == np.uint16:
-                            patch = (patch >> 8).astype(np.uint8)
-                        # Creates 
-                        res = self.model.predict(
-                            [Image.fromarray(patch)],
-                            [keyword],
-                            text_threshold=self.text_threshold,
-                            box_threshold=self.box_threshold,
-                        )
-                        masks = res[0].get("masks") if res else None
-                        if masks is not None and len(masks) > 0:
-                            m_np = masks.cpu().numpy().copy() if hasattr(masks, "cpu") else masks
-                            if m_np.ndim == 3:
-                                c_mask = np.any(m_np, axis=0)
-                            else:
-                                c_mask = m_np
-                            if c_mask.shape != (th, tw):
-                                c_mask = np.array(Image.fromarray(c_mask).resize((tw, th), Image.NEAREST))
-                            full_mask[y:y+th, x:x+tw] |= c_mask.astype(bool)
-                        processed += 1
-                    
-                        # Log progress every 10%
-                        if processed % max(1, total_tiles // 10) == 0:
-                            logger.info(f"Progress: {processed}/{total_tiles} ({processed/total_tiles*100:.0f}%)")
-                    except Exception as e:
-                        failed += 1
-                        logger.warning(f"Tile failed at ({x}, {y}): {str(e)}")
-                        continue
-            elapsed = time.time() - start_time
-            logger.info(f"Inference complete ===> tiles: {processed}/{total_tiles} | failed: {failed} | time: {elapsed:.2f}s")
-            return full_mask.astype(np.uint8)
